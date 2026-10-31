@@ -7,7 +7,9 @@
   const MAX_CHANCE = 75;
   const MIN_CHANCE = 1;
   const MAX_SLOTS = 6;
-  const MIN_TOPUP = 10;
+  const MIN_TOPUP = 10;           // below this balance the upgrader suggests getting coins
+  const TG_CHANNEL = 'rustup';
+  const TG_BONUS = 10000;         // one-time reward for subscribing to the Telegram channel
   const STORE_KEY = 'rustup_demo_v1';
   const PROMOS = { RUSTUP: 50, WIPE: 25, DEMO: 100 };
   const DAILY_MS = 24 * 60 * 60 * 1000;
@@ -287,32 +289,38 @@
     save(); renderHeader();
     const b = $('.balance'); if (b) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   }
-  function openWallet() {
+  // ---------- Telegram channel bonus (replaces top-up) ----------
+  // A static site cannot ask Telegram whether the user really joined (that needs the bot token on a server),
+  // so the claim unlocks after the channel link was opened.
+  const tgBonusDone = () => !!S.rewards.tgSub;
+  function openChannel() {
+    const url = 'https://t.me/' + TG_CHANNEL;
+    if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
+  }
+  function openTgBonus() {
     requireLogin(() => {
-      let amount = 500, method = 'card';
-      modal('Пополнение', `
-        <div class="amounts">${[100, 250, 500, 1000].map(a => `<button class="amount${a === amount ? ' on' : ''}" data-a="${a}">${ICON.coin}${a}</button>`).join('')}</div>
-        <div class="field"><label for="amt">Своя сумма (мин. ${MIN_TOPUP})</label><input id="amt" class="text-input" type="number" min="${MIN_TOPUP}" value="${amount}"></div>
-        <div class="field"><label>Способ</label><div class="methods">
-          <button class="method on" data-m="card">Карта</button><button class="method" data-m="sbp">СБП</button><button class="method" data-m="crypto">Крипто</button>
-        </div></div>
-        <button class="btn btn-wallet" id="doTopup" style="height:48px">${ICON.wallet}<span>Пополнить (демо)</span></button>
-        <p class="note">Демо-режим: деньги не списываются, монеты виртуальные и не выводятся. Подключение платёжной системы — отдельный этап с бэкендом.</p>`,
+      if (tgBonusDone()) return modal('Бонус за подписку', `<p class="note" style="font-size:14px">Бонус ${coin(TG_BONUS)} уже получен. Спасибо, что с нами в <b>@${TG_CHANNEL}</b>! Больше монет — в разделе <a href="#/rewards" data-close-go>Rewards</a>.</p>`,
+        m => $('[data-close-go]', m).addEventListener('click', closeModal));
+      let opened = !!S.rewards.tgOpened;
+      modal('Бонус за подписку', `
+        <div class="tg-bonus"><span class="big">${coin(TG_BONUS, 30)}</span><p>Подпишитесь на наш Telegram-канал <b>@${TG_CHANNEL}</b> и получите монеты на баланс. Один раз на аккаунт.</p></div>
+        <button class="btn btn-tg" id="tgSub" style="height:48px">${ICON.tg}<span>1. Подписаться на @${TG_CHANNEL}</span></button>
+        <button class="btn btn-accent" id="tgClaim" style="height:48px" ${opened ? '' : 'disabled'}><span>2. Получить ${fmt(TG_BONUS)}</span></button>
+        <p class="note">Монеты виртуальные и не выводятся.</p>`,
       m => {
-        const inp = $('#amt', m);
-        m.addEventListener('click', e => {
-          const a = e.target.closest('[data-a]');
-          if (a) { amount = +a.dataset.a; inp.value = amount; m.querySelectorAll('.amount').forEach(x => x.classList.toggle('on', x === a)); }
-          const mt = e.target.closest('[data-m]');
-          if (mt) { method = mt.dataset.m; m.querySelectorAll('.method').forEach(x => x.classList.toggle('on', x === mt)); }
-        });
-        inp.addEventListener('input', () => { amount = +inp.value; m.querySelectorAll('.amount').forEach(x => x.classList.toggle('on', +x.dataset.a === amount)); });
-        $('#doTopup', m).onclick = () => {
-          if (!(amount >= MIN_TOPUP)) return toast(`Минимальная сумма — ${MIN_TOPUP}`, 'error');
-          addBalance(Math.min(amount, 100000));
-          closeModal();
-          toast(`Баланс пополнен на ${coin(amount)}`, 'success');
+        $('#tgSub', m).onclick = () => {
+          openChannel();
+          opened = S.rewards.tgOpened = true; save();
+          $('#tgClaim', m).disabled = false;
+        };
+        $('#tgClaim', m).onclick = () => {
+          if (!opened || tgBonusDone()) return;
+          S.rewards.tgSub = Date.now();
+          addBalance(TG_BONUS);
+          closeModal(); sfxWin();
+          toast(`Бонус за подписку: ${coin(TG_BONUS)}`, 'success');
           refreshUpgrade();
+          if (location.hash === '#/rewards') rewardsPage();
         };
       });
     });
@@ -321,7 +329,7 @@
   // ---------- header ----------
   const socials = () => `
     <a href="#" aria-label="VK">${ICON.vk}</a>
-    <a href="#" aria-label="Telegram">${ICON.tg}</a>
+    <a href="https://t.me/${TG_CHANNEL}" target="_blank" rel="noopener" aria-label="Telegram">${ICON.tg}</a>
     <a href="#" aria-label="Discord">${ICON.ds}</a>`;
 
   function renderHeader() {
@@ -332,9 +340,9 @@
       us.innerHTML = `<button class="btn btn-steam" data-login>${ICON.steam}<span>Войти через Steam</span></button>`;
     } else {
       us.innerHTML = `
-        <div class="wallet-group">
+        <div class="wallet-group${tgBonusDone() ? ' solo' : ''}">
           <div class="balance">${coin(S.balance)}</div>
-          <button class="btn btn-wallet" data-open-wallet>${ICON.wallet}<span>Пополнить</span></button>
+          ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${fmt(TG_BONUS)}</span></button>`}
         </div>
         <button class="btn btn-icon bell" data-bell aria-label="Уведомления">${ICON.bell}${dailyReady() ? '<span class="dot"></span>' : ''}</button>
         <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color)}</a>`;
@@ -667,7 +675,9 @@
     if (tab === 'inventory' && !S.inventory.length) {
       overlay = S.balance >= MIN_TOPUP
         ? `<div class="empty-overlay"><div class="empty-content"><p>Инвентарь пуст</p><span class="muted" style="font-size:12px">Купите скины в магазине или используйте баланс в апгрейде</span><button class="btn btn-accent" data-tab="shop">${ICON.shop}<span>В магазин</span></button></div></div>`
-        : `<div class="empty-overlay"><div class="empty-content"><p>Пополните баланс на ${coin(MIN_TOPUP, 20)}</p><button class="btn btn-wallet" data-open-wallet>${ICON.wallet}<span>Пополнить</span></button></div></div>`;
+        : tgBonusDone()
+          ? `<div class="empty-overlay"><div class="empty-content"><p>Недостаточно монет</p><span class="muted" style="font-size:12px">Заберите ежедневный бонус или введите промокод</span><a class="btn btn-accent" href="#/rewards"><span>Награды</span></a></div></div>`
+          : `<div class="empty-overlay"><div class="empty-content"><p>Получите ${coin(TG_BONUS, 20)}</p><span class="muted" style="font-size:12px">за подписку на Telegram-канал @${TG_CHANNEL}</span><button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>Получить</span></button></div></div>`;
     }
     const sel = [...U.inputs];
     html = head + `<div class="grid-container"><div class="grid">${cells.join('')}</div>${overlay}</div>
@@ -726,7 +736,7 @@
   document.addEventListener('click', e => {
     const t = e.target;
     if (t.closest('[data-login]')) return requireLogin();
-    if (t.closest('[data-open-wallet]')) return openWallet();
+    if (t.closest('[data-tg-bonus]')) return openTgBonus();
     if (t.closest('[data-bell]')) { location.hash = '#/rewards'; return; }
     if (U.spinning) return;
 
@@ -938,6 +948,11 @@
 
     $('#page').innerHTML = `<div class="page">
       <h2 class="section-title">Награды</h2>
+      <div class="panel reward-card tg-banner"><span class="glow"></span>
+        <div class="tg-banner-text"><h4>Подписка на Telegram</h4>
+          <p>Подпишитесь на канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Бонус ${coin(TG_BONUS)} один раз на аккаунт.</p></div>
+        <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${fmt(TG_BONUS)}`}</span></button>
+      </div>
       <div class="cards-3">
         <div class="panel reward-card"><span class="glow"></span>
           <h4>Ежедневный бонус</h4>
@@ -1169,7 +1184,7 @@
           <span class="muted">Купите скины в магазине или выиграйте их в апгрейде</span>
           <div class="row" style="justify-content:center;flex-wrap:wrap">
             <a class="btn btn-accent" href="#/" data-goshop>${ICON.shop}<span>В магазин</span></a>
-            <button class="btn btn-wallet" data-open-wallet>${ICON.wallet}<span>Пополнить</span></button>
+            ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>+${fmt(TG_BONUS)} за подписку</span></button>`}
           </div></div>`
       : !items.length ? '<div class="panel inv-empty"><p>Ничего не найдено</p><span class="muted">Измените фильтры</span></div>'
       : `<div class="inv-grid">${slice.map(i => `<div class="inv-cell${fresh(i.t) ? ' fresh' : ''}">

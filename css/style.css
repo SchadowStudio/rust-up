@@ -108,6 +108,16 @@ img { display: block; }
 .btn-wallet { background: var(--wallet); padding: var(--g-s) var(--g-l); height: 40px; font-size: 16px; }
 .btn-wallet:hover { background: var(--wallet-hover); }
 .btn-wallet:active { background: var(--wallet-pressed); }
+.btn-tg { background: #229ed9; padding: var(--g-s) var(--g-l); height: 40px; font-size: 15px; font-weight: 700; }
+.btn-tg:hover { background: #33aee8; }
+.btn-tg:active { background: #1b86b9; }
+.btn-tg svg { width: 18px; height: 18px; }
+.tg-bonus { text-align: center; display: flex; flex-direction: column; gap: var(--g-s); }
+.tg-bonus .big { font-size: 32px; font-weight: 900; }
+.tg-bonus p { margin: 0; color: var(--text-subtitle); font-size: 14px; line-height: 1.45; }
+.tg-banner { flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: var(--g-s); border: 1px solid #229ed955; }
+.tg-banner .glow { background: radial-gradient(circle, #229ed966, transparent 70%); }
+.tg-banner-text { display: flex; flex-direction: column; gap: var(--g-s); }
 .btn-accent { background: var(--accent); padding: var(--g-s) var(--g-l); height: 40px; font-size: 14px; }
 .btn-accent:hover { background: var(--accent-hover); }
 .btn-accent:active { background: var(--accent-pressed); }
@@ -169,7 +179,8 @@ img { display: block; }
 .balance { display: flex; align-items: center; height: 40px; padding: var(--g-s) var(--g-m); background: var(--bg-secondary); border-radius: var(--r-s) 0 0 var(--r-s); font-size: 16px; --coin-size: 20px; }
 .balance.bump { animation: bump .4s ease; }
 @keyframes bump { 40% { transform: scale(1.08); color: var(--success); } }
-.wallet-group .btn-wallet { border-radius: 0 var(--r-s) var(--r-s) 0; }
+.wallet-group .btn-wallet, .wallet-group .btn-tg { border-radius: 0 var(--r-s) var(--r-s) 0; }
+.wallet-group.solo .balance { border-radius: var(--r-s); }
 .bell { position: relative; }
 .bell .dot { position: absolute; top: 8px; right: 9px; width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
 .avatar { width: 40px; height: 40px; border-radius: var(--r-s); display: grid; place-items: center; font-weight: 900; font-size: 16px; background: linear-gradient(135deg, var(--accent), #7a2e22); transition: opacity var(--fast); overflow: hidden; }
@@ -568,7 +579,10 @@ img { display: block; }
   .right-group, .user-section { gap: var(--g-s); }
   .balance { height: 32px; font-size: 13px; --coin-size: 16px; padding: 0 8px; }
   .wallet-group .btn-wallet { width: 32px; height: 32px; padding: 0; }
+  .wallet-group .btn-tg { height: 32px; padding: 0 8px; font-size: 12px; gap: 4px; }
+  .wallet-group .btn-tg svg { width: 14px; height: 14px; }
   .wallet-group .btn-wallet span, .bell { display: none; }
+  .tg-banner { flex-direction: column; align-items: stretch; }
   .avatar { width: 32px; height: 32px; font-size: 13px; }
   .btn-steam { height: 32px; font-size: 11px; padding: 0 8px; }
   .nav-mobile { display: flex; position: fixed; z-index: 25; left: 0; right: 0; bottom: 0; height: calc(56px + env(safe-area-inset-bottom)); padding: 0 4px env(safe-area-inset-bottom); background: var(--bg-block); border-top: 1px solid #ffffff1a; }
