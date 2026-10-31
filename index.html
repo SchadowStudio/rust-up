@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#161616">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="RUST UP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>RUST UP — Апгрейд предметов Rust</title>
+  <meta name="description" content="RUST UP — апгрейд скинов Rust. Демо-версия: виртуальный баланс, без реальных денег.">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;900&family=Rubik+Dirt&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Telegram Mini App: Telegram passes tgWebAppData in the URL; only then load its SDK (keeps offline/browser use fast)
+    (function () {
+      var tg = /tgWebApp/.test(location.hash + location.search);
+      try { if (tg) sessionStorage.setItem('rustup_tg', '1'); else tg = sessionStorage.getItem('rustup_tg') === '1'; } catch (e) {}
+      if (tg) document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
+    })();
+  </script>
+</head>
+<body>
+  <div class="app">
+    <div class="header-wrap">
+      <header class="header">
+        <a class="logo-link" href="#/" aria-label="Главная">
+          <span class="logo"><span class="logo-rust">RUST</span><span class="logo-up">UP</span></span>
+        </a>
+        <nav class="nav nav-desktop" aria-label="Основная навигация">
+          <a class="nav-item" data-route="/" href="#/"><span class="nav-icon icon-upgrade"></span><span>Upgrade</span></a>
+          <a class="nav-item" data-route="/inventory" href="#/inventory"><span class="nav-icon icon-bag"></span><span>Инвентарь</span></a>
+          <a class="nav-item" data-route="/rewards" href="#/rewards"><span class="nav-icon icon-gift"></span><span>Rewards</span></a>
+        </nav>
+        <div class="right-group">
+          <div class="socials" id="headerSocials"></div>
+          <div class="user-section" id="userSection"></div>
+        </div>
+      </header>
+    </div>
+
+    <div class="demo-strip" role="status">ДЕМО-РЕЖИМ · виртуальный баланс · реальные деньги и скины не используются</div>
+
+    <div class="body">
+      <aside class="sidebar">
+        <div class="sidebar-inner">
+          <div class="desktop-controls">
+            <a href="#/rewards" class="wipe-banner">
+              <span class="wipe-bg"></span>
+              <span class="embers" id="embers"></span>
+              <span class="wipe-text">
+                <span class="wipe-title">ВАЙП</span>
+                <span class="wipe-subtitle">Боевой пропуск</span>
+              </span>
+              <span class="wipe-arrow"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            </a>
+            <div class="stats">
+              <div class="stat">
+                <div class="stat-label"><span class="dot-online"></span><span>Онлайн</span></div>
+                <span class="stat-value" id="statOnline">1 055</span>
+              </div>
+              <div class="stat">
+                <div class="stat-label"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M8 1L2 6v3l6-4.4L14 9V6zM8 7l-6 4.4v3L8 10l6 4.4v-3z" fill="currentColor"/></svg><span>Апгрейдов</span></div>
+                <span class="stat-value" id="statUpgrades">46 027 915</span>
+              </div>
+            </div>
+          </div>
+          <div class="feed">
+            <div class="best-drop" id="bestDrop"></div>
+            <div class="drops-viewport"><div class="drops" id="drops"></div></div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="content">
+        <main class="main" id="page"></main>
+
+        <footer class="footer">
+          <div class="footer-top">
+            <div class="footer-logo"><span class="logo"><span class="logo-rust">RUST</span><span class="logo-up">UP</span></span></div>
+            <div class="footer-col">
+              <span class="footer-label">Поддержка</span>
+              <a class="footer-link" href="mailto:support@rustup.local">support@rustup.local</a>
+            </div>
+            <div class="footer-col">
+              <span class="footer-label">Сотрудничество</span>
+              <a class="footer-link" href="mailto:partners@rustup.local">partners@rustup.local</a>
+            </div>
+            <div class="footer-col">
+              <span class="footer-label">Общее</span>
+              <a class="footer-link footer-link-plain" href="#/provably-fair">Provably Fair</a>
+              <a class="footer-link footer-link-plain" href="#/tos">Условия использования</a>
+              <a class="footer-link footer-link-plain" href="#/privacy">Политика конфиденциальности</a>
+            </div>
+            <div class="footer-socials">
+              <div class="socials" id="footerSocials"></div>
+              <button class="lang-btn" type="button">
+                <svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 10h16M10 2c3 3 3 13 0 16M10 2c-3 3-3 13 0 16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>RUS</span>
+              </button>
+            </div>
+          </div>
+          <div class="footer-divider"></div>
+          <div class="footer-bottom">
+            <p class="copyright">RUST UP © 2026</p>
+            <p class="footer-note">Демонстрационный проект. Все операции виртуальные, баланс не имеет денежной стоимости. Rust — торговая марка Facepunch Studios; проект с ней не связан.</p>
+          </div>
+        </footer>
+      </div>
+    </div>
+
+    <nav class="nav nav-mobile" aria-label="Основная навигация">
+      <a class="nav-item" data-route="/" href="#/"><span class="nav-icon icon-upgrade"></span><span>Upgrade</span></a>
+      <a class="nav-item" data-route="/inventory" href="#/inventory"><span class="nav-icon icon-bag"></span><span>Инвентарь</span></a>
+      <a class="nav-item" data-route="/rewards" href="#/rewards"><span class="nav-icon icon-gift"></span><span>Rewards</span></a>
+      <button type="button" class="nav-item" data-open-wallet><svg viewBox="0 0 20 20" width="20" height="20"><rect x="2" y="5" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M14 11h2M4 5l9-3 1 3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Кошелёк</span></button>
+    </nav>
+  </div>
+
+  <div class="modal-root" id="modalRoot"></div>
+  <ol class="toasts" id="toasts"></ol>
+
+  <script src="js/items.js"></script>
+  <script src="js/sha256.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
