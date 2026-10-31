@@ -134,6 +134,11 @@ img { display: block; }
 .tg-promo-x { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #ffffff12; color: var(--text-subtitle); cursor: pointer; z-index: 1; }
 .tg-promo-x:hover { background: #ffffff22; color: #fff; }
 .tg-promo-x svg { width: 12px; height: 12px; }
+.tg-promo.daily { border-color: #cd412b99; background: radial-gradient(circle at 0% 0%, #cd412b55, transparent 60%), linear-gradient(135deg, #2b1410, #161616 70%); box-shadow: 0 18px 50px #000c, 0 0 0 1px #ffffff08 inset, 0 0 30px #cd412b33; }
+.tg-promo.daily .tg-promo-icon { background: linear-gradient(135deg, #ff6a4d, #cd412b); box-shadow: 0 0 0 4px #cd412b33, 0 0 24px #cd412baa; animation: giftPulse 2s ease-in-out infinite; }
+.tg-promo.daily .tg-promo-icon .nav-icon { width: 26px; height: 26px; color: #fff; }
+.tg-promo.daily .tg-promo-kicker { color: #ff8a73; }
+@keyframes giftPulse { 50% { box-shadow: 0 0 0 8px #cd412b11, 0 0 30px #cd412bcc; transform: rotate(-6deg) scale(1.05); } }
 @keyframes promoIn { from { transform: translateY(40px) scale(.9); opacity: 0; } }
 @keyframes promoOut { to { transform: translateY(30px) scale(.95); opacity: 0; } }
 @keyframes promoShine { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }

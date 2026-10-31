@@ -14,6 +14,7 @@
   const STORE_KEY = 'rustup_demo_v1';
   const PROMOS = { RUSTUP: 50, WIPE: 25, DEMO: 100 };
   const DAILY_MS = 24 * 60 * 60 * 1000;
+  const DAILY_BONUS = 3500;       // daily gift, once per DAILY_MS
 
   const SKINS = window.SKINS.map((s, i) => ({ ...s, id: i }));
   const byName = Object.fromEntries(SKINS.map(s => [s.name, s]));
@@ -318,18 +319,32 @@
   }
   // auto pop-up advertising the channel bonus; waits for open modals (login, starter pack) to close
   const PROMO_SNOOZE = 6 * 60 * 60 * 1000;
+  // also shows the daily gift pop-up when it is ready (channel bonus goes first)
+  let dailyPopupClosed = false;   // closing the daily pop-up hides it until the page reloads
   function scheduleTgPromo(delay) {
     setTimeout(() => {
-      if (tgBonusDone() || Date.now() - (S.rewards.promoHidden || 0) < PROMO_SNOOZE || $('.tg-promo')) return;
+      if ($('.tg-promo')) return;
+      const tgWanted = !tgBonusDone() && Date.now() - (S.rewards.promoHidden || 0) >= PROMO_SNOOZE;
+      const dailyWanted = S.user && dailyReady() && !dailyPopupClosed;
+      if (!tgWanted && !dailyWanted) return;
       if ($('#modalRoot').children.length || U.spinning) return scheduleTgPromo(3000);
-      showTgPromo();
+      showTgPromo(tgWanted ? 'tg' : 'daily');
     }, delay);
   }
-  function showTgPromo() {
+  function showTgPromo(kind = 'tg') {
+    const daily = kind === 'daily';
     const el = document.createElement('div');
-    el.className = 'tg-promo';
+    el.className = 'tg-promo' + (daily ? ' daily' : '');
     el.setAttribute('role', 'dialog');
-    el.innerHTML = `
+    el.innerHTML = daily ? `
+      <button class="tg-promo-x" aria-label="Закрыть">${ICON.x}</button>
+      <div class="tg-promo-icon"><span class="nav-icon icon-gift"></span></div>
+      <div class="tg-promo-body">
+        <span class="tg-promo-kicker">Ежедневный подарок</span>
+        <b class="tg-promo-title">Забирай ${coinInt(DAILY_BONUS, 22)} прямо сейчас</b>
+        <span class="tg-promo-text">Новый подарок — каждые 24 часа</span>
+      </div>
+      <button class="btn btn-accent tg-promo-go">Забрать подарок</button>` : `
       <button class="tg-promo-x" aria-label="Закрыть">${ICON.x}</button>
       <div class="tg-promo-icon">${ICON.tg}</div>
       <div class="tg-promo-body">
@@ -339,12 +354,13 @@
       </div>
       <button class="btn btn-tg tg-promo-go">Забрать</button>`;
     const hide = snooze => {
-      if (snooze) { S.rewards.promoHidden = Date.now(); save(); }
+      if (snooze && daily) dailyPopupClosed = true;
+      else if (snooze) { S.rewards.promoHidden = Date.now(); save(); }
       el.classList.add('out');
-      setTimeout(() => el.remove(), 300);
+      setTimeout(() => { el.remove(); scheduleTgPromo(4000); }, 300);
     };
     el.querySelector('.tg-promo-x').onclick = () => hide(true);
-    el.querySelector('.tg-promo-go').onclick = () => { hide(false); openTgBonus(); };
+    el.querySelector('.tg-promo-go').onclick = () => { hide(false); daily ? claimDaily() : openTgBonus(); };
     document.body.appendChild(el);
     haptic('light');
     beep(880, 0.08, 'triangle', 0.04); setTimeout(() => beep(1320, 0.12, 'triangle', 0.04), 90);
@@ -979,6 +995,17 @@
 
   // ---------- rewards ----------
   const dailyReady = () => Date.now() - (S.rewards.lastDaily || 0) >= DAILY_MS;
+  function claimDaily() {
+    requireLogin(() => {
+      if (!dailyReady()) return;
+      S.rewards.lastDaily = Date.now(); addBalance(DAILY_BONUS);
+      $('.tg-promo.daily')?.remove();
+      sfxWin();
+      toast(`Ежедневный подарок: ${coinInt(DAILY_BONUS)}`, 'success');
+      refreshUpgrade(); renderHeader();
+      if (location.hash === '#/rewards') rewardsPage();
+    });
+  }
   const LEVEL_XP = n => Math.round(40 * Math.pow(n, 1.6)); // wagered coins needed for level n
   function levelInfo() {
     const xp = S.stats.wagered;
@@ -990,7 +1017,6 @@
 
   function rewardsPage() {
     const li = levelInfo();
-    const dailyAmt = 10 + li.lvl * 2;
     const left = DAILY_MS - (Date.now() - (S.rewards.lastDaily || 0));
     const hh = Math.max(0, Math.floor(left / 3600e3)), mm = Math.max(0, Math.floor((left % 3600e3) / 60e3));
     const claimable = Math.max(0, li.lvl - S.rewards.claimedLevel);
@@ -1008,9 +1034,9 @@
       </div>
       <div class="cards-3">
         <div class="panel reward-card"><span class="glow"></span>
-          <h4>Ежедневный бонус</h4>
-          <span class="big">${coin(dailyAmt)}</span>
-          <p>Забирайте монеты каждые 24 часа. Чем выше уровень — тем больше бонус.</p>
+          <h4>Ежедневный подарок</h4>
+          <span class="big">${coinInt(DAILY_BONUS)}</span>
+          <p>Забирайте подарок каждые 24 часа. Не пропускайте — монеты не копятся.</p>
           <button class="btn ${dailyReady() ? 'btn-accent' : 'btn-ghost'}" id="claimDaily" ${dailyReady() ? '' : 'disabled'}>${dailyReady() ? 'Забрать' : `Через ${hh} ч ${mm} мин`}</button>
         </div>
         <div class="panel reward-card">
@@ -1033,11 +1059,7 @@
       </div>
     </div>`;
 
-    $('#claimDaily').onclick = () => requireLogin(() => {
-      if (!dailyReady()) return;
-      S.rewards.lastDaily = Date.now(); addBalance(dailyAmt);
-      toast(`Ежедневный бонус: ${coin(dailyAmt)}`, 'success'); rewardsPage(); renderHeader();
-    });
+    $('#claimDaily').onclick = claimDaily;
     $('#claimLevel').onclick = () => requireLogin(() => {
       S.rewards.claimedLevel = li.lvl; addBalance(lvlReward);
       toast(`Награда за уровни: ${coin(lvlReward)}`, 'success'); rewardsPage();
@@ -1388,5 +1410,5 @@
     scheduleTgPromo(5000);
     startStatsPing();
   });
-  setInterval(() => { renderHeader(); }, 60e3);
+  setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();
