@@ -156,6 +156,63 @@
       body: JSON.stringify({ initData: TG.initData, balance: S.balance, nick: S.user.name })
     }).catch(() => { /* offline: next tick */ });
   }
+  // ---------- referrals (server: bot/worker.js /api/ref) ----------
+  let REF = null;          // last answer from /api/ref: { link, invited, active, earned, refBonus, welcomeBonus }
+  let refBusy = false;
+  const refAvailable = () => !!(TG && window.RUSTUP_API);
+  function refSync() {
+    if (!refAvailable() || !S.user || refBusy) return;
+    refBusy = true;
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/ref', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) return;
+      REF = d;
+      if (d.credited > 0) {
+        addBalance(d.credited);
+        sfxWin();
+        toast(`Награда за друзей: ${coinInt(d.credited)}`, 'success');
+        refreshUpgrade();
+      }
+      if ($('#refPanel')) renderRefPanel();
+    }).catch(() => { /* offline: try again on next visit */ }).finally(() => { refBusy = false; });
+  }
+  function shareRef() {
+    if (!REF) return;
+    const text = `Залетай в RUST UP — апгрейд скинов Rust! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent(REF.link)}&text=${encodeURIComponent(text)}`;
+    if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
+  }
+  function copyRef() {
+    if (!REF) return;
+    const done = () => { toast('Ссылка скопирована', 'success'); haptic('light'); };
+    const fallback = () => { const i = $('#refLink'); i.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Скопируйте ссылку вручную', 'error'); } };
+    if (navigator.clipboard) navigator.clipboard.writeText(REF.link).then(done, fallback); else fallback();
+  }
+  function renderRefPanel() {
+    const box = $('#refPanel');
+    if (!box) return;
+    const bot = window.RUSTUP_BOT;
+    if (!refAvailable()) {
+      box.innerHTML = `<div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${coinInt(5000)} за друга</span></div>
+        <p class="muted">Реферальная ссылка работает в Telegram-боте. Откройте игру через бота — там будет ваша личная ссылка.</p>
+        ${bot ? `<a class="btn btn-tg" href="https://t.me/${esc(bot)}" target="_blank" rel="noopener">${ICON.tg}<span>Открыть @${esc(bot)}</span></a>` : ''}`;
+      return;
+    }
+    if (!REF) { box.innerHTML = `<div class="ref-head"><h4>Пригласи друзей</h4></div><p class="muted">Загрузка…</p>`; return; }
+    box.innerHTML = `
+      <div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${coinInt(REF.refBonus)} за друга</span></div>
+      <p class="muted">Друг получает ${coinInt(REF.welcomeBonus)} на старт, а вы — ${coinInt(REF.refBonus)}, как только он зайдёт в игру. Награды начисляются сами.</p>
+      <div class="ref-link"><input id="refLink" class="text-input mono" readonly value="${esc(REF.link)}"><button class="btn btn-ghost" data-ref="copy">Копировать</button></div>
+      <button class="btn btn-tg" data-ref="share" style="height:44px">${ICON.tg}<span>Отправить друзьям</span></button>
+      <div class="ref-stats">
+        <div><b>${REF.invited}</b><span>пришло</span></div>
+        <div><b>${REF.active}</b><span>в игре</span></div>
+        <div><b>${coinInt(REF.earned)}</b><span>заработано</span></div>
+      </div>`;
+    box.querySelector('[data-ref="copy"]').onclick = copyRef;
+    box.querySelector('[data-ref="share"]').onclick = shareRef;
+  }
   function startStatsPing() {
     if (!TG || !window.RUSTUP_API) return;
     statsPing();
@@ -1032,6 +1089,7 @@
           <p>Подпишитесь на канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Бонус ${coinInt(TG_BONUS)} один раз на аккаунт.</p></div>
         <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${BONUS_TXT}`}</span></button>
       </div>
+      <div class="panel ref-panel" id="refPanel"></div>
       <div class="cards-3">
         <div class="panel reward-card"><span class="glow"></span>
           <h4>Ежедневный подарок</h4>
@@ -1060,6 +1118,8 @@
     </div>`;
 
     $('#claimDaily').onclick = claimDaily;
+    renderRefPanel();
+    refSync();
     $('#claimLevel').onclick = () => requireLogin(() => {
       S.rewards.claimedLevel = li.lvl; addBalance(lvlReward);
       toast(`Награда за уровни: ${coin(lvlReward)}`, 'success'); rewardsPage();
@@ -1409,6 +1469,7 @@
     tgLogin();
     scheduleTgPromo(5000);
     startStatsPing();
+    refSync();
   });
   setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();
