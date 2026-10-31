@@ -145,6 +145,22 @@
       return true;
     } catch (e) { return false; }
   };
+  // heartbeat for the bot's admin statistics (online now, top balances); only inside Telegram,
+  // the server verifies initData so a player can only report about themselves
+  const PING_MS = 45000;
+  function statsPing() {
+    if (!TG || !window.RUSTUP_API || !S.user || document.hidden) return;
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/ping', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+      body: JSON.stringify({ initData: TG.initData, balance: S.balance, nick: S.user.name })
+    }).catch(() => { /* offline: next tick */ });
+  }
+  function startStatsPing() {
+    if (!TG || !window.RUSTUP_API) return;
+    statsPing();
+    setInterval(statsPing, PING_MS);
+    document.addEventListener('visibilitychange', statsPing);
+  }
   function tgInit() {
     if (!TG) return;
     document.documentElement.classList.add('tg');
@@ -1370,6 +1386,7 @@
     if (changed) { U.inputs.clear(); U.inv.sel.clear(); renderHeader(); route(); }
     tgLogin();
     scheduleTgPromo(5000);
+    startStatsPing();
   });
   setInterval(() => { renderHeader(); }, 60e3);
 })();
