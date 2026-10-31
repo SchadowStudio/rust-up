@@ -8,7 +8,7 @@
   const MIN_CHANCE = 1;
   const MAX_SLOTS = 6;
   const MIN_TOPUP = 10;           // below this balance the upgrader suggests getting coins
-  const TG_CHANNEL = 'rustup';
+  const TG_CHANNEL = 'up_rust';
   const TG_BONUS = 10000;         // one-time reward for subscribing to the Telegram channel
   const STORE_KEY = 'rustup_demo_v1';
   const PROMOS = { RUSTUP: 50, WIPE: 25, DEMO: 100 };
