@@ -1656,8 +1656,14 @@
     { id: 'nft-fragment', game: 'nft', name: 'Fragment', color: '#ffd166', tiers: [[1000, 4000, 6, 70], [4000, 15000, 3, 22], [15000, 60000, 2, 7], [60000, 300000, 1, 1]] }
   ];
   PAID_CASES.forEach(c => { c.paid = true; });
+  // free every 15 minutes, no conditions: cheap loot from all three games, nothing above 500 coins;
+  // for a 'mix' case the item count of a tier is per game
+  const TIMER_MS = 15 * 60 * 1000;
+  const TIMER_CASE = { id: 'quarter', game: 'mix', name: 'Кейс 15 минут', color: '#4fc27a', timer: true, tiers: [[1, 15, 3, 72], [15, 60, 2, 22], [60, 300, 1, 5.5], [300, 500.01, 1, 0.5]] };
+  const timerLeft = () => Math.max(0, TIMER_MS - (Date.now() - (S.rewards.timerCase || 0)));
+  const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
   const CASE_RTP = 0.9;           // average win is 90% of a paid case's price
-  const caseById = id => CASES.find(c => c.id === id) || PAID_CASES.find(c => c.id === id);
+  const caseById = id => CASES.find(c => c.id === id) || PAID_CASES.find(c => c.id === id) || (id === TIMER_CASE.id ? TIMER_CASE : null);
   const casesLeft = () => CASES.filter(c => !S.rewards.cases[c.id]);
   const casePrice = c => {
     if (!c.paid) return 0;
@@ -1671,11 +1677,14 @@
   function caseItems(c) {
     if (caseCache[c.id]) return caseCache[c.id];
     const out = [];
+    const games = c.game === 'mix' ? GAMES.map(g => g.id) : [c.game];
     c.tiers.forEach(([lo, hi, n, pct]) => {
-      const band = POOL[c.game].filter(s => s.price >= lo && s.price < hi);
-      const k = Math.min(n, band.length);
-      const picks = [...new Set(Array.from({ length: k }, (_, i) => band[Math.floor(((i + 0.5) * band.length) / k)]))];
-      picks.forEach(skin => out.push({ skin, chance: pct / picks.length }));
+      const groups = games.map(g => {
+        const band = POOL[g].filter(s => s.price >= lo && s.price < hi);
+        const k = Math.min(n, band.length);
+        return [...new Set(Array.from({ length: k }, (_, i) => band[Math.floor(((i + 0.5) * band.length) / k)]))];
+      }).filter(picks => picks.length);
+      groups.forEach(picks => picks.forEach(skin => out.push({ skin, chance: pct / groups.length / picks.length })));
     });
     const total = sum(out.map(i => i.chance));
     out.forEach(i => { i.chance = (i.chance / total) * 100; });
@@ -1762,7 +1771,29 @@
       <img class="ca-hero${imgCls(items[0].skin)}" src="${items[0].skin.img}" alt="" draggable="false">
       <i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i>`;
   }
-  const caseState = c => (!S.user ? 'login' : c.paid ? 'buy' : S.rewards.cases[c.id] ? 'opened' : subsOk() ? 'ready' : 'locked');
+  const caseState = c => (!S.user ? 'login' : c.paid ? 'buy' : c.timer ? (timerLeft() ? 'cooldown' : 'ready') : S.rewards.cases[c.id] ? 'opened' : subsOk() ? 'ready' : 'locked');
+  // wide banner of the 15-minute case (cases page and home)
+  function timerCaseCard() {
+    const c = TIMER_CASE, st = caseState(c), left = timerLeft();
+    const btn = st === 'cooldown' ? `${ICON.history}<span data-timer-left>${mmss(left)}</span>` : 'Бесплатно';
+    return `<a class="timer-case ${st}" href="#/case/${c.id}" style="--cc:${c.color}">
+      <span class="case-art">${caseArt(c)}</span>
+      <span class="tc-text"><span class="case-kicker">Каждые 15 минут</span><b>${c.name}</b><small>Rust · CS2 · NFT — до ${coinInt(500)}</small></span>
+      <span class="case-btn">${btn}</span>
+    </a>`;
+  }
+  // live countdown: the timer text ticks every second, and the case becomes available without a reload
+  let timerWasReady = timerLeft() === 0;
+  setInterval(() => {
+    const left = timerLeft();
+    document.querySelectorAll('[data-timer-left]').forEach(el => { el.textContent = mmss(left); });
+    const ready = left === 0;
+    if (ready === timerWasReady) return;
+    timerWasReady = ready;
+    if (!ready || caseSpinning) return;
+    document.querySelectorAll('.timer-case').forEach(el => { el.outerHTML = timerCaseCard(); });
+    if (curPath() === '/case/' + TIMER_CASE.id) $('#caseActions').innerHTML = caseActions(TIMER_CASE);
+  }, 1000);
   function caseCard(c) {
     const st = caseState(c);
     const btn = c.paid ? coinInt(casePrice(c)) : st === 'opened' ? 'Открыт' : `${st === 'locked' ? ICON.lock : ''}Бесплатно`;
@@ -1776,6 +1807,7 @@
     const left = casesLeft().length;
     $('#page').innerHTML = `<div class="page cases-page">
       <h1 class="up-title">Кейсы</h1>
+      ${timerCaseCard()}
       ${S.user && left && !subsOk() ? subsBlock() : ''}
       <div class="row-head"><h2 class="home-title">Бесплатные</h2><span class="muted">${left ? `Доступно ${left} из ${CASES.length}` : 'Все открыты'}</span></div>
       <div class="cases-grid">${CASES.map(caseCard).join('')}</div>
@@ -1794,6 +1826,8 @@
     const st = caseState(c);
     if (st === 'login') return `<button class="btn btn-accent case-open" data-login>Войти и открыть</button>`;
     if (st === 'locked') return subsBlock();
+    if (st === 'cooldown') return `<button class="btn btn-accent case-open" disabled>Следующий через&nbsp;<span data-timer-left>${mmss(timerLeft())}</span></button>
+        <a class="btn btn-ghost case-next" href="#/upgrade">К апгрейду</a>`;
     if (st === 'buy') {
       const price = casePrice(c);
       return S.balance >= price
@@ -1819,6 +1853,8 @@
         <span class="case-art big">${caseArt(c)}</span>
         <div class="case-hero-text">${c.paid
           ? `<span class="case-kicker paid">Кейс ${gameName}</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · ${coinInt(casePrice(c))}</span>`
+          : c.timer
+          ? `<span class="case-kicker">Бесплатно каждые 15 минут</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · Rust, CS2 и NFT · до ${coinInt(500)}</span>`
           : `<span class="case-kicker">Бесплатный кейс</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · один раз на аккаунт</span>`}</div>
       </div>
       <div class="roulette" id="roulette"><div class="roulette-track" id="rTrack">${Array.from({ length: 14 }, () => rollCell(rollCase(c))).join('')}</div><span class="roulette-marker"></span></div>
@@ -1837,6 +1873,7 @@
       if (S.balance < price) return toast(`Недостаточно монет: нужно ${coin(price)}`, 'error');
       return spinCase(c);
     }
+    if (c.timer) return timerLeft() ? toast(`Следующий кейс через ${mmss(timerLeft())}`, 'error') : spinCase(c);
     if (S.rewards.cases[c.id]) return;
     if (!refAvailable()) return subsOk() ? spinCase(c) : refreshCases();
     btn.disabled = true; btn.textContent = 'Проверяем подписку…';
@@ -1858,6 +1895,7 @@
     const itemUid = uid();
     S.inventory.push({ uid: itemUid, name: win.name, t: Date.now() });
     if (c.paid) addBalance(-casePrice(c));
+    else if (c.timer) S.rewards.timerCase = Date.now();
     else S.rewards.cases[c.id] = Date.now();
     save();
     caseSpinning = true;
@@ -1927,7 +1965,7 @@
       $('#cwUp', m).onclick = () => {
         closeModal();
         if (!invItem(itemUid)) return;
-        setGame(c.game);
+        setGame(skin.game);
         U.inputs = new Set([itemUid]); U.balanceAdd = 0; U.result = null; U.mult = null;
         location.hash = '#/upgrade';
       };
@@ -1982,6 +2020,7 @@
         ${g.badge ? `<span class="gc-badge">${g.badge}</span>` : ''}
         <b class="gc-title">${g.title}</b></a>`).join('')}</div>
       <div class="row-head"><h2 class="home-title">Бесплатные кейсы</h2><a href="#/cases">Все ${ICON.right}</a></div>
+      ${timerCaseCard()}
       <div class="cases-grid">${CASES.map(caseCard).join('')}</div>
       <div class="row-head"><h2 class="home-title">Популярные кейсы</h2><a href="#/cases">Все ${ICON.right}</a></div>
       <div class="cases-grid">${['rust-metal', 'cs2-assault', 'nft-collector'].map(id => caseCard(caseById(id))).join('')}</div>

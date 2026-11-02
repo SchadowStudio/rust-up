@@ -786,6 +786,24 @@ img { display: block; }
 .case-card.locked .case-btn, .case-card.opened .case-btn { background: var(--bg-secondary); box-shadow: none; color: var(--text-subtitle); }
 .case-card.opened .case-btn { color: var(--text-other); }
 .case-btn .coin { --coin-size: 15px; }
+/* 15-minute case: wide banner on the cases page and home */
+.timer-case { --cc: #4fc27a; display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: center; gap: 14px; max-width: 864px; margin-bottom: 12px; padding: 8px 14px 8px 8px; border-radius: 20px; background: radial-gradient(ellipse 260px 120px at 0% 50%, #4fc27a26, transparent 70%), var(--bg-block); border: 1px solid #4fc27a44; transition: border-color var(--fast), transform var(--fast); }
+.timer-case:hover { border-color: #4fc27a88; transform: translateY(-2px); }
+.timer-case .case-art { width: 96px; border-radius: 14px; }
+.tc-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tc-text b { font-size: 17px; font-weight: 800; }
+.tc-text small { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; color: var(--text-subtitle); }
+.tc-text small .coin { --coin-size: 13px; }
+.timer-case .case-btn { padding: 0 18px; white-space: nowrap; background: linear-gradient(135deg, #5fd38a, #2f9e5c); box-shadow: 0 8px 24px #4fc27a4d, inset 0 1px 0 #ffffff33; }
+.timer-case.cooldown .case-btn, .timer-case.login .case-btn { background: var(--bg-secondary); box-shadow: none; color: var(--text-subtitle); font-variant-numeric: tabular-nums; }
+.timer-case.cooldown .case-art > * { filter: grayscale(.5) brightness(.75); }
+@media (max-width: 600px) {
+  .timer-case { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 16px; }
+  .timer-case .case-art { width: 72px; border-radius: 12px; }
+  .tc-text b { font-size: 15px; }
+  .tc-text small { font-size: 11px; }
+  .timer-case .case-btn { padding: 0 12px; font-size: 12px; }
+}
 .case-kicker.paid { color: var(--cc); background: color-mix(in srgb, var(--cc) 14%, transparent); border-color: color-mix(in srgb, var(--cc) 40%, transparent); }
 .case-open .coin { margin-left: 6px; }
 .cases-login { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 18px; }
