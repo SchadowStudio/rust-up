@@ -184,7 +184,8 @@
     if (!refAvailable() || !S.user || refBusy) return;
     refBusy = true;
     fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/ref', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData })
+      // grants: 1 — this version adds admin grants (/give) to the balance
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, grants: 1 })
     }).then(r => r.json()).then(d => {
       if (!d.ok) return;
       REF = d;
