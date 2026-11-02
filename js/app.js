@@ -235,11 +235,11 @@
   // ---------- friends road: a real Telegram gift per level of invited friends who opened the game ----------
   // server: /api/road records the claim and notifies admins, who send the gift by hand (bot/worker.js, same list)
   // [friends in the game, gift]: 5 regular gifts, then 25 NFTs up to 3 000 stars
-  const ROAD = [[1, 'Сердце'], [2, 'Подарок'], [3, 'Мишка'], [5, 'Букет'], [7, 'Алмаз'],
-    [10, 'Big Year #22608'], [15, 'Candy Cane #42032'], [20, 'B-Day Candle #158980'], [25, 'Clover Pin #185914'], [30, 'Bow Tie #15505'],
-    [40, 'Desk Calendar #250031'], [50, 'Eternal Candle #11125'], [60, 'Evil Eye #43197'], [70, 'Berry Box #29950'], [80, 'Fine Pen #26659'],
-    [90, 'Bunny Muffin #14351'], [100, 'Hanging Star #12289'], [120, 'Jingle Bells #34384'], [140, 'Crystal Ball #21104'], [160, 'Flying Broom #13266'],
-    [180, 'Trapped Heart #6334'], [200, 'Skull Flower #8176'], [250, 'Record Player #923'], [300, 'Joyful Bundle #26929'], [350, 'Love Potion #24098'],
+  const ROAD = [[5, 'Сердце'], [10, 'Подарок'], [15, 'Мишка'], [20, 'Букет'], [25, 'Алмаз'],
+    [30, 'Big Year #22608'], [35, 'Candy Cane #42032'], [40, 'B-Day Candle #158980'], [45, 'Clover Pin #185914'], [50, 'Bow Tie #15505'],
+    [60, 'Desk Calendar #250031'], [70, 'Eternal Candle #11125'], [80, 'Evil Eye #43197'], [90, 'Berry Box #29950'], [100, 'Fine Pen #26659'],
+    [110, 'Bunny Muffin #14351'], [120, 'Hanging Star #12289'], [140, 'Jingle Bells #34384'], [160, 'Crystal Ball #21104'], [180, 'Flying Broom #13266'],
+    [200, 'Trapped Heart #6334'], [225, 'Skull Flower #8176'], [250, 'Record Player #923'], [300, 'Joyful Bundle #26929'], [350, 'Love Potion #24098'],
     [400, 'Cupid Charm #10012'], [425, 'Bling Binky #4664'], [450, 'Eternal Rose #18648'], [475, 'Electric Skull #1225'], [500, 'Diamond Ring #26470']];
   // a gift missing from the catalog still shows up, without a picture
   const ROAD_ITEMS = ROAD.map(([lvl, name]) => ({ lvl, skin: byName[name] || { name, rarity: 'gray', game: 'nft', price: 0, img: '' } }));
