@@ -65,7 +65,8 @@
     tg: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M20.7 4.3L2.9 11.2c-1.2.5-1.2 1.2-.2 1.5l4.6 1.4 1.8 5.4c.2.6.4.8.9.8.4 0 .6-.2.9-.5l2.2-2.1 4.6 3.4c.8.5 1.4.2 1.6-.8l3-14.2c.3-1.2-.5-1.8-1.6-1.3zM8.5 13.8l9.4-5.9c.5-.3.8-.1.4.2l-7.8 7.1-.3 3.3z"/></svg>',
     ds: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.3 5.4A16.6 16.6 0 0015.2 4l-.5 1a15.4 15.4 0 00-5.4 0L8.8 4a16.5 16.5 0 00-4.1 1.4C2.1 9.3 1.4 13.1 1.8 16.8a16.7 16.7 0 005 2.6l1.1-1.7a10.8 10.8 0 01-1.7-.8l.4-.3a11.9 11.9 0 0010.2 0l.4.3-1.7.8 1.1 1.7a16.6 16.6 0 005-2.6c.5-4.3-.8-8-3.3-11.4zM8.7 14.5c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z"/></svg>',
     steam: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2a10 10 0 00-10 9.2l5.4 2.2a2.8 2.8 0 011.6-.5h.2l2.4-3.5v-.1a3.8 3.8 0 113.8 3.8h-.1l-3.4 2.4v.1a2.8 2.8 0 01-5.6.3L2.4 14.4A10 10 0 1012 2zM8.3 17.2l-1.2-.5a2.1 2.1 0 103.9-1.6 2.1 2.1 0 00-2.7-1.1l1.3.5a1.5 1.5 0 01-1.3 2.7zm9.9-7.9a2.5 2.5 0 10-2.5 2.5 2.5 2.5 0 002.5-2.5zm-4.4 0a1.9 1.9 0 111.9 1.9 1.9 1.9 0 01-1.9-1.9z"/></svg>',
-    gift: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 7v13M12 7H8.5a2 2 0 010-4C11 3 12 7 12 7zm0 0h3.5a2 2 0 000-4C13 3 12 7 12 7zM20 11v7.5c0 1-.8 1.5-1.8 1.5H5.8c-1 0-1.8-.5-1.8-1.5V11M3 7h18v4H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>'
+    gift: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 7v13M12 7H8.5a2 2 0 010-4C11 3 12 7 12 7zm0 0h3.5a2 2 0 000-4C13 3 12 7 12 7zM20 11v7.5c0 1-.8 1.5-1.8 1.5H5.8c-1 0-1.8-.5-1.8-1.5V11M3 7h18v4H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+    lock: '<svg viewBox="0 0 20 20"><rect x="4" y="9" width="12" height="9" rx="2" fill="currentColor"/><path d="M6.5 9V6.5a3.5 3.5 0 017 0V9" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
   };
   const WEAPON_SVG = '<svg class="placeholder-weapon" viewBox="0 0 160 70"><path fill="#f2f3f2" d="M4 26h70l6-8h18l3 5h36l6-4h11v12h-6l-2 6h-38l-6 6h-12l-4 20H76l4-18-8-1-6 10H50l4-14H34l-8 7H14l-2-9H4z"/></svg>';
 
@@ -84,7 +85,7 @@
       history: [],
       stats: { upgrades: 0, wins: 0, wagered: 0, won: 0, best: 0 },
       seeds: { server, serverHash: sha256(server), client: randHex(8), nonce: 0, prev: null },
-      rewards: { lastDaily: 0, promos: [], claimedLevel: 0 },
+      rewards: { lastDaily: 0, promos: [], claimedLevel: 0, subs: {}, cases: {} },
       settings: { sound: true, fast: false }
     };
   }
@@ -100,6 +101,9 @@
   function sanitize() {
     S.inventory = S.inventory.filter(i => byName[i.name]);
     S.withdrawals = S.withdrawals || [];
+    // profiles saved before the free cases existed
+    S.rewards.subs = S.rewards.subs || {};
+    S.rewards.cases = S.rewards.cases || {};
   }
   sanitize();
   const addItem = name => S.inventory.push({ uid: uid(), name, t: Date.now() });
@@ -368,7 +372,7 @@
       <div class="starter-grid">${names.map((n, i) => `<div class="starter-cell" style="animation-delay:${i * 0.12}s">${card(byName[n], { static: true })}</div>`).join('')}</div>
       <div class="row">
         <a class="btn btn-ghost" href="#/inventory" data-close-go style="flex:1">В инвентарь</a>
-        <a class="btn btn-accent" href="#/" data-close-go style="flex:1">Играть</a>
+        <a class="btn btn-accent" href="#/cases" data-close-go style="flex:1">Бесплатные кейсы</a>
       </div>`,
     m => { m.querySelectorAll('[data-close-go]').forEach(a => a.addEventListener('click', closeModal)); });
     sfxWin();
@@ -384,30 +388,39 @@
   // A static site cannot ask Telegram whether the user really joined (that needs the bot token on a server),
   // so the claim unlocks after the channel link was opened.
   const tgBonusDone = () => !!S.rewards.tgSub;
-  function openChannel() {
-    const url = 'https://t.me/' + TG_CHANNEL;
+  function openChannel(ch = TG_CHANNEL) {
+    const url = 'https://t.me/' + ch;
     if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
   }
   // auto pop-up advertising the channel bonus; waits for open modals (login, starter pack) to close
   const PROMO_SNOOZE = 6 * 60 * 60 * 1000;
-  // also shows the daily gift pop-up when it is ready (channel bonus goes first)
+  // also shows the free cases and the daily gift pop-ups (order: cases, channel bonus, daily gift)
   let dailyPopupClosed = false;   // closing the daily pop-up hides it until the page reloads
   function scheduleTgPromo(delay) {
     setTimeout(() => {
       if ($('.tg-promo')) return;
+      const casesWanted = S.user && casesLeft().length === CASES.length && !curPath().startsWith('/case') && Date.now() - (S.rewards.casesPromoHidden || 0) >= PROMO_SNOOZE;
       const tgWanted = !tgBonusDone() && Date.now() - (S.rewards.promoHidden || 0) >= PROMO_SNOOZE;
       const dailyWanted = S.user && dailyReady() && !dailyPopupClosed;
-      if (!tgWanted && !dailyWanted) return;
-      if ($('#modalRoot').children.length || U.spinning) return scheduleTgPromo(3000);
-      showTgPromo(tgWanted ? 'tg' : 'daily');
+      if (!casesWanted && !tgWanted && !dailyWanted) return;
+      if ($('#modalRoot').children.length || U.spinning || caseSpinning) return scheduleTgPromo(3000);
+      showTgPromo(casesWanted ? 'cases' : tgWanted ? 'tg' : 'daily');
     }, delay);
   }
   function showTgPromo(kind = 'tg') {
-    const daily = kind === 'daily';
+    const daily = kind === 'daily', cases = kind === 'cases';
     const el = document.createElement('div');
-    el.className = 'tg-promo' + (daily ? ' daily' : '');
+    el.className = 'tg-promo' + (daily ? ' daily' : cases ? ' daily cases' : '');
     el.setAttribute('role', 'dialog');
-    el.innerHTML = daily ? `
+    el.innerHTML = cases ? `
+      <button class="tg-promo-x" aria-label="Закрыть">${ICON.x}</button>
+      <div class="tg-promo-icon"><span class="nav-icon icon-gift"></span></div>
+      <div class="tg-promo-body">
+        <span class="tg-promo-kicker">Для новых игроков</span>
+        <b class="tg-promo-title">${CASES.length} кейса бесплатно</b>
+        <span class="tg-promo-text">Rust, CS2 и Telegram NFT — за подписку на 2 канала</span>
+      </div>
+      <button class="btn btn-accent tg-promo-go">Открыть кейсы</button>` : daily ? `
       <button class="tg-promo-x" aria-label="Закрыть">${ICON.x}</button>
       <div class="tg-promo-icon"><span class="nav-icon icon-gift"></span></div>
       <div class="tg-promo-body">
@@ -426,12 +439,15 @@
       <button class="btn btn-tg tg-promo-go">Забрать</button>`;
     const hide = snooze => {
       if (snooze && daily) dailyPopupClosed = true;
-      else if (snooze) { S.rewards.promoHidden = Date.now(); save(); }
+      else if (snooze || cases) { S.rewards[cases ? 'casesPromoHidden' : 'promoHidden'] = Date.now(); save(); }
       el.classList.add('out');
       setTimeout(() => { el.remove(); scheduleTgPromo(4000); }, 300);
     };
     el.querySelector('.tg-promo-x').onclick = () => hide(true);
-    el.querySelector('.tg-promo-go').onclick = () => { hide(false); daily ? claimDaily() : openTgBonus(); };
+    el.querySelector('.tg-promo-go').onclick = () => {
+      hide(false);
+      if (cases) location.hash = '#/cases'; else if (daily) claimDaily(); else openTgBonus();
+    };
     document.body.appendChild(el);
     haptic('light');
     beep(880, 0.08, 'triangle', 0.04); setTimeout(() => beep(1320, 0.12, 'triangle', 0.04), 90);
@@ -516,7 +532,7 @@
   let best = null;
 
   function feedItem(d, cls = 'drop') {
-    return `<a class="${cls} rarity-${d.skin.rarity} game-${d.skin.game}${d.enter ? ' enter' : ''}" href="#/" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
+    return `<a class="${cls} rarity-${d.skin.rarity} game-${d.skin.game}${d.enter ? ' enter' : ''}" href="#/upgrade?game=${d.skin.game}" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
       <span class="drop-img"><img src="${d.skin.img}" alt="${esc(d.skin.name)}" draggable="false"></span>
       <span class="drop-info">
         <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava')}<span>${esc(d.user)}</span></span>
@@ -930,6 +946,12 @@
     if (t.closest('[data-login]')) return requireLogin();
     if (t.closest('[data-tg-bonus]')) return openTgBonus();
     if (t.closest('[data-bell]')) { location.hash = '#/rewards'; return; }
+    const sub = t.closest('[data-sub]');
+    if (sub) return openSub(sub.dataset.sub);
+    const chk = t.closest('[data-subs-check]');
+    if (chk) return manualSubsCheck(chk);
+    const oc = t.closest('[data-open-case]');
+    if (oc) return openCase(oc.dataset.openCase, oc);
     if (U.spinning) return;
 
     const gm = t.closest('[data-game]');
@@ -1394,7 +1416,7 @@
           <p>В инвентаре пока пусто</p>
           <span class="muted">Купите скины в магазине или выиграйте их в апгрейде</span>
           <div class="row" style="justify-content:center;flex-wrap:wrap">
-            <a class="btn btn-accent" href="#/" data-goshop>${ICON.shop}<span>В магазин</span></a>
+            <a class="btn btn-accent" href="#/upgrade" data-goshop>${ICON.shop}<span>В магазин</span></a>
             ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>+${BONUS_TXT} за подписку</span></button>`}
           </div></div>`
       : !items.length ? '<div class="panel inv-empty"><p>Ничего не найдено</p><span class="muted">Измените фильтры</span></div>'
@@ -1468,7 +1490,7 @@
       U.inputs = new Set(sel.map(i => i.uid));
       U.balanceAdd = 0; U.result = null; U.mult = null;
       v.sel.clear();
-      location.hash = '#/';
+      location.hash = '#/upgrade';
       return;
     }
     if (act === 'withdraw') openWithdraw(sel);
@@ -1524,6 +1546,317 @@
       : '<p class="muted" style="padding:24px;margin:0">Выводов пока не было</p>'}</div></div>`;
   }
 
+  // ---------- free cases: one per game, unlocked by subscribing to both channels ----------
+  const SUB_CHANNELS = [
+    { id: TG_CHANNEL, name: 'RUST UP', sub: 'Новости, промокоды, розыгрыши' },
+    { id: 'rustuper', name: 'RUST UP · Отзывы', sub: 'Отзывы игроков о выводах' }
+  ];
+  // tiers: [min price, max price, items, chance % of the whole tier]; the items are taken from the catalog by price
+  const CASES = [
+    { id: 'rust', game: 'rust', name: 'Кейс RUST', tiers: [[20, 80, 6, 70], [80, 300, 3, 22], [300, 800, 2, 7], [1000, Infinity, 1, 1]] },
+    { id: 'cs2', game: 'cs2', name: 'Кейс CS2', tiers: [[10, 60, 6, 70], [60, 400, 3, 22], [400, 2500, 2, 7], [8000, 30000, 1, 1]] },
+    { id: 'nft', game: 'nft', name: 'Кейс Telegram NFT', tiers: [[0, 100, 6, 70], [300, 450, 3, 22], [450, 1500, 2, 7], [1500, 5000, 1, 1]] }
+  ];
+  const caseById = id => CASES.find(c => c.id === id);
+  const casesLeft = () => CASES.filter(c => !S.rewards.cases[c.id]);
+  const caseCache = {};
+  // evenly spread picks inside each price band, so a case holds the same items on every visit
+  function caseItems(c) {
+    if (caseCache[c.id]) return caseCache[c.id];
+    const out = [];
+    c.tiers.forEach(([lo, hi, n, pct]) => {
+      const band = POOL[c.game].filter(s => s.price >= lo && s.price < hi);
+      const k = Math.min(n, band.length);
+      const picks = [...new Set(Array.from({ length: k }, (_, i) => band[Math.floor(((i + 0.5) * band.length) / k)]))];
+      picks.forEach(skin => out.push({ skin, chance: pct / picks.length }));
+    });
+    const total = sum(out.map(i => i.chance));
+    out.forEach(i => { i.chance = (i.chance / total) * 100; });
+    return (caseCache[c.id] = out.sort((a, b) => b.skin.price - a.skin.price));
+  }
+  function rollCase(c) {
+    const items = caseItems(c);
+    const r = (crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000) * 100;
+    let acc = 0;
+    return (items.find(i => (acc += i.chance) > r) || items[items.length - 1]).skin;
+  }
+
+  // inside the Telegram bot the server asks Telegram whether the player joined;
+  // on the plain website there is no way to check, so opening the channel link counts
+  const subsOk = () => SUB_CHANNELS.every(c => S.rewards.subs[c.id]);
+  let subsBusy = null, subsCheckedAt = 0;
+  function checkSubs() {
+    if (!refAvailable()) return Promise.resolve(S.rewards.subs);
+    if (subsBusy) return subsBusy;
+    subsBusy = fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/subs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) throw new Error('subs check failed');
+      SUB_CHANNELS.forEach(c => { S.rewards.subs[c.id] = !!d.subs[c.id]; });
+      // a verified channel subscription also unlocks the channel bonus
+      if (S.rewards.subs[TG_CHANNEL]) S.rewards.tgOpened = true;
+      subsCheckedAt = Date.now();
+      save();
+      return S.rewards.subs;
+    }).finally(() => { subsBusy = null; });
+    return subsBusy;
+  }
+  function openSub(id) {
+    openChannel(id);
+    if (!refAvailable()) S.rewards.subs[id] = true;
+    if (id === TG_CHANNEL) S.rewards.tgOpened = true;
+    save();
+    refreshCases();
+  }
+  function manualSubsCheck(btn) {
+    btn.disabled = true; btn.textContent = 'Проверяем…';
+    checkSubs().then(() => {
+      if (subsOk()) { sfxWin(); toast('Подписки подтверждены — кейсы открыты!', 'success'); }
+      else toast('Не видим подписку на ' + SUB_CHANNELS.filter(c => !S.rewards.subs[c.id]).map(c => '@' + c.id).join(' и '), 'error');
+    }).catch(() => toast('Не удалось проверить подписку, попробуйте ещё раз', 'error')).finally(refreshCases);
+  }
+  // silent re-check when the player comes back from a channel
+  function autoCheckSubs() {
+    if (!refAvailable() || !S.user || subsOk() || !casesLeft().length || Date.now() - subsCheckedAt < 10000) return;
+    checkSubs().then(() => { if (subsOk()) { sfxWin(); toast('Подписки подтверждены — кейсы открыты!', 'success'); refreshCases(); } }).catch(() => {});
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && curPath().startsWith('/case')) { subsCheckedAt = 0; autoCheckSubs(); }
+  });
+  const curPath = () => (location.hash.replace(/^#/, '') || '/').split('?')[0];
+  function refreshCases() {
+    if (caseSpinning) return;
+    const p = curPath();
+    if (p === '/cases') casesPage();
+    else if (p.startsWith('/case/')) casePage(p.slice(6));
+  }
+
+  function subsBlock() {
+    return `<div class="panel subs-panel">
+      <div class="subs-head"><b>Откройте ${CASES.length} кейса бесплатно</b><span>Выполните 2 условия — и кейсы ваши</span></div>
+      ${SUB_CHANNELS.map((c, i) => {
+        const ok = S.rewards.subs[c.id];
+        return `<div class="sub-row${ok ? ' done' : ''}">
+          <span class="sub-ico">${ICON.tg}</span>
+          <span class="sub-text"><b>${i + 1}. Подпишитесь на ${esc(c.name)}</b><small>@${c.id} · ${esc(c.sub)}</small></span>
+          ${ok ? `<span class="sub-ok">${ICON.check}</span>` : `<button class="btn btn-tg sub-btn" data-sub="${c.id}">Подписаться</button>`}
+        </div>`;
+      }).join('')}
+      ${refAvailable() ? '<button class="btn btn-accent subs-check" data-subs-check>Проверить подписку</button>'
+        : `<p class="note">В Telegram-боте${window.RUSTUP_BOT ? ` @${esc(window.RUSTUP_BOT)}` : ''} подписка проверяется автоматически.</p>`}
+    </div>`;
+  }
+
+  const imgCls = s => (s.img.includes('assets/nft/') ? ' nft' : '');
+  function caseArt(c) {
+    const items = caseItems(c);
+    return `<span class="case-rays"></span>
+      ${items.slice(1, 5).map((i, n) => `<img class="ca-side ca-${n}${imgCls(i.skin)}" src="${i.skin.img}" alt="" draggable="false" loading="lazy">`).join('')}
+      <img class="ca-hero${imgCls(items[0].skin)}" src="${items[0].skin.img}" alt="" draggable="false">
+      <i class="spark s1"></i><i class="spark s2"></i><i class="spark s3"></i>`;
+  }
+  const caseState = c => (!S.user ? 'login' : S.rewards.cases[c.id] ? 'opened' : subsOk() ? 'ready' : 'locked');
+  function caseCard(c) {
+    const st = caseState(c);
+    return `<a class="case-card case-${c.id} ${st}" href="#/case/${c.id}">
+      <span class="case-art">${caseArt(c)}${st === 'opened' ? '<span class="case-badge">Открыт</span>' : ''}</span>
+      <span class="case-foot"><b>${c.name}</b><span class="case-btn">${st === 'opened' ? 'Открыт' : `${st === 'locked' ? ICON.lock : ''}Бесплатно`}</span></span>
+    </a>`;
+  }
+
+  function casesPage() {
+    const left = casesLeft().length;
+    $('#page').innerHTML = `<div class="page cases-page">
+      <h1 class="up-title">Кейсы</h1>
+      ${S.user && left && !subsOk() ? subsBlock() : ''}
+      <div class="row-head"><h2 class="home-title">Бесплатные</h2><span class="muted">${left ? `Доступно ${left} из ${CASES.length}` : 'Все открыты'}</span></div>
+      <div class="cases-grid">${CASES.map(caseCard).join('')}</div>
+      ${S.user ? '' : `<div class="panel cases-login"><p>Войдите, чтобы забрать бесплатные кейсы</p><button class="btn btn-steam" data-login>${ICON.steam}<span>Войти</span></button></div>`}
+    </div>`;
+    autoCheckSubs();
+  }
+
+  // ---------- case page: roulette ----------
+  const ROUL_N = 56, ROUL_WIN = 46;   // strip length and the index the winner lands on
+  let caseSpinning = false;
+  const rollCell = s => `<div class="roll-cell rarity-${s.rarity}"><img class="${imgCls(s).trim()}" src="${s.img}" alt="" draggable="false"></div>`;
+  function caseActions(c) {
+    const st = caseState(c);
+    if (st === 'login') return `<button class="btn btn-accent case-open" data-login>Войти и открыть</button>`;
+    if (st === 'locked') return subsBlock();
+    if (st === 'opened') {
+      const next = casesLeft()[0];
+      return `<button class="btn btn-accent case-open" disabled>Кейс уже открыт</button>
+        ${next ? `<a class="btn btn-ghost case-next" href="#/case/${next.id}">Открыть ${next.name}</a>` : `<a class="btn btn-ghost case-next" href="#/upgrade?game=${c.game}">К апгрейду</a>`}`;
+    }
+    return `<button class="btn btn-accent case-open" data-open-case="${c.id}">Открыть бесплатно</button>`;
+  }
+  function casePage(id) {
+    const c = caseById(id);
+    if (!c) { location.hash = '#/cases'; return; }
+    const items = caseItems(c);
+    $('#page').innerHTML = `<div class="page case-page case-${c.id}">
+      <a class="back-link" href="#/cases">${ICON.left}<span>Все кейсы</span></a>
+      <div class="case-hero">
+        <span class="case-art big">${caseArt(c)}</span>
+        <div class="case-hero-text"><span class="case-kicker">Бесплатный кейс</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · один раз на аккаунт</span></div>
+      </div>
+      <div class="roulette" id="roulette"><div class="roulette-track" id="rTrack">${Array.from({ length: 14 }, () => rollCell(rollCase(c))).join('')}</div><span class="roulette-marker"></span></div>
+      <div class="case-actions" id="caseActions">${caseActions(c)}</div>
+      <div class="row-head"><h2 class="home-title">Содержимое кейса</h2></div>
+      <div class="case-items">${items.map(i => `<div class="case-item">${card(i.skin, { static: true })}<span class="chance-tag">${i.chance < 1 ? i.chance.toFixed(2) : i.chance.toFixed(1)}%</span></div>`).join('')}</div>
+    </div>`;
+    if (caseState(c) === 'locked') autoCheckSubs();
+  }
+
+  function openCase(id, btn) {
+    const c = caseById(id);
+    if (!c || caseSpinning || !S.user || S.rewards.cases[c.id]) return;
+    if (!refAvailable()) return subsOk() ? spinCase(c) : refreshCases();
+    btn.disabled = true; btn.textContent = 'Проверяем подписку…';
+    checkSubs().then(() => {
+      if (subsOk()) return spinCase(c);
+      toast('Сначала подпишитесь на оба канала', 'error');
+      refreshCases();
+    }).catch(() => {
+      // server unreachable: an earlier confirmed subscription is enough
+      if (subsOk()) return spinCase(c);
+      btn.disabled = false; btn.textContent = 'Открыть бесплатно';
+      toast('Не удалось проверить подписку, попробуйте ещё раз', 'error');
+    });
+  }
+
+  function spinCase(c) {
+    const win = rollCase(c);
+    // commit first so a reload mid-spin can't open the case twice
+    const itemUid = uid();
+    S.inventory.push({ uid: itemUid, name: win.name, t: Date.now() });
+    S.rewards.cases[c.id] = Date.now();
+    save();
+    caseSpinning = true;
+    $('#caseActions').innerHTML = '<button class="btn btn-accent case-open" disabled>Открываем…</button>';
+    const track = $('#rTrack'), view = $('#roulette');
+    track.innerHTML = Array.from({ length: ROUL_N }, (_, i) => rollCell(i === ROUL_WIN ? win : rollCase(c))).join('');
+    track.style.transform = 'translateX(0)';
+    const cellW = track.firstElementChild.offsetWidth;
+    const step = cellW + (parseFloat(getComputedStyle(track).columnGap) || 0);
+    const end = ROUL_WIN * step + cellW * rand(0.15, 0.85) - view.clientWidth / 2;
+    const dur = S.settings.fast ? 2600 : 6500;
+    const ease = t => 1 - Math.pow(1 - t, 4);
+    const t0 = performance.now();
+    let lastCell = -1, done = false;
+    requestAnimationFrame(function frame(now) {
+      if (done) return;
+      const t = Math.min(1, (now - t0) / dur);
+      const x = end * ease(t);
+      if (track.isConnected) track.style.transform = `translateX(${-x}px)`;
+      const cell = Math.floor((x + view.clientWidth / 2) / step);
+      if (cell !== lastCell) { lastCell = cell; beep(1400, 0.015, 'square', 0.02); }
+      if (t < 1) requestAnimationFrame(frame);
+    });
+    // the timer settles the result even if frames are throttled (background tab)
+    setTimeout(() => {
+      done = true;
+      caseSpinning = false;
+      if (track.isConnected) {
+        track.style.transform = `translateX(${-end}px)`;
+        track.children[ROUL_WIN].classList.add('win');
+      }
+      sfxWin();
+      pushDrop({ user: S.user.name, color: S.user.color, skin: win, chance: 100, t: Date.now() });
+      if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
+      showCaseWin(c, win, itemUid);
+    }, dur + 30);
+  }
+
+  function showCaseWin(c, skin, itemUid) {
+    const next = casesLeft()[0];
+    modal('Ваш выигрыш', `
+      <div class="case-win">${card(skin, { static: true })}</div>
+      <p class="note" style="text-align:center">Предмет уже в инвентаре: продайте его или поставьте в апгрейд, чтобы выиграть дороже.</p>
+      <div class="row">
+        <button class="btn btn-ghost" id="cwSell" style="flex:1">Продать за ${coin(skin.price)}</button>
+        <button class="btn btn-accent" id="cwUp" style="flex:1">В апгрейд</button>
+      </div>
+      ${next ? `<a class="btn btn-ghost" href="#/case/${next.id}" id="cwNext">Открыть ${next.name}</a>` : ''}`,
+    m => {
+      $('#cwSell', m).onclick = () => {
+        if (invItem(itemUid)) { S.inventory = S.inventory.filter(i => i.uid !== itemUid); addBalance(skin.price); toast(`Продано за ${coin(skin.price)}`, 'success'); }
+        closeModal();
+      };
+      $('#cwUp', m).onclick = () => {
+        closeModal();
+        if (!invItem(itemUid)) return;
+        setGame(c.game);
+        U.inputs = new Set([itemUid]); U.balanceAdd = 0; U.result = null; U.mult = null;
+        location.hash = '#/upgrade';
+      };
+      const nx = $('#cwNext', m); if (nx) nx.addEventListener('click', closeModal);
+    });
+  }
+
+  // ---------- home: banner carousel, games, free cases ----------
+  let heroTimer = null;
+  const giftImg = n => (byName[n] || akIcon('nft')).img;
+  function heroSlides() {
+    const heroes = CASES.map(c => caseItems(c)[0].skin);
+    const coins = ['c1', 'c2', 'c3'].map(k => `<span class="ha-coin ${k}">${ICON.coin}</span>`).join('');
+    return [
+      `<a class="hero-slide hs-cases" href="#/cases">
+        <span class="hero-text"><span class="hero-kicker"><i class="dot-online"></i>Для новых игроков</span><b class="hero-title">${CASES.length} кейса<br>бесплатно</b><span class="hero-sub">Rust · CS2 · Telegram NFT</span><span class="hero-btn">Открыть ${ICON.right}</span></span>
+        <span class="hero-art">${heroes.map((s, i) => `<img class="ha-${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`).join('')}</span></a>`,
+      tgBonusDone()
+        ? `<a class="hero-slide hs-daily" href="#/rewards">
+          <span class="hero-text"><span class="hero-kicker">Каждые 24 часа</span><b class="hero-title">Подарок<br>${fmtInt(DAILY_BONUS)}</b><span class="hero-sub">монет на баланс — бесплатно</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
+          <span class="hero-art"><img class="ha-gift" src="${giftImg('Подарок')}" alt="" draggable="false">${coins}</span></a>`
+        : `<button class="hero-slide hs-tg" data-tg-bonus>
+          <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${BONUS_TXT}<br>монет</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
+          <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`,
+      `<a class="hero-slide hs-friends" href="#/rewards">
+        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">+5 000 монет за каждого друга</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
+        <span class="hero-art"><img class="ha-bear" src="${giftImg('Мишка')}" alt="" draggable="false"><img class="ha-rocket" src="${giftImg('Ракета')}" alt="" draggable="false"></span></a>`
+    ];
+  }
+  function homePage() {
+    const slides = heroSlides();
+    const playing = share => fmtInt(Math.max(3, online * share));
+    const games = [
+      { href: '#/upgrade?game=rust', cls: 'gc-rust', title: 'Апгрейд Rust', share: 0.27, art: `<img class="gc-img" src="${akIcon('rust').img}" alt="" draggable="false">` },
+      { href: '#/upgrade?game=cs2', cls: 'gc-cs2', title: 'Апгрейд CS2', share: 0.18, art: `<img class="gc-img" src="${akIcon('cs2').img}" alt="" draggable="false">` },
+      { href: '#/upgrade?game=nft', cls: 'gc-nft', title: 'Апгрейд NFT', share: 0.12, art: `<img class="gc-img nft" src="${akIcon('nft').img}" alt="" draggable="false">` },
+      { href: '#/cases', cls: 'gc-cases', title: 'Кейсы', share: 0.21, badge: 'FREE', art: CASES.map((c, i) => { const s = caseItems(c)[0].skin; return `<img class="gc-mini m${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`; }).join('') },
+      { href: '#/rewards', cls: 'gc-bonus', title: 'Бонусы', share: 0.08, art: `<img class="gc-img gift" src="${giftImg('Подарок')}" alt="" draggable="false">` },
+      { href: '#/rewards', cls: 'gc-friends', title: 'Друзья', share: 0.05, badge: '+5 000', art: `<img class="gc-img gift" src="${giftImg('Мишка')}" alt="" draggable="false">` }
+    ];
+    $('#page').innerHTML = `<div class="page home">
+      <div class="hero">
+        <div class="hero-track" id="heroTrack">${slides.join('')}</div>
+        <div class="hero-dots" id="heroDots">${slides.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>
+      </div>
+      <div class="row-head"><h2 class="home-title">Игры</h2></div>
+      <div class="games-grid">${games.map(g => `<a class="game-card ${g.cls}" href="${g.href}">
+        ${g.art}
+        <span class="gc-online"><i class="dot-online"></i>${playing(g.share)} играют</span>
+        ${g.badge ? `<span class="gc-badge">${g.badge}</span>` : ''}
+        <b class="gc-title">${g.title}</b></a>`).join('')}</div>
+      <div class="row-head"><h2 class="home-title">Бесплатные кейсы</h2><a href="#/cases">Все ${ICON.right}</a></div>
+      <div class="cases-grid">${CASES.map(caseCard).join('')}</div>
+    </div>`;
+    initHero();
+  }
+  function initHero() {
+    clearInterval(heroTimer);
+    const track = $('#heroTrack');
+    const dots = [...document.querySelectorAll('#heroDots i')];
+    const cur = () => Math.round(track.scrollLeft / track.clientWidth);
+    track.addEventListener('scroll', () => dots.forEach((d, i) => d.classList.toggle('on', i === cur())), { passive: true });
+    heroTimer = setInterval(() => {
+      if (!track.isConnected) return clearInterval(heroTimer);
+      if (document.hidden || track.matches(':hover')) return;
+      track.scrollTo({ left: ((cur() + 1) % dots.length) * track.clientWidth, behavior: 'smooth' });
+    }, 5000);
+  }
+
   // ---------- static text pages ----------
   function textPage(title, body) {
     $('#page').innerHTML = `<div class="page"><h2 class="section-title">${title}</h2><div class="panel prose">${body}</div></div>`;
@@ -1531,21 +1864,26 @@
 
   // ---------- router ----------
   function route() {
-    const [path, query] = (location.hash.replace(/^#/, '') || '/').split('?');
-    // deep link to an upgrade tab: #/?game=cs2
+    let [path, query] = (location.hash.replace(/^#/, '') || '/').split('?');
+    // deep link to an upgrade tab: #/upgrade?game=cs2 (older links: #/?game=cs2)
     const game = new URLSearchParams(query || '').get('game');
     if (game && GAMES.some(g => g.id === game)) setGame(game);
-    document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === path));
-    if (path !== '/') U.result = null;
+    if (path === '/' && game) path = '/upgrade';
+    const navKey = path === '/upgrade' ? '/' : path.startsWith('/case/') ? '/cases' : path;
+    document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === navKey));
+    if (path !== '/upgrade') U.result = null;
+    if (path !== '/') clearInterval(heroTimer);
     if (tgVer('6.1')) TG.BackButton[path === '/' ? 'hide' : 'show']();
     switch (path) {
+      case '/upgrade': upgradePage(); break;
+      case '/cases': casesPage(); break;
       case '/rewards': rewardsPage(); break;
       case '/inventory': inventoryPage(); break;
       case '/profile': profilePage(); break;
       case '/provably-fair': fairPage(); break;
       case '/tos': textPage('Условия использования', '<p>RUST UP — демонстрационный интерфейс. Баланс, скины и результаты виртуальные и не имеют денежной стоимости, их нельзя вывести или обменять.</p><p>Проект не связан с Valve, Steam и Facepunch Studios. Изображения предметов принадлежат их правообладателям.</p>'); break;
       case '/privacy': textPage('Политика конфиденциальности', '<p>Демо-версия не отправляет данные на сервер. Ник, баланс, инвентарь и история хранятся только в localStorage вашего браузера. Очистка данных сайта полностью удаляет их.</p>'); break;
-      default: upgradePage();
+      default: if (path.startsWith('/case/')) casePage(path.slice(6)); else homePage();
     }
     window.scrollTo({ top: 0 });
   }
