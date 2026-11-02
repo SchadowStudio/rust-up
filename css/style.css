@@ -789,6 +789,9 @@ img { display: block; }
 .case-btn svg { width: 14px; height: 14px; }
 .case-card.locked .case-btn, .case-card.opened .case-btn { background: var(--bg-secondary); box-shadow: none; color: var(--text-subtitle); }
 .case-card.opened .case-btn { color: var(--text-other); }
+.case-btn .coin { --coin-size: 15px; }
+.case-kicker.paid { color: var(--cc); background: color-mix(in srgb, var(--cc) 14%, transparent); border-color: color-mix(in srgb, var(--cc) 40%, transparent); }
+.case-open .coin { margin-left: 6px; }
 .cases-login { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 18px; }
 .cases-login p { margin: 0; font-weight: 600; }
 
