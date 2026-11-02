@@ -16,8 +16,18 @@
   const DAILY_MS = 24 * 60 * 60 * 1000;
   const DAILY_BONUS = 3500;       // daily gift, once per DAILY_MS
 
-  const SKINS = window.SKINS.map((s, i) => ({ ...s, id: i }));
+  // one catalog for all games; names don't collide ("AK47" in Rust vs "AK-47 | ..." in CS2)
+  const SKINS = [
+    ...window.SKINS.map(s => ({ ...s, game: 'rust' })),
+    ...(window.SKINS_CS2 || []).map(s => ({ ...s, game: 'cs2' }))
+  ].map((s, i) => ({ ...s, id: i }));
   const byName = Object.fromEntries(SKINS.map(s => [s.name, s]));
+  // per-game skins, cheapest first
+  const POOL = { rust: [], cs2: [] };
+  SKINS.forEach(s => POOL[s.game].push(s));
+  Object.values(POOL).forEach(p => p.sort((a, b) => a.price - b.price));
+  const gamePool = () => POOL[U.game] || POOL.rust;
+  const ofGame = name => byName[name].game === U.game;
 
   // ---------- utils ----------
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -179,7 +189,7 @@
   }
   function shareRef() {
     if (!REF) return;
-    const text = `Залетай в RUST UP — апгрейд скинов Rust! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
+    const text = `Залетай в RUST UP — апгрейд скинов Rust и CS2! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(REF.link)}&text=${encodeURIComponent(text)}`;
     if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
   }
@@ -249,7 +259,7 @@
     angle: 0,
     game: 'rust',          // upgrade tab: 'rust' | 'cs2' | 'nft'
     // inventory page
-    inv: { sel: new Set(), q: '', rarity: 'all', cat: 'all', sort: 'price-desc', page: 0, view: 'items' }
+    inv: { sel: new Set(), q: '', game: 'all', rarity: 'all', cat: 'all', sort: 'price-desc', page: 0, view: 'items' }
   };
 
   // ---------- sound ----------
@@ -340,8 +350,8 @@
   function giveStarterPack() {
     const taken = new Set();
     const names = STARTER_TIERS.map(([lo, hi]) => {
-      const pool = SKINS.filter(s => s.price >= lo && s.price < hi && !taken.has(s.name));
-      const s = pick(pool.length ? pool : SKINS);
+      const pool = POOL.rust.filter(s => s.price >= lo && s.price < hi && !taken.has(s.name));
+      const s = pick(pool.length ? pool : POOL.rust);
       taken.add(s.name);
       return s.name;
     });
@@ -524,17 +534,21 @@
     if (!best || d.skin.price > best.skin.price || Date.now() - best.t > 3600e3) { best = d; renderBest(true); }
   }
   function botDrop() {
-    // weighted toward cheap skins, like a real feed
-    const r = Math.random();
-    const pool = SKINS.filter(s => r < 0.6 ? s.price < 20 : r < 0.92 ? s.price < 200 : true);
-    return { user: pick(BOTS), color: pick(AVA_COLORS), skin: pick(pool), chance: rand(5, 79.9), t: Date.now() };
+    // skins of the open game, weighted toward cheap ones like a real feed
+    const pool = gamePool();
+    const skin = pool[Math.floor(Math.pow(Math.random(), 2.2) * pool.length)];
+    return { user: pick(BOTS), color: pick(AVA_COLORS), skin, chance: rand(5, 79.9), t: Date.now() };
+  }
+  // fills the strip with fresh drops of the open game
+  function seedFeed() {
+    feed.length = 0;
+    Array.from({ length: 16 }, botDrop).forEach(d => feed.push(d));
+    $('#drops').innerHTML = feed.map(d => feedItem(d)).join('');
+    best = feed.reduce((a, b) => (b.skin.price > a.skin.price ? b : a));
+    renderBest(false);
   }
   function initFeed() {
-    const seed = Array.from({ length: 16 }, botDrop);
-    seed.forEach(d => feed.push(d));
-    $('#drops').innerHTML = feed.map(d => feedItem(d)).join('');
-    best = seed.reduce((a, b) => (b.skin.price > a.skin.price ? b : a));
-    renderBest(false);
+    seedFeed();
     (function loop() {
       setTimeout(() => { pushDrop(botDrop()); bumpStats(); loop(); }, rand(1800, 4200));
     })();
@@ -595,22 +609,31 @@
     </svg>`;
   }
 
-  // ---------- game switch: only Rust works for now, CS2 and Telegram NFT are "coming soon" ----------
+  // ---------- game switch: Rust and CS2 work, Telegram NFT is "coming soon" ----------
   const GAME_ICON = {
     cs2: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="3.5" fill="currentColor"/><path d="M24 3v11M24 34v11M3 24h11M34 24h11" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
     nft: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="20" width="34" height="22" rx="4" fill="currentColor" opacity=".35"/><rect x="4" y="13" width="40" height="9" rx="3" fill="currentColor"/><path d="M24 13v29" stroke="#141518" stroke-width="4"/><path d="M24 13c-3-7-12-8-12-2.5S20 13 24 13zm0 0c3-7 12-8 12-2.5S28 13 24 13z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>'
   };
   const GAMES = [
     { id: 'rust', name: 'Rust', sub: 'Скины Rust' },
-    { id: 'cs2', name: 'CS2', sub: 'Скины CS2', soon: true, what: 'скины Counter-Strike 2' },
+    { id: 'cs2', name: 'CS2', sub: 'Скины CS2' },
     { id: 'nft', name: 'NFT Telegram', sub: 'Подарки', soon: true, what: 'NFT-подарки Telegram' }
   ];
-  // the priciest AK reads best as a "Rust" icon; fall back to the priciest skin if the catalog changes
-  const rustIcon = () => {
-    const ak = SKINS.filter(s => /AK47/.test(s.name));
-    return (ak.length ? ak : SKINS).reduce((a, b) => (b.price > a.price ? b : a));
+  // the priciest AK reads best as a game icon; fall back to the priciest skin if the catalog changes
+  const akIcon = id => {
+    const pool = POOL[id], ak = pool.filter(s => /AK-?47/.test(s.name));
+    return (ak.length ? ak : pool).reduce((a, b) => (b.price > a.price ? b : a));
   };
-  const gameIcon = id => (id === 'rust' ? `<img src="${rustIcon().img}" alt="" draggable="false">` : GAME_ICON[id]);
+  const gameIcon = id => (POOL[id] && POOL[id].length ? `<img src="${akIcon(id).img}" alt="" draggable="false">` : GAME_ICON[id]);
+
+  // stake and targets belong to one game, so switching games starts a fresh upgrade
+  function setGame(id) {
+    if (id === U.game) return;
+    U.game = id;
+    U.inputs.clear(); U.targets = []; U.balanceAdd = 0; U.mult = null; U.result = null;
+    U.invPage = 0; U.upPage = 0; U.filter = { min: '', max: '', q: '' };
+    if (POOL[id]) seedFeed();
+  }
 
   function gameSwitch() {
     return `<div class="game-switch" role="tablist" aria-label="Игра">${GAMES.map(g => `
@@ -630,8 +653,11 @@
           <span class="soon-art">${GAME_ICON[g.id]}</span>
           <span class="soon-badge">Скоро</span>
           <h2>Апгрейд ${g.name}</h2>
-          <p>Режим в разработке: скоро здесь можно будет улучшать ${g.what}. А пока доступен апгрейд скинов Rust.</p>
-          <button class="btn btn-accent btn-pill" data-game="rust">Перейти к Rust</button>
+          <p>Режим в разработке: скоро здесь можно будет улучшать ${g.what}. А пока доступен апгрейд скинов Rust и CS2.</p>
+          <div class="row" style="justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-accent btn-pill" data-game="rust">Rust</button>
+            <button class="btn btn-accent btn-pill" data-game="cs2">CS2</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -786,7 +812,7 @@
     const kind = key[0], val = +key.slice(1);
     const want = kind === 'x' ? iv * val : (iv * RTP * 100) / val;
     // smallest-error skin whose chance stays within limits
-    const ok = SKINS.filter(s => { const c = (iv / s.price) * RTP * 100; return c <= MAX_CHANCE && c >= MIN_CHANCE; });
+    const ok = gamePool().filter(s => { const c = (iv / s.price) * RTP * 100; return c <= MAX_CHANCE && c >= MIN_CHANCE; });
     if (!ok.length) return toast('Нет подходящего предмета для такой ставки', 'error');
     const best = ok.reduce((a, b) => (Math.abs(Math.log(b.price / want)) < Math.abs(Math.log(a.price / want)) ? b : a));
     U.targets = [best.name];
@@ -806,7 +832,8 @@
     const tab = U.invTab;
     const per = perPage();
     let items, html;
-    const total = sum(S.inventory.map(i => byName[i.name].price));
+    const mine = S.inventory.filter(i => ofGame(i.name));
+    const total = sum(mine.map(i => byName[i.name].price));
     const head = `<div class="inv-header">
       <div class="tabs" role="tablist">
         <button class="tab${tab === 'inventory' ? ' active' : ''}" data-tab="inventory" role="tab">${ICON.bag}<span>Мой инвентарь</span></button>
@@ -818,10 +845,10 @@
       </div></div>`;
 
     if (tab === 'inventory') {
-      items = S.inventory.map(i => ({ ...i, skin: byName[i.name] }))
+      items = mine.map(i => ({ ...i, skin: byName[i.name] }))
         .sort((a, b) => (U.invSort === 'desc' ? b.skin.price - a.skin.price : a.skin.price - b.skin.price));
     } else {
-      items = SKINS.slice().sort((a, b) => (U.invSort === 'desc' ? b.price - a.price : a.price - b.price)).map(s => ({ skin: s }));
+      items = gamePool().slice().sort((a, b) => (U.invSort === 'desc' ? b.price - a.price : a.price - b.price)).map(s => ({ skin: s }));
     }
     const pg = pager(items.length, U.invPage, per); U.invPage = pg.page;
     const slice = items.slice(pg.page * per, pg.page * per + per);
@@ -831,7 +858,7 @@
     while (cells.length < per) cells.push('<div class="ghost-card"></div>');
 
     let overlay = '';
-    if (tab === 'inventory' && !S.inventory.length) {
+    if (tab === 'inventory' && !mine.length) {
       overlay = S.balance >= MIN_TOPUP
         ? `<div class="empty-overlay"><div class="empty-content"><p>Инвентарь пуст</p><span class="muted" style="font-size:12px">Купите скины в магазине или используйте баланс в апгрейде</span><button class="btn btn-accent" data-tab="shop">${ICON.shop}<span>В магазин</span></button></div></div>`
         : tgBonusDone()
@@ -855,7 +882,7 @@
     const per = perPage();
     const f = U.filter;
     const iv = inputValue();
-    let items = SKINS.filter(s =>
+    let items = gamePool().filter(s =>
       (f.min === '' || s.price >= +f.min) && (f.max === '' || s.price <= +f.max) &&
       (!f.q || s.name.toLowerCase().includes(f.q.toLowerCase())));
     items.sort((a, b) => (U.upSort === 'desc' ? b.price - a.price : a.price - b.price));
@@ -901,7 +928,7 @@
 
     const gm = t.closest('[data-game]');
     if (gm) {
-      if (gm.dataset.game !== U.game) { U.game = gm.dataset.game; U.result = null; haptic('light'); upgradePage(); }
+      if (gm.dataset.game !== U.game) { setGame(gm.dataset.game); haptic('light'); upgradePage(); }
       return;
     }
     const un = t.closest('[data-unselect]');
@@ -1277,9 +1304,11 @@
     clothing: /\b(pants|jacket|hoodie|kilt|boots|gloves|facemask|mask|helmet|chestplate|vest|bandana|balaclava|hat|cap|shirt|tshirt|t-shirt|poncho|wraps|jeans|backpack|pantalones|armor|bandana)\b/i,
     deploy: /\b(door|box|furnace|bed|sleeping bag|barricade|frame|sign|banner|turret|chest|lamp|torch|garlands|bbq|lights|cauldron|grave|post|storage|nest|wallpaper|rock|skull)\b/i
   };
-  const catOf = name => (CATS.weapon.test(name) ? 'weapon' : CATS.clothing.test(name) ? 'clothing' : CATS.deploy.test(name) ? 'deploy' : 'other');
-  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
-  const RARITY_LABEL = { all: 'Все', gray: 'Обычные', blue: 'Необычные', fiol: 'Редкие', red: 'Мифические', yellow: 'Легендарные' };
+  // CS2 skins carry their category from the catalog; Rust ones are guessed by name
+  const catOf = name => byName[name].cat || (CATS.weapon.test(name) ? 'weapon' : CATS.clothing.test(name) ? 'clothing' : CATS.deploy.test(name) ? 'deploy' : 'other');
+  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', knife: 'Ножи', gloves: 'Перчатки', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
+  const GAME_LABEL = { all: 'Все игры', rust: 'Rust', cs2: 'CS2' };
+  const RARITY_LABEL = { all: 'Все', gray: 'Обычные', blue: 'Необычные', fiol: 'Редкие', pink: 'Засекреченные', red: 'Мифические', yellow: 'Легендарные' };
   const TRADE_RE = /^https:\/\/steamcommunity\.com\/tradeoffer\/new\/\?partner=\d+&token=[\w-]{6,12}$/;
   const INV_PER = 30;
 
@@ -1287,6 +1316,7 @@
     const v = U.inv;
     const q = v.q.trim().toLowerCase();
     const list = S.inventory.map(i => ({ ...i, skin: byName[i.name] })).filter(i =>
+      (v.game === 'all' || i.skin.game === v.game) &&
       (v.rarity === 'all' || i.skin.rarity === v.rarity) &&
       (v.cat === 'all' || catOf(i.name) === v.cat) &&
       (!q || i.name.toLowerCase().includes(q)));
@@ -1346,6 +1376,7 @@
         <input class="search" id="ipSearch" placeholder="Поиск по названию..." value="${esc(v.q)}">
         <div class="rarity-chips">${Object.keys(RARITY_LABEL).map(r =>
           `<button class="rchip${v.rarity === r ? ' on' : ''}" data-ir="${r}" ${r !== 'all' ? `style="--rc:var(--skin-${r})"` : ''}>${r !== 'all' ? '<i></i>' : ''}${RARITY_LABEL[r]}</button>`).join('')}</div>
+        <select class="select" id="ipGame">${Object.keys(GAME_LABEL).map(g => `<option value="${g}"${v.game === g ? ' selected' : ''}>${GAME_LABEL[g]}</option>`).join('')}</select>
         <select class="select" id="ipCat">${Object.keys(CAT_LABEL).map(c => `<option value="${c}"${v.cat === c ? ' selected' : ''}>${CAT_LABEL[c]}</option>`).join('')}</select>
         <select class="select" id="ipSort">
           <option value="price-desc">Сначала дорогие</option><option value="price-asc">Сначала дешёвые</option>
@@ -1362,7 +1393,7 @@
       : !items.length ? '<div class="panel inv-empty"><p>Ничего не найдено</p><span class="muted">Измените фильтры</span></div>'
       : `<div class="inv-grid">${slice.map(i => `<div class="inv-cell${fresh(i.t) ? ' fresh' : ''}">
             ${card(i.skin, { selected: v.sel.has(i.uid), hover: 'check', attrs: `data-isel="${i.uid}"` })}
-            <span class="cat-tag">${CAT_LABEL[catOf(i.name)]}</span>
+            <span class="cat-tag">${i.skin.game === 'cs2' ? 'CS2 · ' : ''}${CAT_LABEL[catOf(i.name)]}</span>
           </div>`).join('')}</div>
         <div class="inv-pager">
           <button class="page-btn" data-ipage="-1" ${v.page === 0 ? 'disabled' : ''} aria-label="Назад">${ICON.left}</button>
@@ -1386,6 +1417,7 @@
       v.q = search.value; v.page = 0; renderInvItems();
       const s = $('#ipSearch'); s.focus(); s.setSelectionRange(s.value.length, s.value.length);
     };
+    $('#ipGame').onchange = e => { v.game = e.target.value; v.page = 0; renderInvItems(); };
     $('#ipCat').onchange = e => { v.cat = e.target.value; v.page = 0; renderInvItems(); };
     $('#ipSort').onchange = e => { v.sort = e.target.value; renderInvItems(); };
     body.onclick = e => {
@@ -1423,6 +1455,9 @@
     }
     if (act === 'upgrade') {
       if (sel.length > MAX_SLOTS) return toast(`В апгрейд можно взять не больше ${MAX_SLOTS} предметов`, 'error');
+      const games = new Set(sel.map(i => byName[i.name].game));
+      if (games.size > 1) return toast('В апгрейд можно взять предметы только одной игры', 'error');
+      setGame([...games][0]);
       U.inputs = new Set(sel.map(i => i.uid));
       U.balanceAdd = 0; U.result = null; U.mult = null;
       v.sel.clear();
@@ -1478,7 +1513,7 @@
     const [path, query] = (location.hash.replace(/^#/, '') || '/').split('?');
     // deep link to an upgrade tab: #/?game=cs2
     const game = new URLSearchParams(query || '').get('game');
-    if (game && GAMES.some(g => g.id === game)) U.game = game;
+    if (game && GAMES.some(g => g.id === game)) setGame(game);
     document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === path));
     if (path !== '/') U.result = null;
     if (tgVer('6.1')) TG.BackButton[path === '/' ? 'hide' : 'show']();

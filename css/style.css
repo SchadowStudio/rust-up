@@ -47,6 +47,7 @@
   --skin-gray: #a3a8b1;   --skin-gray-60: #a3a8b199;  --skin-gray-0: #a3a8b100;
   --skin-blue: #4f86e8;   --skin-blue-60: #4f86e899;  --skin-blue-0: #4f86e800;
   --skin-fiol: #a96ef0;   --skin-fiol-60: #a96ef099;  --skin-fiol-0: #a96ef000;
+  --skin-pink: #d84ae6;   --skin-pink-60: #d84ae699;  --skin-pink-0: #d84ae600;
   --skin-red: #ec3b3e;    --skin-red-60: #ec3b3e99;   --skin-red-0: #ec3b3e00;
   --skin-yellow: #ffd166; --skin-yellow-60: #ffd16699; --skin-yellow-0: #ffd16600;
 
@@ -258,6 +259,7 @@ img { display: block; }
 .rarity-gray { --rc: var(--skin-gray); --rc60: var(--skin-gray-60); --rc0: var(--skin-gray-0); }
 .rarity-blue { --rc: var(--skin-blue); --rc60: var(--skin-blue-60); --rc0: var(--skin-blue-0); }
 .rarity-fiol { --rc: var(--skin-fiol); --rc60: var(--skin-fiol-60); --rc0: var(--skin-fiol-0); }
+.rarity-pink { --rc: var(--skin-pink); --rc60: var(--skin-pink-60); --rc0: var(--skin-pink-0); }
 .rarity-red { --rc: var(--skin-red); --rc60: var(--skin-red-60); --rc0: var(--skin-red-0); }
 .rarity-yellow { --rc: var(--skin-yellow); --rc60: var(--skin-yellow-60); --rc0: var(--skin-yellow-0); }
 .card-img { position: relative; z-index: 1; flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
