@@ -872,6 +872,9 @@ img { display: block; }
 .road-btn { width: 100%; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text-other); background: var(--bg-secondary); }
 .btn.road-btn { padding: 0; font-size: 13px; color: #fff; background: var(--grad-accent); }
 .road-btn.done { color: var(--success); background: #4fc27a1a; }
+.road-stars { margin-top: -4px; font-size: 12px; font-weight: 700; color: var(--skin-yellow); }
+.real-badge { display: inline-block; vertical-align: 2px; margin-left: 6px; font-size: 10px; font-weight: 900; letter-spacing: .4px; padding: 3px 8px; border-radius: 999px; color: #1d1f24; background: linear-gradient(135deg, #ffe08a, #ffb84d); box-shadow: 0 0 14px #ffd16655; }
+.road-head p b { color: var(--text-title); }
 
 @media (max-width: 1024px) {
   .games-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

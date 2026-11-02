@@ -192,6 +192,7 @@
         refreshUpgrade();
       }
       if ($('#refPanel')) renderRefPanel();
+      syncRoadWithdrawals();
       if ($('#refRoad')) renderRoad();
     }).catch(() => { /* offline: try again on next visit */ }).finally(() => { refBusy = false; });
   }
@@ -231,18 +232,26 @@
     box.querySelector('[data-ref="copy"]').onclick = copyRef;
     box.querySelector('[data-ref="share"]').onclick = shareRef;
   }
-  // ---------- friends road: an NFT gift per level of invited friends who opened the game (server: /api/road) ----------
-  const ROAD = [[10, 600], [25, 1500], [50, 3000], [75, 5000], [100, 8000], [150, 15000], [200, 25000], [300, 40000], [400, 70000], [500, 120000]];
-  // each level gets the NFT priced closest to its target coin value (only NFT gifts, not regular ones)
-  const ROAD_ITEMS = (() => {
-    const nfts = POOL.nft.filter(s => s.cat === 'nft'), used = new Set();
-    return ROAD.map(([lvl, target]) => {
-      const skin = nfts.filter(s => !used.has(s.name))
-        .reduce((a, b) => (Math.abs(Math.log(b.price / target)) < Math.abs(Math.log(a.price / target)) ? b : a));
-      used.add(skin.name);
-      return { lvl, skin };
-    });
-  })();
+  // ---------- friends road: a real Telegram gift per level of invited friends who opened the game ----------
+  // server: /api/road records the claim and notifies admins, who send the gift by hand (bot/worker.js, same list)
+  // [friends in the game, gift]: 5 regular gifts, then 25 NFTs up to 3 000 stars
+  const ROAD = [[1, 'Сердце'], [2, 'Подарок'], [3, 'Мишка'], [5, 'Букет'], [7, 'Алмаз'],
+    [10, 'Big Year #22608'], [15, 'Candy Cane #42032'], [20, 'B-Day Candle #158980'], [25, 'Clover Pin #185914'], [30, 'Bow Tie #15505'],
+    [40, 'Desk Calendar #250031'], [50, 'Eternal Candle #11125'], [60, 'Evil Eye #43197'], [70, 'Berry Box #29950'], [80, 'Fine Pen #26659'],
+    [90, 'Bunny Muffin #14351'], [100, 'Hanging Star #12289'], [120, 'Jingle Bells #34384'], [140, 'Crystal Ball #21104'], [160, 'Flying Broom #13266'],
+    [180, 'Trapped Heart #6334'], [200, 'Skull Flower #8176'], [250, 'Record Player #923'], [300, 'Joyful Bundle #26929'], [350, 'Love Potion #24098'],
+    [400, 'Cupid Charm #10012'], [425, 'Bling Binky #4664'], [450, 'Eternal Rose #18648'], [475, 'Electric Skull #1225'], [500, 'Diamond Ring #26470']];
+  // a gift missing from the catalog still shows up, without a picture
+  const ROAD_ITEMS = ROAD.map(([lvl, name]) => ({ lvl, skin: byName[name] || { name, rarity: 'gray', game: 'nft', price: 0, img: '' } }));
+  const STAR_COINS = 0.75;   // catalog: 1 star = $0.015, 1 coin = $0.02
+  const starsOf = s => s.stars || Math.round(s.price / STAR_COINS);
+  // statuses of real gift requests come from the server
+  function syncRoadWithdrawals() {
+    const sent = new Set((REF && REF.roadSent) || []);
+    let changed = false;
+    S.withdrawals.forEach(w => { if (w.real && w.status !== 'sent' && sent.has(w.level)) { w.status = 'sent'; changed = true; } });
+    if (changed) save();
+  }
   let roadBusy = false;
   function renderRoad() {
     const box = $('#refRoad');
@@ -250,7 +259,8 @@
     const active = REF ? REF.active : 0, claimed = new Set((REF && REF.road) || []);
     box.innerHTML = `
       <div class="road-head">
-        <div><h4>Дорога друзей</h4><p class="muted">NFT-подарок за каждую ступень. Считаются друзья, которые зашли в игру по вашей ссылке.</p></div>
+        <div><h4>Дорога друзей <span class="real-badge">РЕАЛЬНЫЕ NFT</span></h4>
+          <p class="muted">Мы выдаём <b>РЕАЛЬНЫЕ</b> подарки и NFT Telegram прямо на ваш аккаунт! ${ROAD.length} наград: первые 5 — подарки, дальше NFT до 3 000 ⭐. Считаются друзья, которые зашли в игру по вашей ссылке.</p></div>
         <div class="road-count"><b>${fmtInt(active)}</b><span>друзей в игре</span></div>
       </div>
       <div class="road-scroll"><div class="road">${ROAD_ITEMS.map((r, i) => {
@@ -260,7 +270,8 @@
         return `<div class="road-step ${st}">
           <span class="road-line"><i style="width:${pct}%"></i></span>
           <span class="road-dot">${st === 'claimed' ? ICON.check : r.lvl}</span>
-          ${card(r.skin, { static: true })}
+          ${card(r.skin, { static: true, price: false })}
+          <span class="road-stars">⭐ ${fmtInt(starsOf(r.skin))}</span>
           ${st === 'ready' ? `<button class="btn btn-accent road-btn" data-road="${r.lvl}">Забрать</button>`
             : st === 'claimed' ? '<span class="road-btn done">Получено</span>'
             : `<span class="road-btn">Ещё ${fmtInt(r.lvl - active)}</span>`}
@@ -283,13 +294,16 @@
       if (!d.ok) return toast(d.active != null ? `Нужно ${lvl} друзей в игре, сейчас ${d.active}` : 'Не удалось забрать награду', 'error');
       REF.road = [...(REF.road || []), lvl];
       if (!d.claimed) return toast('Эта награда уже получена', 'error');
-      addItem(r.skin.name); save();
+      // a real gift, not an inventory item: it is tracked as a withdrawal until an admin sends it
+      S.withdrawals.unshift({ id: Math.floor(rand(1e6, 9e6)), t: Date.now(), items: [r.skin.name], value: r.skin.price, status: 'pending', real: true, level: lvl });
+      save();
       sfxWin();
-      modal('Награда за друзей', `
-        <div class="case-win">${card(r.skin, { static: true })}</div>
-        <p class="note" style="text-align:center">NFT-подарок за ${lvl} друзей уже в инвентаре.</p>
-        <a class="btn btn-accent" href="#/inventory" data-close-go style="height:48px">В инвентарь</a>`,
-      m => $('[data-close-go]', m).addEventListener('click', closeModal));
+      const tgu = tgUser() && tgUser().username;
+      modal('Заявка принята!', `
+        <div class="case-win">${card(r.skin, { static: true, price: false })}</div>
+        <p class="note" style="text-align:center;font-size:14px;color:var(--text-subtitle)">Мы отправим <b style="color:var(--text-title)">реальный подарок ${esc(r.skin.name)}</b> на ваш Telegram-аккаунт${tgu ? ` <b>@${esc(tgu)}</b>` : ''}. Бот напишет, когда он будет отправлен.</p>
+        <a class="btn btn-accent" href="#/inventory" data-close-go style="height:48px">Мои заявки</a>`,
+      m => $('[data-close-go]', m).addEventListener('click', () => { U.inv.view = 'withdrawals'; closeModal(); }));
     }).catch(() => toast('Нет связи с сервером, попробуйте ещё раз', 'error'))
       .finally(() => { roadBusy = false; renderRoad(); });
   }
@@ -1613,7 +1627,7 @@
       <td>${new Date(w.t).toLocaleString('ru-RU')}</td>
       <td>${w.items.slice(0, 3).map(esc).join(', ')}${w.items.length > 3 ? ` и ещё ${w.items.length - 3}` : ''}</td>
       <td>${coin(w.value)}</td>
-      <td class="ok">Отправлено (демо)</td></tr>`).join('');
+      <td class="${w.real && w.status !== 'sent' ? 'muted' : 'ok'}">${w.real ? (w.status === 'sent' ? 'Отправлен на аккаунт' : 'Ожидает отправки') : 'Отправлено (демо)'}</td></tr>`).join('');
     $('#invPageBody').innerHTML = `<div class="panel" style="padding:0"><div class="table-wrap">${rows
       ? `<table class="table"><thead><tr><th>Заявка</th><th>Время</th><th>Предметы</th><th>Сумма</th><th>Статус</th></tr></thead><tbody>${rows}</tbody></table>`
       : '<p class="muted" style="padding:24px;margin:0">Выводов пока не было</p>'}</div></div>`;
@@ -1937,7 +1951,7 @@
           <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${BONUS_TXT}<br>монет</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
           <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`,
       `<a class="hero-slide hs-friends" href="#/friends">
-        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">+5 000 монет за друга и NFT-подарки</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
+        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">РЕАЛЬНЫЕ NFT на аккаунт за друзей</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
         <span class="hero-art"><img class="ha-bear" src="${giftImg('Мишка')}" alt="" draggable="false"><img class="ha-rocket" src="${giftImg('Ракета')}" alt="" draggable="false"></span></a>`
     ];
   }
