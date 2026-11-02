@@ -19,11 +19,12 @@
   // one catalog for all games; names don't collide ("AK47" in Rust vs "AK-47 | ..." in CS2)
   const SKINS = [
     ...window.SKINS.map(s => ({ ...s, game: 'rust' })),
-    ...(window.SKINS_CS2 || []).map(s => ({ ...s, game: 'cs2' }))
+    ...(window.SKINS_CS2 || []).map(s => ({ ...s, game: 'cs2' })),
+    ...(window.SKINS_NFT || []).map(s => ({ ...s, game: 'nft' }))
   ].map((s, i) => ({ ...s, id: i }));
   const byName = Object.fromEntries(SKINS.map(s => [s.name, s]));
   // per-game skins, cheapest first
-  const POOL = { rust: [], cs2: [] };
+  const POOL = { rust: [], cs2: [], nft: [] };
   SKINS.forEach(s => POOL[s.game].push(s));
   Object.values(POOL).forEach(p => p.sort((a, b) => a.price - b.price));
   const gamePool = () => POOL[U.game] || POOL.rust;
@@ -189,7 +190,7 @@
   }
   function shareRef() {
     if (!REF) return;
-    const text = `Залетай в RUST UP — апгрейд скинов Rust и CS2! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
+    const text = `Залетай в RUST UP — апгрейд скинов Rust, CS2 и NFT-подарков! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(REF.link)}&text=${encodeURIComponent(text)}`;
     if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
   }
@@ -490,7 +491,7 @@
 
   // ---------- skin card ----------
   function card(skin, o = {}) {
-    const cls = ['skin-card', 'rarity-' + skin.rarity];
+    const cls = ['skin-card', 'rarity-' + skin.rarity, 'game-' + skin.game];
     if (o.selected) cls.push('selected');
     if (o.static) cls.push('static');
     if (o.disabled) cls.push('disabled');
@@ -513,7 +514,7 @@
   let best = null;
 
   function feedItem(d, cls = 'drop') {
-    return `<a class="${cls} rarity-${d.skin.rarity}${d.enter ? ' enter' : ''}" href="#/" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
+    return `<a class="${cls} rarity-${d.skin.rarity} game-${d.skin.game}${d.enter ? ' enter' : ''}" href="#/" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
       <span class="drop-img"><img src="${d.skin.img}" alt="${esc(d.skin.name)}" draggable="false"></span>
       <span class="drop-info">
         <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava')}<span>${esc(d.user)}</span></span>
@@ -609,7 +610,7 @@
     </svg>`;
   }
 
-  // ---------- game switch: Rust and CS2 work, Telegram NFT is "coming soon" ----------
+  // ---------- game switch: Rust, CS2, Telegram NFT gifts; a game marked `soon` shows a placeholder screen ----------
   const GAME_ICON = {
     cs2: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="3.5" fill="currentColor"/><path d="M24 3v11M24 34v11M3 24h11M34 24h11" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
     nft: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="20" width="34" height="22" rx="4" fill="currentColor" opacity=".35"/><rect x="4" y="13" width="40" height="9" rx="3" fill="currentColor"/><path d="M24 13v29" stroke="#141518" stroke-width="4"/><path d="M24 13c-3-7-12-8-12-2.5S20 13 24 13zm0 0c3-7 12-8 12-2.5S28 13 24 13z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>'
@@ -617,7 +618,7 @@
   const GAMES = [
     { id: 'rust', name: 'Rust', sub: 'Скины Rust' },
     { id: 'cs2', name: 'CS2', sub: 'Скины CS2' },
-    { id: 'nft', name: 'NFT Telegram', sub: 'Подарки', soon: true, what: 'NFT-подарки Telegram' }
+    { id: 'nft', name: 'NFT Telegram', sub: 'Подарки' }
   ];
   // the priciest AK reads best as a game icon; fall back to the priciest skin if the catalog changes
   const akIcon = id => {
@@ -727,13 +728,16 @@
       return (p.innerHTML = selGrid(U.lastInputs.map(n => card(byName[n], { static: true, cls: 'flash' })), 'Потеряно', U.lastInputValue));
     }
     if (!skins.length && !U.balanceAdd) {
-      p.innerHTML = `<div class="panel-labels"><span class="panel-title">Выберите скины или скины и баланс</span><span class="panel-sub">Можно выбрать несколько предметов</span></div><div class="item-slot">${WEAPON_SVG}</div>`;
+      const what = U.game === 'nft' ? 'подарки' : 'скины';
+      p.innerHTML = `<div class="panel-labels"><span class="panel-title">Выберите ${what} или ${what} и баланс</span><span class="panel-sub">Можно выбрать несколько предметов</span></div><div class="item-slot">${slotArt()}</div>`;
       return;
     }
     const cards = skins.map(i => card(byName[i.name], { static: true, remove: `data-unselect="${i.uid}"` }));
     if (U.balanceAdd) cards.push(`<div class="balance-chip">${ICON.coin}<span>${fmt(U.balanceAdd)}</span></div>`);
     p.innerHTML = selGrid(cards, 'Ваша ставка', inputValue());
   }
+  // empty-slot silhouette: a gun for skins, a gift box for Telegram NFT
+  const slotArt = () => (U.game === 'nft' ? GAME_ICON.nft.replace('<svg', '<svg class="placeholder-weapon placeholder-gift"') : WEAPON_SVG);
   function selGrid(cards, label, total) {
     return `<div class="sel-grid" data-count="${cards.length}">${cards.join('')}</div>
       <div class="panel-total"><span class="label">${label}</span>${coin(total)}</div>`;
@@ -748,7 +752,7 @@
       return;
     }
     if (!U.targets.length) {
-      p.innerHTML = `<div class="panel-labels"><span class="panel-title">Выберите предмет для апгрейда</span><span class="panel-sub">Или нажмите множитель ниже</span></div><div class="item-slot">${WEAPON_SVG}</div>`;
+      p.innerHTML = `<div class="panel-labels"><span class="panel-title">Выберите предмет для апгрейда</span><span class="panel-sub">Или нажмите множитель ниже</span></div><div class="item-slot">${slotArt()}</div>`;
       return;
     }
     p.innerHTML = selGrid(U.targets.map((n, i) => card(byName[n], { static: true, remove: `data-untarget="${i}"` })), 'Вы получите', targetValue());
@@ -1306,8 +1310,9 @@
   };
   // CS2 skins carry their category from the catalog; Rust ones are guessed by name
   const catOf = name => byName[name].cat || (CATS.weapon.test(name) ? 'weapon' : CATS.clothing.test(name) ? 'clothing' : CATS.deploy.test(name) ? 'deploy' : 'other');
-  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', knife: 'Ножи', gloves: 'Перчатки', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
-  const GAME_LABEL = { all: 'Все игры', rust: 'Rust', cs2: 'CS2' };
+  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', knife: 'Ножи', gloves: 'Перчатки', gift: 'Подарок', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
+  const GAME_LABEL = { all: 'Все игры', rust: 'Rust', cs2: 'CS2', nft: 'NFT Telegram' };
+  const GAME_TAG = { cs2: 'CS2 · ', nft: 'NFT · ' };
   const RARITY_LABEL = { all: 'Все', gray: 'Обычные', blue: 'Необычные', fiol: 'Редкие', pink: 'Засекреченные', red: 'Мифические', yellow: 'Легендарные' };
   const TRADE_RE = /^https:\/\/steamcommunity\.com\/tradeoffer\/new\/\?partner=\d+&token=[\w-]{6,12}$/;
   const INV_PER = 30;
@@ -1393,7 +1398,7 @@
       : !items.length ? '<div class="panel inv-empty"><p>Ничего не найдено</p><span class="muted">Измените фильтры</span></div>'
       : `<div class="inv-grid">${slice.map(i => `<div class="inv-cell${fresh(i.t) ? ' fresh' : ''}">
             ${card(i.skin, { selected: v.sel.has(i.uid), hover: 'check', attrs: `data-isel="${i.uid}"` })}
-            <span class="cat-tag">${i.skin.game === 'cs2' ? 'CS2 · ' : ''}${CAT_LABEL[catOf(i.name)]}</span>
+            <span class="cat-tag">${GAME_TAG[i.skin.game] || ''}${CAT_LABEL[catOf(i.name)]}</span>
           </div>`).join('')}</div>
         <div class="inv-pager">
           <button class="page-btn" data-ipage="-1" ${v.page === 0 ? 'disabled' : ''} aria-label="Назад">${ICON.left}</button>
@@ -1467,10 +1472,19 @@
     if (act === 'withdraw') openWithdraw(sel);
   }
 
+  const TG_USER_RE = /^@?[A-Za-z0-9_]{5,32}$/;
   function openWithdraw(sel) {
     const total = sum(sel.map(i => byName[i.name].price));
-    modal('Вывод в Steam', `
-      <p class="note" style="font-size:13px;color:var(--text-subtitle)">Будет отправлено <b style="color:var(--text-title)">${sel.length} шт.</b> на сумму ${coin(total)}. Бот пришлёт трейд-оффер на вашу ссылку обмена.</p>
+    // NFT gifts go to a Telegram account, skins to a Steam trade link; one request can't mix them
+    const nft = sel.filter(i => byName[i.name].game === 'nft').length;
+    if (nft && nft < sel.length) return toast('NFT-подарки и скины выводятся отдельно', 'error');
+    const head = `<p class="note" style="font-size:13px;color:var(--text-subtitle)">Будет отправлено <b style="color:var(--text-title)">${sel.length} шт.</b> на сумму ${coin(total)}.`;
+    const tgName = (tgUser() && tgUser().username) || S.user.tgName || '';
+    modal(nft ? 'Вывод в Telegram' : 'Вывод в Steam', nft ? `${head} Подарки придут на ваш Telegram-аккаунт.</p>
+      <div class="field"><label for="trade">Telegram-юзернейм получателя</label>
+        <input id="trade" class="text-input" placeholder="@username" value="${esc(tgName ? '@' + tgName.replace(/^@/, '') : '')}"></div>
+      <button class="btn btn-tg" id="doWithdraw" style="height:48px">${ICON.tg}<span>Вывести (демо)</span></button>
+      <p class="note">Демо-режим: настоящий подарок не отправляется, предметы просто списываются из инвентаря и попадают в историю выводов.</p>` : `${head} Бот пришлёт трейд-оффер на вашу ссылку обмена.</p>
       <div class="field"><label for="trade">Ссылка на обмен Steam</label>
         <input id="trade" class="text-input mono" placeholder="https://steamcommunity.com/tradeoffer/new/?partner=...&token=..." value="${esc(S.user.tradeLink || '')}"></div>
       <button class="btn btn-steam" id="doWithdraw" style="height:48px">${ICON.steam}<span>Вывести (демо)</span></button>
@@ -1478,8 +1492,13 @@
     m => {
       $('#doWithdraw', m).onclick = () => {
         const link = $('#trade', m).value.trim();
-        if (!TRADE_RE.test(link)) return toast('Неверная ссылка на обмен', 'error');
-        S.user.tradeLink = link;
+        if (nft) {
+          if (!TG_USER_RE.test(link)) return toast('Неверный юзернейм Telegram', 'error');
+          S.user.tgName = link.replace(/^@/, '');
+        } else {
+          if (!TRADE_RE.test(link)) return toast('Неверная ссылка на обмен', 'error');
+          S.user.tradeLink = link;
+        }
         const uids = new Set(sel.map(i => i.uid));
         S.inventory = S.inventory.filter(i => !uids.has(i.uid));
         S.withdrawals.unshift({ id: Math.floor(rand(1e6, 9e6)), t: Date.now(), items: sel.map(i => i.name), value: total, status: 'sent' });
