@@ -236,11 +236,11 @@
   // server: /api/road records the claim and notifies admins, who send the gift by hand (bot/worker.js, same list)
   // [friends in the game, gift]: 5 regular gifts, then 25 NFTs up to 3 000 stars
   const ROAD = [[5, 'Сердце'], [10, 'Подарок'], [15, 'Мишка'], [20, 'Букет'], [25, 'Алмаз'],
-    [30, 'Big Year #22608'], [35, 'Candy Cane #42032'], [40, 'B-Day Candle #158980'], [45, 'Clover Pin #185914'], [50, 'Bow Tie #15505'],
-    [60, 'Desk Calendar #250031'], [70, 'Eternal Candle #11125'], [80, 'Evil Eye #43197'], [90, 'Berry Box #29950'], [100, 'Fine Pen #26659'],
-    [110, 'Bunny Muffin #14351'], [120, 'Hanging Star #12289'], [140, 'Jingle Bells #34384'], [160, 'Crystal Ball #21104'], [180, 'Flying Broom #13266'],
-    [200, 'Trapped Heart #6334'], [225, 'Skull Flower #8176'], [250, 'Record Player #923'], [300, 'Joyful Bundle #26929'], [350, 'Love Potion #24098'],
-    [400, 'Cupid Charm #10012'], [425, 'Bling Binky #4664'], [450, 'Eternal Rose #18648'], [475, 'Electric Skull #1225'], [500, 'Diamond Ring #26470']];
+    [70, 'Big Year #22608'], [100, 'Candy Cane #42032'], [150, 'B-Day Candle #158980'], [175, 'Clover Pin #185914'], [200, 'Bow Tie #15505'],
+    [250, 'Desk Calendar #250031'], [300, 'Eternal Candle #11125'], [450, 'Evil Eye #43197'], [500, 'Berry Box #29950'], [600, 'Fine Pen #26659'],
+    [700, 'Bunny Muffin #14351'], [800, 'Hanging Star #12289'], [900, 'Jingle Bells #34384'], [1000, 'Crystal Ball #21104'], [1100, 'Flying Broom #13266'],
+    [1200, 'Trapped Heart #6334'], [1300, 'Skull Flower #8176'], [1400, 'Record Player #923'], [1500, 'Joyful Bundle #26929'], [1600, 'Love Potion #24098'],
+    [1700, 'Cupid Charm #10012'], [1800, 'Bling Binky #4664'], [1900, 'Eternal Rose #18648'], [2000, 'Electric Skull #1225'], [2100, 'Diamond Ring #26470']];
   // a gift missing from the catalog still shows up, without a picture
   const ROAD_ITEMS = ROAD.map(([lvl, name]) => ({ lvl, skin: byName[name] || { name, rarity: 'gray', game: 'nft', price: 0, img: '' } }));
   const STAR_COINS = 0.75;   // catalog: 1 star = $0.015, 1 coin = $0.02
