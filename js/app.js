@@ -1314,13 +1314,36 @@
     $('#claimCashback').onclick = () => requireLogin(claimCashback);
     const apply = () => requireLogin(() => {
       const code = $('#promo').value.trim().toUpperCase();
-      if (!PROMOS[code]) return toast('Промокод не найден', 'error');
+      if (!code) return;
       if (S.rewards.promos.includes(code)) return toast('Промокод уже использован', 'error');
+      if (!PROMOS[code]) return redeemDailyPromo(code);
       S.rewards.promos.push(code); addBalance(PROMOS[code]);
       toast(`Промокод активирован: ${coin(PROMOS[code])}`, 'success'); $('#promo').value = '';
     });
     $('#applyPromo').onclick = apply;
     $('#promo').addEventListener('keydown', e => e.key === 'Enter' && apply());
+  }
+  // promo code of the day (posted by the bot at 15:00 MSK): checked and counted on the server, once per account
+  const PROMO_ERR = { not_found: 'Промокод не найден', expired: 'Срок промокода истёк — новый придёт в бота в 15:00 МСК', used: 'Промокод уже использован', limit: 'Активации закончились — ждите новый промокод завтра в 15:00 МСК' };
+  let promoBusy = false;
+  function redeemDailyPromo(code) {
+    if (!refAvailable()) return toast('Промокод дня вводится в игре через Telegram-бота' + (window.RUSTUP_BOT ? ` @${esc(window.RUSTUP_BOT)}` : ''), 'error');
+    if (promoBusy) return;
+    promoBusy = true;
+    const btn = $('#applyPromo');
+    if (btn) btn.disabled = true;
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/promo', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, code })
+    }).then(r => r.json()).then(d => {
+      if (!d.ok) return toast(PROMO_ERR[d.error] || 'Не удалось активировать промокод', 'error');
+      S.rewards.promos.push(code);
+      addBalance(d.amount);
+      sfxWin(); haptic('success');
+      toast(`Промокод активирован: ${coinInt(d.amount)}`, 'success');
+      if ($('#promo')) $('#promo').value = '';
+      refreshUpgrade();
+    }).catch(() => toast('Нет связи с сервером, попробуйте ещё раз', 'error'))
+      .finally(() => { promoBusy = false; if (btn) btn.disabled = false; });
   }
 
   // ---------- profile ----------
