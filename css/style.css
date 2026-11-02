@@ -848,6 +848,31 @@ img { display: block; }
 .case-win { width: 180px; align-self: center; animation: pop .5s cubic-bezier(.22,1,.36,1); }
 .case-win .skin-card { width: 100%; }
 
+/* friends road */
+.road-panel { display: flex; flex-direction: column; gap: 14px; margin-bottom: var(--g-m); padding-bottom: 18px; background: radial-gradient(circle at 100% 0, #d84ae622, transparent 45%), var(--bg-block); }
+.road-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.road-head h4 { margin: 0 0 4px; font-size: 17px; }
+.road-head p { margin: 0; font-size: 13px; line-height: 1.45; }
+.road-count { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding: 8px 14px; border-radius: var(--r-m); background: var(--bg-secondary); }
+.road-count b { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.road-count span { font-size: 11px; color: var(--text-subtitle); }
+.road-scroll { overflow-x: auto; margin: 0 -24px; padding: 4px 24px 6px; scrollbar-width: thin; }
+.road { display: flex; width: max-content; }
+.road-step { position: relative; width: 150px; padding: 0 8px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.road-line { position: absolute; top: 17px; left: -50%; right: 50%; height: 4px; border-radius: 2px; background: var(--bg-secondary); overflow: hidden; }
+.road-step:first-child .road-line { left: 8px; }
+.road-line i { display: block; height: 100%; background: var(--grad-accent); box-shadow: 0 0 8px var(--accent); }
+.road-dot { position: relative; z-index: 1; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; font-size: 13px; font-weight: 800; background: var(--bg-secondary); border: 2px solid #ffffff1a; color: var(--text-subtitle); }
+.road-dot svg { width: 22px; height: 22px; color: var(--success); }
+.road-step.ready .road-dot { background: var(--grad-accent); border-color: #ffffff55; color: #fff; box-shadow: var(--glow-accent); }
+.road-step.claimed .road-dot { border-color: #4fc27a77; background: #1d2a22; }
+.road-step .skin-card { width: 100%; }
+.road-step.locked .skin-card { filter: saturate(.55) brightness(.75); }
+.road-step.ready .skin-card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 18px #e5383b44; }
+.road-btn { width: 100%; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text-other); background: var(--bg-secondary); }
+.btn.road-btn { padding: 0; font-size: 13px; color: #fff; background: var(--grad-accent); }
+.road-btn.done { color: var(--success); background: #4fc27a1a; }
+
 @media (max-width: 1024px) {
   .games-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -884,5 +909,8 @@ img { display: block; }
   .case-hero { gap: 14px; }
   .case-hero-text h1 { font-size: 22px; }
   .roll-cell { flex-basis: 96px; height: 96px; }
+  .road-step { width: 124px; padding: 0 6px; }
+  .road-head { flex-direction: column; gap: 10px; }
+  .road-count { flex-direction: row; gap: 8px; align-items: baseline; }
   .case-items { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 }

@@ -192,6 +192,7 @@
         refreshUpgrade();
       }
       if ($('#refPanel')) renderRefPanel();
+      if ($('#refRoad')) renderRoad();
     }).catch(() => { /* offline: try again on next visit */ }).finally(() => { refBusy = false; });
   }
   function shareRef() {
@@ -229,6 +230,76 @@
       </div>`;
     box.querySelector('[data-ref="copy"]').onclick = copyRef;
     box.querySelector('[data-ref="share"]').onclick = shareRef;
+  }
+  // ---------- friends road: an NFT gift per level of invited friends who opened the game (server: /api/road) ----------
+  const ROAD = [[10, 600], [25, 1500], [50, 3000], [75, 5000], [100, 8000], [150, 15000], [200, 25000], [300, 40000], [400, 70000], [500, 120000]];
+  // each level gets the NFT priced closest to its target coin value (only NFT gifts, not regular ones)
+  const ROAD_ITEMS = (() => {
+    const nfts = POOL.nft.filter(s => s.cat === 'nft'), used = new Set();
+    return ROAD.map(([lvl, target]) => {
+      const skin = nfts.filter(s => !used.has(s.name))
+        .reduce((a, b) => (Math.abs(Math.log(b.price / target)) < Math.abs(Math.log(a.price / target)) ? b : a));
+      used.add(skin.name);
+      return { lvl, skin };
+    });
+  })();
+  let roadBusy = false;
+  function renderRoad() {
+    const box = $('#refRoad');
+    if (!box) return;
+    const active = REF ? REF.active : 0, claimed = new Set((REF && REF.road) || []);
+    box.innerHTML = `
+      <div class="road-head">
+        <div><h4>Дорога друзей</h4><p class="muted">NFT-подарок за каждую ступень. Считаются друзья, которые зашли в игру по вашей ссылке.</p></div>
+        <div class="road-count"><b>${fmtInt(active)}</b><span>друзей в игре</span></div>
+      </div>
+      <div class="road-scroll"><div class="road">${ROAD_ITEMS.map((r, i) => {
+        const st = claimed.has(r.lvl) ? 'claimed' : active >= r.lvl ? 'ready' : 'locked';
+        const prev = i ? ROAD_ITEMS[i - 1].lvl : 0;
+        const pct = Math.max(0, Math.min(100, ((active - prev) / (r.lvl - prev)) * 100));
+        return `<div class="road-step ${st}">
+          <span class="road-line"><i style="width:${pct}%"></i></span>
+          <span class="road-dot">${st === 'claimed' ? ICON.check : r.lvl}</span>
+          ${card(r.skin, { static: true })}
+          ${st === 'ready' ? `<button class="btn btn-accent road-btn" data-road="${r.lvl}">Забрать</button>`
+            : st === 'claimed' ? '<span class="road-btn done">Получено</span>'
+            : `<span class="road-btn">Ещё ${fmtInt(r.lvl - active)}</span>`}
+        </div>`;
+      }).join('')}</div></div>
+      ${refAvailable() ? '' : '<p class="note">Награды выдаются в Telegram-боте — там считаются приглашённые друзья.</p>'}`;
+    box.querySelectorAll('[data-road]').forEach(b => { b.onclick = () => claimRoad(+b.dataset.road, b); });
+    // start the strip at the first reward that is not taken yet
+    const next = box.querySelector('.road-step.ready, .road-step.locked');
+    const sc = box.querySelector('.road-scroll');
+    if (next) sc.scrollLeft = Math.max(0, next.getBoundingClientRect().left - sc.getBoundingClientRect().left - 24);
+  }
+  function claimRoad(lvl, btn) {
+    if (!refAvailable() || roadBusy) return;
+    const r = ROAD_ITEMS.find(x => x.lvl === lvl);
+    roadBusy = true; btn.disabled = true; btn.textContent = '…';
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/road', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, level: lvl })
+    }).then(res => res.json()).then(d => {
+      if (!d.ok) return toast(d.active != null ? `Нужно ${lvl} друзей в игре, сейчас ${d.active}` : 'Не удалось забрать награду', 'error');
+      REF.road = [...(REF.road || []), lvl];
+      if (!d.claimed) return toast('Эта награда уже получена', 'error');
+      addItem(r.skin.name); save();
+      sfxWin();
+      modal('Награда за друзей', `
+        <div class="case-win">${card(r.skin, { static: true })}</div>
+        <p class="note" style="text-align:center">NFT-подарок за ${lvl} друзей уже в инвентаре.</p>
+        <a class="btn btn-accent" href="#/inventory" data-close-go style="height:48px">В инвентарь</a>`,
+      m => $('[data-close-go]', m).addEventListener('click', closeModal));
+    }).catch(() => toast('Нет связи с сервером, попробуйте ещё раз', 'error'))
+      .finally(() => { roadBusy = false; renderRoad(); });
+  }
+  function friendsPage() {
+    $('#page').innerHTML = `<div class="page">
+      <h1 class="up-title" style="margin-bottom:16px">Друзья</h1>
+      <div class="panel ref-panel" id="refPanel"></div>
+      <div class="panel road-panel" id="refRoad"></div>
+    </div>`;
+    renderRefPanel(); renderRoad(); refSync();
   }
   function startStatsPing() {
     if (!TG || !window.RUSTUP_API) return;
@@ -1183,6 +1254,7 @@
         <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${BONUS_TXT}`}</span></button>
       </div>
       <div class="panel ref-panel" id="refPanel"></div>
+      <div class="panel road-panel" id="refRoad"></div>
       <div class="cards-3">
         <div class="panel reward-card"><span class="glow"></span>
           <h4>Ежедневный подарок</h4>
@@ -1212,6 +1284,7 @@
 
     $('#claimDaily').onclick = claimDaily;
     renderRefPanel();
+    renderRoad();
     refSync();
     $('#claimLevel').onclick = () => requireLogin(() => {
       S.rewards.claimedLevel = li.lvl; addBalance(lvlReward);
@@ -1863,8 +1936,8 @@
         : `<button class="hero-slide hs-tg" data-tg-bonus>
           <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${BONUS_TXT}<br>монет</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
           <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`,
-      `<a class="hero-slide hs-friends" href="#/rewards">
-        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">+5 000 монет за каждого друга</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
+      `<a class="hero-slide hs-friends" href="#/friends">
+        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">+5 000 монет за друга и NFT-подарки</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
         <span class="hero-art"><img class="ha-bear" src="${giftImg('Мишка')}" alt="" draggable="false"><img class="ha-rocket" src="${giftImg('Ракета')}" alt="" draggable="false"></span></a>`
     ];
   }
@@ -1877,7 +1950,7 @@
       { href: '#/upgrade?game=nft', cls: 'gc-nft', title: 'Апгрейд NFT', share: 0.12, art: `<img class="gc-img nft" src="${akIcon('nft').img}" alt="" draggable="false">` },
       { href: '#/cases', cls: 'gc-cases', title: 'Кейсы', share: 0.21, badge: 'FREE', art: CASES.map((c, i) => { const s = caseItems(c)[0].skin; return `<img class="gc-mini m${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`; }).join('') },
       { href: '#/rewards', cls: 'gc-bonus', title: 'Бонусы', share: 0.08, art: `<img class="gc-img gift" src="${giftImg('Подарок')}" alt="" draggable="false">` },
-      { href: '#/rewards', cls: 'gc-friends', title: 'Друзья', share: 0.05, badge: '+5 000', art: `<img class="gc-img gift" src="${giftImg('Мишка')}" alt="" draggable="false">` }
+      { href: '#/friends', cls: 'gc-friends', title: 'Друзья', share: 0.05, badge: 'NFT', art: `<img class="gc-img gift" src="${giftImg('Мишка')}" alt="" draggable="false">` }
     ];
     $('#page').innerHTML = `<div class="page home">
       <div class="hero">
@@ -1930,6 +2003,7 @@
     switch (path) {
       case '/upgrade': upgradePage(); break;
       case '/cases': casesPage(); break;
+      case '/friends': friendsPage(); break;
       case '/rewards': rewardsPage(); break;
       case '/inventory': inventoryPage(); break;
       case '/profile': profilePage(); break;
