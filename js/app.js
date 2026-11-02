@@ -32,7 +32,7 @@
 
   const ICON = {
     coin: '<svg viewBox="0 0 20 20" aria-hidden="true"><polygon points="10,1 18,5.5 18,14.5 10,19 2,14.5 2,5.5" fill="#e0a83a"/><polygon points="10,3.5 15.8,6.8 15.8,13.2 10,16.5 4.2,13.2 4.2,6.8" fill="#b97a1c"/><path d="M10 5.5l3.6 2.1v4.8L10 14.5l-3.6-2.1V7.6z" fill="#f6cf6a"/><path d="M8.3 8.2h2.4a1.3 1.3 0 010 2.6H9.4l2 2" fill="none" stroke="#8a5510" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-    plus: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#cd412b"/><path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    plus: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#e5383b"/><path d="M12 7v10M7 12h10" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>',
     cart: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#7c954d"/><path d="M6.5 8h1.6l1.4 6.2h6.3l1.2-4.6H9" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10.3" cy="16.6" r="1" fill="#fff"/><circle cx="15.2" cy="16.6" r="1" fill="#fff"/></svg>',
     check: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     x: '<svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -225,8 +225,8 @@
     TG.ready();
     TG.expand();
     try {
-      if (tgVer('6.1')) { TG.setHeaderColor('#161616'); TG.setBackgroundColor('#020202'); }
-      if (tgVer('7.10')) TG.setBottomBarColor('#161616');
+      if (tgVer('6.1')) { TG.setHeaderColor('#141518'); TG.setBackgroundColor('#141518'); }
+      if (tgVer('7.10')) TG.setBottomBarColor('#141518');
       if (tgVer('7.7')) TG.disableVerticalSwipes();   // scrolling the page must not collapse the app
     } catch (e) { /* older client */ }
     if (tgVer('6.1')) TG.BackButton.onClick(() => { if (history.length > 1) history.back(); else location.hash = '#/'; });
@@ -247,6 +247,7 @@
     spinning: false,
     result: null,          // 'win' | 'lose'
     angle: 0,
+    game: 'rust',          // upgrade tab: 'rust' | 'cs2' | 'nft'
     // inventory page
     inv: { sel: new Set(), q: '', rarity: 'all', cat: 'all', sort: 'price-desc', page: 0, view: 'items' }
   };
@@ -459,18 +460,16 @@
     <a href="#" aria-label="Discord">${ICON.ds}</a>`;
 
   function renderHeader() {
-    $('#headerSocials').innerHTML = socials();
     $('#footerSocials').innerHTML = socials();
     const us = $('#userSection');
     if (!S.user) {
-      us.innerHTML = `<button class="btn btn-steam" data-login>${ICON.steam}<span>Войти через Steam</span></button>`;
+      us.innerHTML = `<button class="btn btn-steam" data-login>${ICON.steam}<span>Войти</span></button>`;
     } else {
       us.innerHTML = `
-        <div class="wallet-group${tgBonusDone() ? ' solo' : ''}">
-          <div class="balance">${coin(S.balance)}</div>
-          ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${BONUS_TXT}</span></button>`}
-        </div>
-        <button class="btn btn-icon bell" data-bell aria-label="Уведомления">${ICON.bell}${dailyReady() ? '<span class="dot"></span>' : ''}</button>
+        <a class="balance" href="#/inventory" aria-label="Баланс">${coin(S.balance)}</a>
+        ${tgBonusDone()
+          ? `<a class="btn btn-accent btn-pill" href="#/rewards">${ICON.gift}<span>Бонусы</span>${dailyReady() ? '<span class="dot"></span>' : ''}</a>`
+          : `<button class="btn btn-accent btn-pill" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${BONUS_TXT}</span></button>`}
         <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color)}</a>`;
     }
     document.querySelectorAll('.nav-item[data-route="/rewards"]').forEach(a => {
@@ -503,23 +502,18 @@
   const feed = [];
   let best = null;
 
-  function feedItem(d) {
-    return `<a class="drop${d.enter ? ' enter' : ''}" href="#/" data-user="${esc(d.user)}">
-      ${card(d.skin, { price: false, static: true })}
-      <span class="badge">${ICON.bolt}${d.chance.toFixed(2)} %</span>
-      <span class="drop-name">${esc(d.skin.name)}</span>
-      <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava')}<span>${esc(d.user)}</span></span>
+  function feedItem(d, cls = 'drop') {
+    return `<a class="${cls} rarity-${d.skin.rarity}${d.enter ? ' enter' : ''}" href="#/" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
+      <span class="drop-img"><img src="${d.skin.img}" alt="${esc(d.skin.name)}" draggable="false"></span>
+      <span class="drop-info">
+        <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava')}<span>${esc(d.user)}</span></span>
+        <span class="drop-price">${coin(d.skin.price)}</span>
+      </span>
     </a>`;
   }
   function renderBest(enter) {
     if (!best) return;
-    $('#bestDrop').innerHTML = `<a class="best${enter ? ' enter' : ''}" href="#/" title="Лучший дроп за час: ${esc(best.skin.name)} — ${esc(best.user)}">
-      <span class="best-glow"></span>
-      <span class="best-skin"><img src="${best.skin.img}" alt="${esc(best.skin.name)}"></span>
-      <span class="badge best">${ICON.bolt}${best.chance.toFixed(2)} %</span>
-      <span class="best-label">ЛУЧШИЙ ЗА ЧАС</span>
-      <span class="drop-name">${esc(best.skin.name)}</span>
-    </a>`;
+    $('#bestDrop').innerHTML = feedItem({ ...best, enter }, 'drop best');
   }
   function pushDrop(d) {
     feed.unshift(d);
@@ -538,22 +532,17 @@
   function initFeed() {
     const seed = Array.from({ length: 16 }, botDrop);
     seed.forEach(d => feed.push(d));
-    $('#drops').innerHTML = feed.map(feedItem).join('');
+    $('#drops').innerHTML = feed.map(d => feedItem(d)).join('');
     best = seed.reduce((a, b) => (b.skin.price > a.skin.price ? b : a));
     renderBest(false);
     (function loop() {
       setTimeout(() => { pushDrop(botDrop()); bumpStats(); loop(); }, rand(1800, 4200));
     })();
-    // embers
-    $('#embers').innerHTML = Array.from({ length: 11 }, (_, i) =>
-      `<span class="ember" style="--x:${8 + i * 8}%;--size:${2 + (i % 2)}px;--duration:${rand(3, 4.6).toFixed(1)}s;--delay:-${rand(0, 3.5).toFixed(1)}s;--drift:${(i % 2 ? -1 : 1) * Math.round(rand(5, 12))}px"></span>`).join('');
   }
-  let online = 1055, upgradesTotal = 46027915;
+  let online = 1055;
   function bumpStats() {
     online = Math.max(700, Math.round(online + rand(-6, 7)));
-    upgradesTotal += Math.floor(rand(1, 4));
     $('#statOnline').textContent = fmtInt(online);
-    $('#statUpgrades').textContent = fmtInt(upgradesTotal);
   }
 
   // ---------- upgrade math ----------
@@ -587,14 +576,14 @@
   function wheelSvg() {
     const ticks = Array.from({ length: 60 }, (_, i) => {
       const a = (i * 6 - 90) * Math.PI / 180, r1 = i % 5 ? 95 : 93, r2 = 98;
-      return `<line x1="${100 + r1 * Math.cos(a)}" y1="${100 + r1 * Math.sin(a)}" x2="${100 + r2 * Math.cos(a)}" y2="${100 + r2 * Math.sin(a)}" stroke="${i % 5 ? '#3a352e' : '#5e574c'}" stroke-width="${i % 5 ? 0.8 : 1.4}"/>`;
+      return `<line x1="${100 + r1 * Math.cos(a)}" y1="${100 + r1 * Math.sin(a)}" x2="${100 + r2 * Math.cos(a)}" y2="${100 + r2 * Math.sin(a)}" stroke="${i % 5 ? '#3a3d45' : '#5d616b'}" stroke-width="${i % 5 ? 0.8 : 1.4}"/>`;
     }).join('');
     return `<svg class="wheel-svg" viewBox="0 0 200 200">
       <defs>
-        <radialGradient id="wInner" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#211d18"/><stop offset="1" stop-color="#0b0a09"/></radialGradient>
-        <linearGradient id="wRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b2722"/><stop offset=".5" stop-color="#151311"/><stop offset="1" stop-color="#2b2722"/></linearGradient>
+        <radialGradient id="wInner" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#2a2d34"/><stop offset="1" stop-color="#16171b"/></radialGradient>
+        <linearGradient id="wRing" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2c2f36"/><stop offset=".5" stop-color="#1b1d22"/><stop offset="1" stop-color="#2c2f36"/></linearGradient>
       </defs>
-      <circle cx="100" cy="100" r="99" fill="url(#wRing)" stroke="#020202" stroke-width="1"/>
+      <circle cx="100" cy="100" r="99" fill="url(#wRing)" stroke="#0e0f12" stroke-width="1"/>
       ${ticks}
       <circle class="wheel-ring-glow" cx="100" cy="100" r="84" fill="none" stroke-width="16"/>
       <circle cx="100" cy="100" r="84" fill="none" stroke="var(--wheel-bg)" stroke-width="14"/>
@@ -606,9 +595,53 @@
     </svg>`;
   }
 
-  function upgradePage() {
+  // ---------- game switch: only Rust works for now, CS2 and Telegram NFT are "coming soon" ----------
+  const GAME_ICON = {
+    cs2: '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="3.5" fill="currentColor"/><path d="M24 3v11M24 34v11M3 24h11M34 24h11" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+    nft: '<svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="20" width="34" height="22" rx="4" fill="currentColor" opacity=".35"/><rect x="4" y="13" width="40" height="9" rx="3" fill="currentColor"/><path d="M24 13v29" stroke="#141518" stroke-width="4"/><path d="M24 13c-3-7-12-8-12-2.5S20 13 24 13zm0 0c3-7 12-8 12-2.5S28 13 24 13z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg>'
+  };
+  const GAMES = [
+    { id: 'rust', name: 'Rust', sub: 'Скины Rust' },
+    { id: 'cs2', name: 'CS2', sub: 'Скины CS2', soon: true, what: 'скины Counter-Strike 2' },
+    { id: 'nft', name: 'NFT Telegram', sub: 'Подарки', soon: true, what: 'NFT-подарки Telegram' }
+  ];
+  // the priciest AK reads best as a "Rust" icon; fall back to the priciest skin if the catalog changes
+  const rustIcon = () => {
+    const ak = SKINS.filter(s => /AK47/.test(s.name));
+    return (ak.length ? ak : SKINS).reduce((a, b) => (b.price > a.price ? b : a));
+  };
+  const gameIcon = id => (id === 'rust' ? `<img src="${rustIcon().img}" alt="" draggable="false">` : GAME_ICON[id]);
+
+  function gameSwitch() {
+    return `<div class="game-switch" role="tablist" aria-label="Игра">${GAMES.map(g => `
+      <button class="game-tab game-${g.id}${U.game === g.id ? ' active' : ''}" data-game="${g.id}" role="tab" aria-selected="${U.game === g.id}">
+        <span class="game-icon">${gameIcon(g.id)}</span>
+        <span class="game-text"><b>${g.name}</b><small>${g.sub}</small></span>
+        ${g.soon ? '<span class="soon-badge">Скоро</span>' : ''}
+      </button>`).join('')}</div>`;
+  }
+
+  function soonPage(g) {
     $('#page').innerHTML = `<div class="page">
-      <div class="page-logo"><span class="logo"><span class="logo-rust">RUST</span><span class="logo-up">UP</span></span><p>Апгрейд предметов Rust</p></div>
+      <div class="up-head"><h1 class="up-title">Апгрейд</h1>${gameSwitch()}</div>
+      <div class="soon game-${g.id}">
+        <div class="soon-preview" aria-hidden="true"><span></span><span class="soon-circle"></span><span></span></div>
+        <div class="soon-body">
+          <span class="soon-art">${GAME_ICON[g.id]}</span>
+          <span class="soon-badge">Скоро</span>
+          <h2>Апгрейд ${g.name}</h2>
+          <p>Режим в разработке: скоро здесь можно будет улучшать ${g.what}. А пока доступен апгрейд скинов Rust.</p>
+          <button class="btn btn-accent btn-pill" data-game="rust">Перейти к Rust</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function upgradePage() {
+    const g = GAMES.find(x => x.id === U.game) || GAMES[0];
+    if (g.soon) return soonPage(g);
+    $('#page').innerHTML = `<div class="page">
+      <div class="up-head"><h1 class="up-title">Апгрейд</h1>${gameSwitch()}</div>
       <div class="upgrader">
         <div class="controls-bar">
           <button class="btn btn-icon" id="ctlSound" title="Звук"></button>
@@ -619,14 +652,14 @@
         <div class="wheel-cell"><div class="wheel-wrap" id="wheel">
           ${wheelSvg()}
           <div class="wheel-arrow" id="wArrow" style="transform:rotate(${U.angle % 360}deg)">
-            <svg viewBox="0 0 40 46"><path d="M20 44L4 8a4 4 0 013.6-6h24.8A4 4 0 0136 8z" fill="#f2f3f2" stroke="#020202" stroke-width="2"/><path d="M20 36L10 10h20z" fill="#cd412b"/></svg>
+            <svg viewBox="0 0 40 46"><path d="M20 44L4 8a4 4 0 013.6-6h24.8A4 4 0 0136 8z" fill="#f4f5f7" stroke="#141518" stroke-width="2"/><path d="M20 36L10 10h20z" fill="#e5383b"/></svg>
           </div>
           <div class="wheel-overlay"><span class="chance-percent" id="wPercent">0.00 %</span><span class="chance-label" id="wLabel">Выберите предметы</span></div>
         </div></div>
         <div class="item-panel left" id="leftPanel"></div>
         <div class="item-panel right" id="rightPanel"></div>
         <div class="balance-bar" id="balanceBar"></div>
-        <button class="btn upgrade-btn" id="upBtn">Апгрейд</button>
+        <button class="btn upgrade-btn" id="upBtn">Улучшить</button>
         <span class="upgrade-hint" id="upHint"></span>
         <div class="multipliers-bar" id="mults"></div>
       </div>
@@ -743,7 +776,7 @@
     const v = validity();
     const b = $('#upBtn');
     b.disabled = U.spinning || (!v.ok && S.user);
-    b.textContent = U.spinning ? 'Крутим…' : S.user ? 'Апгрейд' : 'Войти и играть';
+    b.textContent = U.spinning ? 'Крутим…' : S.user ? 'Улучшить' : 'Войти и играть';
     $('#upHint').textContent = U.spinning ? '' : v.msg;
   }
 
@@ -866,6 +899,11 @@
     if (t.closest('[data-bell]')) { location.hash = '#/rewards'; return; }
     if (U.spinning) return;
 
+    const gm = t.closest('[data-game]');
+    if (gm) {
+      if (gm.dataset.game !== U.game) { U.game = gm.dataset.game; U.result = null; haptic('light'); upgradePage(); }
+      return;
+    }
     const un = t.closest('[data-unselect]');
     if (un) { U.inputs.delete(un.dataset.unselect); U.result = null; U.mult = null; return refreshUpgrade(); }
     const ut = t.closest('[data-untarget]');
@@ -1029,7 +1067,7 @@
     host.appendChild(cv);
     const w = cv.width = host.clientWidth * devicePixelRatio, h = cv.height = host.clientHeight * devicePixelRatio;
     const ctx = cv.getContext('2d');
-    const cols = ['#cd412b', '#ffdd59', '#84b030', '#f2f3f2', '#ae6eee'];
+    const cols = ['#e5383b', '#ff7a6b', '#f4f5f7', '#9aa0aa', '#ffd166'];
     const ps = Array.from({ length: 90 }, () => ({ x: w / 2, y: h * 0.6, vx: rand(-1, 1) * 9 * devicePixelRatio, vy: rand(-14, -5) * devicePixelRatio, s: rand(3, 7) * devicePixelRatio, c: pick(cols), r: rand(0, 6), vr: rand(-.3, .3) }));
     const t0 = performance.now();
     (function f(now) {
@@ -1437,7 +1475,10 @@
 
   // ---------- router ----------
   function route() {
-    const path = (location.hash.replace(/^#/, '') || '/').split('?')[0];
+    const [path, query] = (location.hash.replace(/^#/, '') || '/').split('?');
+    // deep link to an upgrade tab: #/?game=cs2
+    const game = new URLSearchParams(query || '').get('game');
+    if (game && GAMES.some(g => g.id === game)) U.game = game;
     document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === path));
     if (path !== '/') U.result = null;
     if (tgVer('6.1')) TG.BackButton[path === '/' ? 'hide' : 'show']();
