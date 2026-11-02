@@ -20,7 +20,9 @@
   const SKINS = [
     ...window.SKINS.map(s => ({ ...s, game: 'rust' })),
     ...(window.SKINS_CS2 || []).map(s => ({ ...s, game: 'cs2' })),
-    ...(window.SKINS_NFT || []).map(s => ({ ...s, game: 'nft' }))
+    // the Telegram tab holds both NFT gifts and regular (star) gifts
+    ...(window.SKINS_NFT || []).map(s => ({ ...s, game: 'nft' })),
+    ...(window.SKINS_GIFTS || []).map(s => ({ ...s, game: 'nft' }))
   ].map((s, i) => ({ ...s, id: i }));
   const byName = Object.fromEntries(SKINS.map(s => [s.name, s]));
   // per-game skins, cheapest first
@@ -1310,9 +1312,9 @@
   };
   // CS2 skins carry their category from the catalog; Rust ones are guessed by name
   const catOf = name => byName[name].cat || (CATS.weapon.test(name) ? 'weapon' : CATS.clothing.test(name) ? 'clothing' : CATS.deploy.test(name) ? 'deploy' : 'other');
-  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', knife: 'Ножи', gloves: 'Перчатки', gift: 'Подарок', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
+  const CAT_LABEL = { all: 'Все типы', weapon: 'Оружие', knife: 'Ножи', gloves: 'Перчатки', nft: 'NFT', gift: 'Подарок', clothing: 'Одежда', deploy: 'Постройки', other: 'Прочее' };
   const GAME_LABEL = { all: 'Все игры', rust: 'Rust', cs2: 'CS2', nft: 'NFT Telegram' };
-  const GAME_TAG = { cs2: 'CS2 · ', nft: 'NFT · ' };
+  const GAME_TAG = { cs2: 'CS2 · ' };
   const RARITY_LABEL = { all: 'Все', gray: 'Обычные', blue: 'Необычные', fiol: 'Редкие', pink: 'Засекреченные', red: 'Мифические', yellow: 'Легендарные' };
   const TRADE_RE = /^https:\/\/steamcommunity\.com\/tradeoffer\/new\/\?partner=\d+&token=[\w-]{6,12}$/;
   const INV_PER = 30;
