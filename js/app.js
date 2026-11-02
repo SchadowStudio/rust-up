@@ -171,6 +171,9 @@
     fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/ping', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
       body: JSON.stringify({ initData: TG.initData, balance: S.balance, nick: S.user.name })
+    }).then(r => r.json()).then(d => {
+      // an admin gave coins (/give in the bot): collect them right away
+      if (d && d.grants) refSync();
     }).catch(() => { /* offline: next tick */ });
   }
   // ---------- referrals (server: bot/worker.js /api/ref) ----------
@@ -189,6 +192,12 @@
         addBalance(d.credited);
         sfxWin();
         toast(`Награда за друзей: ${coinInt(d.credited)}`, 'success');
+        refreshUpgrade();
+      }
+      if (d.granted > 0) {
+        addBalance(d.granted);
+        sfxWin(); haptic('success');
+        toast(`Начислено администрацией: ${coinInt(d.granted)}${d.grantNote ? ` — ${esc(d.grantNote)}` : ''}`, 'success');
         refreshUpgrade();
       }
       if ($('#refPanel')) renderRefPanel();
