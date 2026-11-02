@@ -1047,6 +1047,8 @@
     if (chk) return manualSubsCheck(chk);
     const oc = t.closest('[data-open-case]');
     if (oc) return openCase(oc.dataset.openCase, oc);
+    const cc = t.closest('[data-case-count]');
+    if (cc) return setCaseCount(Number(cc.dataset.caseCount));
     if (U.spinning) return;
 
     const gm = t.closest('[data-game]');
@@ -1854,7 +1856,20 @@
   // ---------- case page: roulette ----------
   const ROUL_N = 56, ROUL_WIN = 46;   // strip length and the index the winner lands on
   let caseSpinning = false;
+  // paid cases open up to 5 at once (one roulette per case); free cases are always one
+  const CASE_COUNTS = [1, 2, 3, 4, 5];
+  let caseCount = 1;
+  const countFor = c => (c.paid ? caseCount : 1);
   const rollCell = s => `<div class="roll-cell rarity-${s.rarity}"><img class="${imgCls(s).trim()}" src="${s.img}" alt="" draggable="false"></div>`;
+  const roulettes = (c, n) => Array.from({ length: n }, () =>
+    `<div class="roulette${n > 1 ? ' multi' : ''}"><div class="roulette-track">${Array.from({ length: 14 }, () => rollCell(rollCase(c))).join('')}</div><span class="roulette-marker"></span></div>`).join('');
+  function setCaseCount(n) {
+    const c = caseById(curPath().slice(6));
+    if (!c || !c.paid || caseSpinning || !CASE_COUNTS.includes(n)) return;
+    caseCount = n;
+    $('#roulettes').innerHTML = roulettes(c, n);
+    $('#caseActions').innerHTML = caseActions(c);
+  }
   function caseActions(c) {
     const st = caseState(c);
     if (st === 'login') return `<button class="btn btn-accent case-open" data-login>Войти и открыть</button>`;
@@ -1862,11 +1877,12 @@
     if (st === 'cooldown') return `<button class="btn btn-accent case-open" disabled>Следующий через&nbsp;<span data-timer-left>${mmss(timerLeft())}</span></button>
         <a class="btn btn-ghost case-next" href="#/upgrade">К апгрейду</a>`;
     if (st === 'buy') {
-      const price = casePrice(c);
-      return S.balance >= price
-        ? `<button class="btn btn-accent case-open" data-open-case="${c.id}">Открыть за ${coinInt(price, 20)}</button>`
+      const n = countFor(c), price = casePrice(c) * n;
+      const counts = `<div class="case-count">${CASE_COUNTS.map(k => `<button class="cc-btn${k === n ? ' on' : ''}" data-case-count="${k}">x${k}</button>`).join('')}</div>`;
+      return counts + (S.balance >= price
+        ? `<button class="btn btn-accent case-open" data-open-case="${c.id}">Открыть${n > 1 ? ` ${n} шт.` : ''} за ${coinInt(price, 20)}</button>`
         : `<button class="btn btn-accent case-open" disabled>Не хватает ${coin(price - S.balance, 18)}</button>
-          <a class="btn btn-ghost case-next" href="#/rewards">Получить монеты</a>`;
+          <a class="btn btn-ghost case-next" href="#/rewards">Получить монеты</a>`);
     }
     if (st === 'opened') {
       const next = casesLeft()[0];
@@ -1890,7 +1906,7 @@
           ? `<span class="case-kicker">Бесплатно каждые 15 минут</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · Rust, CS2 и NFT · до ${coinInt(500)}</span>`
           : `<span class="case-kicker">Бесплатный кейс</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · один раз на аккаунт</span>`}</div>
       </div>
-      <div class="roulette" id="roulette"><div class="roulette-track" id="rTrack">${Array.from({ length: 14 }, () => rollCell(rollCase(c))).join('')}</div><span class="roulette-marker"></span></div>
+      <div class="roulettes" id="roulettes">${roulettes(c, countFor(c))}</div>
       <div class="case-actions" id="caseActions">${caseActions(c)}</div>
       <div class="row-head"><h2 class="home-title">Содержимое кейса</h2></div>
       <div class="case-items">${items.map(i => `<div class="case-item">${card(i.skin, { static: true })}<span class="chance-tag">${i.chance < 1 ? i.chance.toFixed(2) : i.chance.toFixed(1)}%</span></div>`).join('')}</div>
@@ -1902,9 +1918,9 @@
     const c = caseById(id);
     if (!c || caseSpinning || !S.user) return;
     if (c.paid) {
-      const price = casePrice(c);
+      const n = countFor(c), price = casePrice(c) * n;
       if (S.balance < price) return toast(`Недостаточно монет: нужно ${coin(price)}`, 'error');
-      return spinCase(c);
+      return spinCase(c, n);
     }
     if (c.timer) return timerLeft() ? toast(`Следующий кейс через ${mmss(timerLeft())}`, 'error') : spinCase(c);
     if (S.rewards.cases[c.id]) return;
@@ -1922,23 +1938,26 @@
     });
   }
 
-  function spinCase(c) {
-    const win = rollCase(c);
+  function spinCase(c, n = 1) {
+    const wins = Array.from({ length: n }, () => rollCase(c));
     // commit first so a reload mid-spin can't open the case twice
-    const itemUid = uid();
-    S.inventory.push({ uid: itemUid, name: win.name, t: Date.now() });
-    if (c.paid) addBalance(-casePrice(c));
+    const uids = wins.map(w => { const u = uid(); S.inventory.push({ uid: u, name: w.name, t: Date.now() }); return u; });
+    if (c.paid) addBalance(-casePrice(c) * n);
     else if (c.timer) S.rewards.timerCase = Date.now();
     else S.rewards.cases[c.id] = Date.now();
     save();
     caseSpinning = true;
-    $('#caseActions').innerHTML = '<button class="btn btn-accent case-open" disabled>Открываем…</button>';
-    const track = $('#rTrack'), view = $('#roulette');
-    track.innerHTML = Array.from({ length: ROUL_N }, (_, i) => rollCell(i === ROUL_WIN ? win : rollCase(c))).join('');
-    track.style.transform = 'translateX(0)';
-    const cellW = track.firstElementChild.offsetWidth;
-    const step = cellW + (parseFloat(getComputedStyle(track).columnGap) || 0);
-    const end = ROUL_WIN * step + cellW * rand(0.15, 0.85) - view.clientWidth / 2;
+    $('#caseActions').innerHTML = `<button class="btn btn-accent case-open" disabled>Открываем${n > 1 ? ` ${n} шт.` : ''}…</button>`;
+    // one roulette per case; they spin together and each stops on its own winner
+    $('#roulettes').innerHTML = roulettes(c, n);
+    const strips = [...document.querySelectorAll('#roulettes .roulette')].map((view, k) => {
+      const track = view.firstElementChild;
+      track.innerHTML = Array.from({ length: ROUL_N }, (_, i) => rollCell(i === ROUL_WIN ? wins[k] : rollCase(c))).join('');
+      track.style.transform = 'translateX(0)';
+      const cellW = track.firstElementChild.offsetWidth;
+      const step = cellW + (parseFloat(getComputedStyle(track).columnGap) || 0);
+      return { view, track, step, end: ROUL_WIN * step + cellW * rand(0.15, 0.85) - view.clientWidth / 2 };
+    });
     const dur = S.settings.fast ? 2600 : 6500;
     const ease = t => 1 - Math.pow(1 - t, 4);
     const t0 = performance.now();
@@ -1946,9 +1965,9 @@
     requestAnimationFrame(function frame(now) {
       if (done) return;
       const t = Math.min(1, (now - t0) / dur);
-      const x = end * ease(t);
-      if (track.isConnected) track.style.transform = `translateX(${-x}px)`;
-      const cell = Math.floor((x + view.clientWidth / 2) / step);
+      strips.forEach(s => { if (s.track.isConnected) s.track.style.transform = `translateX(${-s.end * ease(t)}px)`; });
+      // one tick sound for all strips: they move at the same speed
+      const s0 = strips[0], cell = Math.floor((s0.end * ease(t) + s0.view.clientWidth / 2) / s0.step);
       if (cell !== lastCell) { lastCell = cell; beep(1400, 0.015, 'square', 0.02); }
       if (t < 1) requestAnimationFrame(frame);
     });
@@ -1956,32 +1975,35 @@
     setTimeout(() => {
       done = true;
       caseSpinning = false;
-      if (track.isConnected) {
-        track.style.transform = `translateX(${-end}px)`;
-        track.children[ROUL_WIN].classList.add('win');
-      }
+      strips.forEach(s => {
+        if (!s.track.isConnected) return;
+        s.track.style.transform = `translateX(${-s.end}px)`;
+        s.track.children[ROUL_WIN].classList.add('win');
+      });
       sfxWin();
-      // a paid case that paid out less than its price counts as a loss for cashback
-      const cb = c.paid ? addCashback(casePrice(c) - win.price) : 0;
+      // paid cases that paid out less than their price count as a loss for cashback
+      const cb = c.paid ? addCashback(casePrice(c) * n - sum(wins.map(w => w.price))) : 0;
       if (cb) toast(`Кешбэк +${coin(cb)} — забрать в «Бонусах»`, 'success');
-      pushDrop({ user: S.user.name, color: S.user.color, skin: win, chance: 100, t: Date.now() });
+      wins.forEach(w => pushDrop({ user: S.user.name, color: S.user.color, skin: w, chance: 100, t: Date.now() }));
       if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
-      showCaseWin(c, win, itemUid);
+      showCaseWin(c, wins, uids);
     }, dur + 30);
   }
 
-  function showCaseWin(c, skin, itemUid) {
+  function showCaseWin(c, wins, uids) {
+    const n = wins.length, total = sum(wins.map(w => w.price));
     const next = c.paid ? null : casesLeft()[0];
-    const again = c.paid && S.balance >= casePrice(c);
-    modal('Ваш выигрыш', `
-      <div class="case-win">${card(skin, { static: true })}</div>
-      <p class="note" style="text-align:center">Предмет уже в инвентаре: продайте его или поставьте в апгрейд, чтобы выиграть дороже.</p>
+    const again = c.paid && S.balance >= casePrice(c) * n;
+    const owned = () => uids.filter(u => invItem(u));
+    modal(n > 1 ? `Ваш выигрыш · ${n} шт.` : 'Ваш выигрыш', `
+      <div class="case-win${n > 1 ? ' multi' : ''}">${wins.map(w => card(w, { static: true })).join('')}</div>
+      <p class="note" style="text-align:center">${n > 1 ? `Всего на ${coin(total)}. Предметы` : 'Предмет'} уже в инвентаре: продайте ${n > 1 ? 'их' : 'его'} или поставьте в апгрейд, чтобы выиграть дороже.</p>
       <div class="row">
-        <button class="btn btn-ghost" id="cwSell" style="flex:1">Продать за ${coin(skin.price)}</button>
+        <button class="btn btn-ghost" id="cwSell" style="flex:1">${n > 1 ? 'Продать всё' : 'Продать'} за ${coin(total)}</button>
         <button class="btn btn-accent" id="cwUp" style="flex:1">В апгрейд</button>
       </div>
       ${next ? `<a class="btn btn-ghost" href="#/case/${next.id}" id="cwNext">Открыть ${next.name}</a>` : ''}
-      ${again ? `<button class="btn btn-ghost" id="cwAgain">Открыть ещё за ${coinInt(casePrice(c))}</button>` : ''}`,
+      ${again ? `<button class="btn btn-ghost" id="cwAgain">Открыть ещё${n > 1 ? ` ${n} шт.` : ''} за ${coinInt(casePrice(c) * n)}</button>` : ''}`,
     m => {
       const ag = $('#cwAgain', m);
       if (ag) ag.onclick = () => {
@@ -1990,16 +2012,20 @@
         setTimeout(() => openCase(c.id), 50);
       };
       $('#cwSell', m).onclick = () => {
-        if (invItem(itemUid)) { S.inventory = S.inventory.filter(i => i.uid !== itemUid); addBalance(skin.price); toast(`Продано за ${coin(skin.price)}`, 'success'); }
+        // only what is still in the inventory (an item may have been used meanwhile)
+        const left = new Set(owned());
+        const value = sum(wins.filter((_, i) => left.has(uids[i])).map(w => w.price));
+        if (left.size) { S.inventory = S.inventory.filter(i => !left.has(i.uid)); addBalance(value); toast(`Продано ${left.size > 1 ? `${left.size} шт. ` : ''}за ${coin(value)}`, 'success'); }
         closeModal();
         // the balance changed: the "open for N coins" button may become available
         if (c.paid && curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
       };
       $('#cwUp', m).onclick = () => {
         closeModal();
-        if (!invItem(itemUid)) return;
-        setGame(skin.game);
-        U.inputs = new Set([itemUid]); U.balanceAdd = 0; U.result = null; U.mult = null;
+        const left = owned();
+        if (!left.length) return;
+        setGame(wins[0].game);
+        U.inputs = new Set(left.slice(0, MAX_SLOTS)); U.balanceAdd = 0; U.result = null; U.mult = null;
         location.hash = '#/upgrade';
       };
       const nx = $('#cwNext', m); if (nx) nx.addEventListener('click', closeModal);

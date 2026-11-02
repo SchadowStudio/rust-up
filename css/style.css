@@ -851,6 +851,16 @@ img { display: block; }
 .roulette-marker::before, .roulette-marker::after { content: ""; position: absolute; left: 50%; margin-left: -8px; border: 8px solid transparent; }
 .roulette-marker::before { top: 0; border-top-color: var(--accent); }
 .roulette-marker::after { bottom: 0; border-bottom-color: var(--accent); }
+/* several cases at once: stacked compact roulettes + x1…x5 picker */
+.roulettes { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+.roulettes .roulette { margin-top: 0; }
+.roulette.multi { padding: 8px 0; border-radius: 16px; }
+.roulette.multi .roll-cell { flex-basis: 88px; height: 88px; border-radius: 12px; }
+.case-count { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 5px; border-radius: 16px; background: var(--bg-block); border: 1px solid var(--border-block); }
+.cc-btn { height: 40px; border: 0; border-radius: 12px; background: transparent; color: var(--text-subtitle); font: 700 15px var(--font); cursor: pointer; transition: background var(--fast), color var(--fast); }
+.cc-btn:hover { background: var(--bg-secondary); color: var(--text-title); }
+.cc-btn.on { background: var(--grad-accent); color: #fff; box-shadow: var(--glow-accent); }
+.case-win.multi { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 140px)); justify-content: center; gap: 8px; }
 .case-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .case-actions .subs-panel { margin-top: 0; }
 .btn.case-open { height: 56px; font-size: 17px; border-radius: 16px; }
@@ -926,6 +936,8 @@ img { display: block; }
   .case-hero { gap: 14px; }
   .case-hero-text h1 { font-size: 22px; }
   .roll-cell { flex-basis: 96px; height: 96px; }
+  .roulette.multi .roll-cell { flex-basis: 64px; height: 64px; }
+  .case-win.multi { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .road-step { width: 124px; padding: 0 6px; }
   .road-head { flex-direction: column; gap: 10px; }
   .road-count { flex-direction: row; gap: 8px; align-items: baseline; }
