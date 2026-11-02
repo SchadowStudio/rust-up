@@ -697,7 +697,12 @@ img { display: block; }
 .hero-slide::before { content: ""; position: absolute; inset: 0; z-index: -1; background: repeating-conic-gradient(from 0deg at 76% 50%, #ffffff0b 0 6deg, transparent 6deg 18deg); -webkit-mask: radial-gradient(circle at 76% 50%, #000 0, transparent 60%); mask: radial-gradient(circle at 76% 50%, #000 0, transparent 60%); }
 .hs-tg { --hc: #2ea6e0; }
 .hs-daily { --hc: #ffb84d; }
-.hs-friends { --hc: #d84ae6; }
+.hs-road { --hc: #ffb84d; }
+.hero-kicker.real { color: #1d1f24; background: linear-gradient(135deg, #ffe08a, #ffb84d); border-color: transparent; font-weight: 900; letter-spacing: .4px; box-shadow: 0 0 16px #ffd16666; }
+.hs-road .hero-art img { height: auto; aspect-ratio: 1; }
+.hs-road .hr-0 { --w: min(46%, 160px); width: var(--w); left: 50%; margin-left: calc(var(--w) / -2); top: 18%; z-index: 2; }
+.hs-road .hr-1 { --w: min(34%, 118px); width: var(--w); left: 50%; margin-left: calc(var(--w) * -1.55); top: 34%; rotate: -12deg; animation-delay: -1.3s; }
+.hs-road .hr-2 { --w: min(34%, 118px); width: var(--w); left: 50%; margin-left: calc(var(--w) * 0.55); top: 30%; rotate: 12deg; animation-delay: -2.6s; }
 .hero-text { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 6px; padding: 24px 0 30px 28px; max-width: 58%; }
 .hero-kicker { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #0b0c0e73; border: 1px solid #ffffff1a; }
 .hero-kicker .dot-online { width: 6px; height: 6px; }
@@ -713,8 +718,6 @@ img { display: block; }
 .hs-cases .ha-1 { width: 56%; height: 50%; right: 2%; top: 4%; rotate: 8deg; animation-delay: -1.3s; }
 .hs-cases .ha-2 { width: 32%; height: auto; right: 14%; bottom: 10%; rotate: 8deg; animation-delay: -2.6s; }
 .ha-gift { width: 58%; height: 70%; left: 22%; top: 14%; }
-.ha-bear { width: 52%; height: 64%; left: 10%; top: 20%; }
-.ha-rocket { width: 42%; height: 52%; right: 4%; top: 6%; rotate: 20deg; animation-delay: -2s; }
 .ha-tg { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #3cb6f0, #1d8fcf); box-shadow: 0 0 60px #2ea6e088, inset 0 2px 0 #ffffff55; animation: float 4s ease-in-out infinite; }
 .ha-tg svg { width: 64px; height: 64px; margin-left: -4px; }
 .ha-coin { position: absolute; width: 40px; height: 40px; filter: drop-shadow(0 6px 10px #000a); animation: float 3.4s ease-in-out infinite; }

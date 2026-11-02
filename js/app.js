@@ -1941,7 +1941,12 @@
   function heroSlides() {
     const heroes = CASES.map(c => caseItems(c)[0].skin);
     const coins = ['c1', 'c2', 'c3'].map(k => `<span class="ha-coin ${k}">${ICON.coin}</span>`).join('');
+    // the three priciest friends-road NFTs
+    const roadNfts = ROAD_ITEMS.filter(r => r.skin.img.includes('assets/nft/')).slice(-3).reverse().map(r => r.skin);
     return [
+      `<a class="hero-slide hs-road" href="#/friends">
+        <span class="hero-text"><span class="hero-kicker real">РЕАЛЬНЫЕ NFT</span><b class="hero-title">Дорога<br>друзей</b><span class="hero-sub">Подарки и NFT Telegram на твой аккаунт за друзей</span><span class="hero-btn">Смотреть награды ${ICON.right}</span></span>
+        <span class="hero-art">${roadNfts.map((s, i) => `<img class="hr-${i} nft" src="${s.img}" alt="" draggable="false">`).join('')}</span></a>`,
       `<a class="hero-slide hs-cases" href="#/cases">
         <span class="hero-text"><span class="hero-kicker"><i class="dot-online"></i>Для новых игроков</span><b class="hero-title">${CASES.length} кейса<br>бесплатно</b><span class="hero-sub">Rust · CS2 · Telegram NFT</span><span class="hero-btn">Открыть ${ICON.right}</span></span>
         <span class="hero-art">${heroes.map((s, i) => `<img class="ha-${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`).join('')}</span></a>`,
@@ -1951,10 +1956,7 @@
           <span class="hero-art"><img class="ha-gift" src="${giftImg('Подарок')}" alt="" draggable="false">${coins}</span></a>`
         : `<button class="hero-slide hs-tg" data-tg-bonus>
           <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${BONUS_TXT}<br>монет</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
-          <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`,
-      `<a class="hero-slide hs-friends" href="#/friends">
-        <span class="hero-text"><span class="hero-kicker">Реферальная программа</span><b class="hero-title">Зови<br>друзей</b><span class="hero-sub">РЕАЛЬНЫЕ NFT на аккаунт за друзей</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
-        <span class="hero-art"><img class="ha-bear" src="${giftImg('Мишка')}" alt="" draggable="false"><img class="ha-rocket" src="${giftImg('Ракета')}" alt="" draggable="false"></span></a>`
+          <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`
     ];
   }
   function homePage() {
