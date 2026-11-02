@@ -85,7 +85,7 @@
       history: [],
       stats: { upgrades: 0, wins: 0, wagered: 0, won: 0, best: 0 },
       seeds: { server, serverHash: sha256(server), client: randHex(8), nonce: 0, prev: null },
-      rewards: { lastDaily: 0, promos: [], claimedLevel: 0, subs: {}, cases: {} },
+      rewards: { lastDaily: 0, promos: [], subs: {}, cases: {}, cashback: 0 },
       settings: { sound: true, fast: false }
     };
   }
@@ -588,7 +588,7 @@
     }
     document.querySelectorAll('.nav-item[data-route="/rewards"]').forEach(a => {
       a.querySelector('.nav-dot')?.remove();
-      if (S.user && dailyReady()) a.insertAdjacentHTML('beforeend', '<span class="nav-dot"></span>');
+      if (S.user && (dailyReady() || (S.rewards.cashback || 0) >= 1)) a.insertAdjacentHTML('beforeend', '<span class="nav-dot"></span>');
     });
   }
 
@@ -1193,7 +1193,8 @@
         targets.forEach(n => pushDrop({ user: S.user.name, color: S.user.color, skin: byName[n], chance: c, t: Date.now() }));
       } else {
         sfxLose();
-        toast(`Не повезло — выпало ${roll.toFixed(2)}, нужно было меньше ${c.toFixed(2)}`, 'error');
+        const cb = addCashback(inValue);
+        toast(`Не повезло — выпало ${roll.toFixed(2)}, нужно было меньше ${c.toFixed(2)}${cb ? ` · кешбэк +${fmt(cb)}` : ''}`, 'error');
       }
       refreshUpgrade();
       renderHeader();
@@ -1241,24 +1242,31 @@
       if (location.hash === '#/rewards') rewardsPage();
     });
   }
-  const LEVEL_XP = n => Math.round(40 * Math.pow(n, 1.6)); // wagered coins needed for level n
-  function levelInfo() {
-    const xp = S.stats.wagered;
-    let lvl = 0;
-    while (xp >= LEVEL_XP(lvl + 1)) lvl++;
-    const cur = LEVEL_XP(lvl), next = LEVEL_XP(lvl + 1);
-    return { lvl, xp, cur, next, pct: lvl === 0 && !xp ? 0 : ((xp - (lvl ? cur : 0)) / (next - (lvl ? cur : 0))) * 100 };
+  // cashback: a share of every lost upgrade stake and of every paid case that paid out less than its price
+  const CASHBACK = 0.02;
+  function addCashback(lost) {
+    const v = Math.round(lost * CASHBACK * 100) / 100;
+    if (v <= 0) return 0;
+    S.rewards.cashback = Math.round(((S.rewards.cashback || 0) + v) * 100) / 100;
+    save(); renderHeader();
+    return v;
+  }
+  function claimCashback() {
+    const v = S.rewards.cashback || 0;
+    if (v < 0.01) return;
+    S.rewards.cashback = 0;
+    S.rewards.cashbackTotal = Math.round(((S.rewards.cashbackTotal || 0) + v) * 100) / 100;
+    addBalance(v);
+    sfxWin();
+    toast(`Кешбэк зачислен: ${coin(v)}`, 'success');
+    refreshUpgrade();
+    if (location.hash === '#/rewards') rewardsPage();
   }
 
   function rewardsPage() {
-    const li = levelInfo();
     const left = DAILY_MS - (Date.now() - (S.rewards.lastDaily || 0));
     const hh = Math.max(0, Math.floor(left / 3600e3)), mm = Math.max(0, Math.floor((left % 3600e3) / 60e3));
-    const claimable = Math.max(0, li.lvl - S.rewards.claimedLevel);
-    const lvlReward = sum(Array.from({ length: claimable }, (_, i) => (S.rewards.claimedLevel + i + 1) * 5));
-    const from = Math.max(1, li.lvl - 4);
-    const tiles = Array.from({ length: 10 }, (_, i) => from + i).map(n =>
-      `<div class="level ${n <= li.lvl ? 'done' : ''} ${n === li.lvl + 1 ? 'now' : ''}">${n}</div>`).join('');
+    const cb = S.rewards.cashback || 0;
 
     $('#page').innerHTML = `<div class="page">
       <h2 class="section-title">Награды</h2>
@@ -1281,18 +1289,12 @@
           <p>Введите промокод и получите бонус на баланс. Для демо работают: <b>RUSTUP</b>, <b>WIPE</b>, <b>DEMO</b>.</p>
           <div class="row"><input class="text-input" id="promo" placeholder="Промокод" maxlength="20"><button class="btn btn-accent" id="applyPromo">OK</button></div>
         </div>
-        <div class="panel reward-card">
-          <h4>Награда за уровень</h4>
-          <span class="big">${coin(lvlReward)}</span>
-          <p>За каждый новый уровень боевого пропуска — уровень × 5 монет.</p>
-          <button class="btn ${claimable ? 'btn-accent' : 'btn-ghost'}" id="claimLevel" ${claimable ? '' : 'disabled'}>${claimable ? `Забрать (${claimable})` : 'Нет наград'}</button>
+        <div class="panel reward-card"><span class="glow"></span>
+          <h4>Кешбэк ${CASHBACK * 100}%</h4>
+          <span class="big">${coin(cb)}</span>
+          <p>Возвращаем ${CASHBACK * 100}% с каждого проигрыша в апгрейде и в платных кейсах. Копится здесь — забирайте когда угодно.${S.rewards.cashbackTotal ? ` Всего получено: ${coin(S.rewards.cashbackTotal)}.` : ''}</p>
+          <button class="btn ${cb >= 0.01 ? 'btn-accent' : 'btn-ghost'}" id="claimCashback" ${cb >= 0.01 ? '' : 'disabled'}>${cb >= 0.01 ? 'Забрать кешбэк' : 'Пока пусто'}</button>
         </div>
-      </div>
-      <h2 class="section-title">Боевой пропуск · Вайп</h2>
-      <div class="panel" style="display:flex;flex-direction:column;gap:16px">
-        <div class="row" style="justify-content:space-between;flex-wrap:wrap"><b style="font-size:18px">Уровень ${li.lvl}</b><span class="muted">${fmt(li.xp)} / ${fmt(li.next)} XP · 1 монета в апгрейде = 1 XP</span></div>
-        <div class="progress"><div style="width:${Math.min(100, li.pct)}%"></div></div>
-        <div class="levels">${tiles}</div>
       </div>
     </div>`;
 
@@ -1300,10 +1302,7 @@
     renderRefPanel();
     renderRoad();
     refSync();
-    $('#claimLevel').onclick = () => requireLogin(() => {
-      S.rewards.claimedLevel = li.lvl; addBalance(lvlReward);
-      toast(`Награда за уровни: ${coin(lvlReward)}`, 'success'); rewardsPage();
-    });
+    $('#claimCashback').onclick = () => requireLogin(claimCashback);
     const apply = () => requireLogin(() => {
       const code = $('#promo').value.trim().toUpperCase();
       if (!PROMOS[code]) return toast('Промокод не найден', 'error');
@@ -1321,7 +1320,7 @@
       $('#page').innerHTML = `<div class="page"><div class="panel" style="text-align:center;padding:60px 24px"><h2 style="margin-top:0">Профиль</h2><p class="muted">Войдите, чтобы увидеть профиль</p><button class="btn btn-steam" data-login>${ICON.steam}<span>Войти через Steam</span></button></div></div>`;
       return;
     }
-    const st = S.stats, li = levelInfo();
+    const st = S.stats;
     const rows = S.history.slice(0, 50).map(h => `<tr>
       <td>${new Date(h.t).toLocaleString('ru-RU')}</td>
       <td>${h.inputs.map(esc).join(', ') || '—'}${h.bal ? ` + ${fmt(h.bal)}` : ''}</td>
@@ -1332,7 +1331,7 @@
     $('#page').innerHTML = `<div class="page">
       <div class="profile-head">
         ${avatarHtml(S.user.name, S.user.color)}
-        <div><h2>${esc(S.user.name)}</h2><span class="muted">ID ${S.user.id} · Уровень ${li.lvl}</span></div>
+        <div><h2>${esc(S.user.name)}</h2><span class="muted">ID ${S.user.id}</span></div>
         <div class="row" style="margin-left:auto;flex-wrap:wrap">
           <button class="btn btn-ghost" id="rename">Сменить ник</button>
           <button class="btn btn-ghost" id="reset">Сбросить демо</button>
@@ -1891,6 +1890,9 @@
         track.children[ROUL_WIN].classList.add('win');
       }
       sfxWin();
+      // a paid case that paid out less than its price counts as a loss for cashback
+      const cb = c.paid ? addCashback(casePrice(c) - win.price) : 0;
+      if (cb) toast(`Кешбэк +${coin(cb)} — забрать в «Бонусах»`, 'success');
       pushDrop({ user: S.user.name, color: S.user.color, skin: win, chance: 100, t: Date.now() });
       if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
       showCaseWin(c, win, itemUid);
