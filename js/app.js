@@ -154,7 +154,7 @@
   const gameErr = d => GAME_ERR[d && d.error] || 'Не удалось выполнить — попробуйте ещё раз';
   function applyState(st) {
     S.balance = st.balance; S.inventory = st.inventory.filter(i => byName[i.name]); S.withdrawals = st.withdrawals;
-    S.history = st.history; S.stats = st.stats; S.seeds = st.seeds; S.rewards = st.rewards;
+    S.history = st.history; S.stats = st.stats; S.seeds = st.seeds; S.rewards = st.rewards; S.tx = st.tx || [];
     const u = tgUser() || {};
     S.user = { ...(S.user || {}), ...st.user, id: u.id || (S.user && S.user.id), tg: true };
     if (!S.user.color) S.user.color = AVA_COLORS[(u.id || 0) % AVA_COLORS.length];
@@ -558,7 +558,7 @@
   const rubFmt = n => fmtInt(n) + ' ₽';
   // one «бонус за пополнение» card; also used on the bonuses page (amount 0 = empty progress)
   // the first option is a gift, an NFT or a Rust skin — the toggle names it after its kind
-  const depKind = s => !s ? 'Подарок' : s.game === 'nft' || s.img.includes('assets/nft/') ? 'NFT' : s.img.includes('assets/gifts/') ? 'Подарок' : 'Rust';
+  const depKind = s => !s || s.img.includes('assets/gifts/') ? 'Подарок' : s.game === 'nft' || s.img.includes('assets/nft/') ? 'NFT' : 'Rust';
   const depCard = (b, i, amount, kind) => {
     const s = byName[kind === 'gift' ? b[1] : b[2]], first = depKind(byName[b[1]]);
     return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
@@ -570,38 +570,153 @@
       <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
     </div>`;
   };
+  // the top-up and the bonus cards lead to the wallet page
   function openDeposit(sum = 1500) {
-    let amount = sum, way = 'sbp';
-    const kind = DEPOSIT_BONUSES.map(() => 'gift');
-    const bonusCard = (b, i) => depCard(b, i, amount, kind[i]);
-    modal('Пополнение', `
-      <div class="dep-sums">${DEPOSIT_SUMS.map(v => `<button type="button" class="dep-sum" data-v="${v}">${rubFmt(v)}</button>`).join('')}</div>
-      <div class="dep-input"><input class="text-input" id="depAmt" inputmode="numeric" maxlength="7" value="${amount}"><span>₽</span></div>
-      <div class="dep-ways">${DEPOSIT_WAYS.map(([id, t]) => `<button type="button" class="dep-way" data-way="${id}">${t}</button>`).join('')}</div>
-      <button class="btn btn-accent dep-pay" id="depPay" type="button"></button>
-      <div class="dep-head"><h4>Бонусы за пополнение</h4><span class="muted">по цене как пополнение</span></div>
-      <div class="dep-bonuses" id="depBonuses"></div>`, m => {
-      m.classList.add('modal-deposit');
-      const draw = () => {
-        m.querySelectorAll('.dep-sum').forEach(b => b.classList.toggle('on', +b.dataset.v === amount));
-        m.querySelectorAll('.dep-way').forEach(b => b.classList.toggle('on', b.dataset.way === way));
-        $('#depPay', m).textContent = `Пополнить на ${rubFmt(amount || 0)}`;
-        $('#depBonuses', m).innerHTML = DEPOSIT_BONUSES.map(bonusCard).join('');
-      };
-      const setAmount = v => { amount = Math.max(0, Math.min(1e6, Math.floor(v) || 0)); $('#depAmt', m).value = amount || ''; draw(); };
-      m.addEventListener('click', e => {
-        const t = e.target.closest('button');
-        if (!t) return;
-        if (t.dataset.v) return setAmount(+t.dataset.v);
-        if (t.dataset.way) { way = t.dataset.way; return draw(); }
-        if (t.dataset.kind) { kind[+t.closest('.dep-bonus').dataset.i] = t.dataset.kind; return draw(); }
-        if (t.dataset.sum) return setAmount(+t.dataset.sum);
-        if (t.id === 'depPay') { haptic('warning'); toast('На данный момент такой возможности нет', 'error'); }
-      });
-      $('#depAmt', m).addEventListener('input', e => { amount = Math.floor(Number(e.target.value.replace(/\D/g, ''))) || 0; draw(); });
-      draw();
-    });
+    location.hash = `#/wallet?tab=deposit&sum=${sum}`;
   }
+
+  // ---------- wallet page (like RubUP): top up · withdraw · history ----------
+  // Top-up and cash-out are visual only — no payment provider is connected, the buttons say so. The history is real (server ledger).
+  // payment method icons: glossy, with their own gradients and a light rim on top
+  const WICO = {
+    sbp: '<svg viewBox="0 0 40 40"><defs><linearGradient id="wiSbp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6be38f"/><stop offset=".55" stop-color="#1fa155"/><stop offset="1" stop-color="#0f6b36"/></linearGradient></defs><rect x="2" y="2" width="36" height="36" rx="11" fill="url(#wiSbp)"/><path d="M4 12c6-7 26-7 32 0v-1c-2-6-8-9-16-9S6 5 4 11z" fill="#fff" opacity=".28"/><path d="M11.5 20.5l5.6 5.6 11.4-12.3" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    card: '<svg viewBox="0 0 40 40"><defs><linearGradient id="wiCard" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fb4ff"/><stop offset=".5" stop-color="#4f7ff0"/><stop offset="1" stop-color="#2a4fb8"/></linearGradient><linearGradient id="wiChip" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b0"/><stop offset="1" stop-color="#e0a83a"/></linearGradient></defs><rect x="2" y="7" width="36" height="26" rx="6" fill="url(#wiCard)"/><rect x="2" y="13" width="36" height="5" fill="#1b2f75" opacity=".75"/><rect x="7" y="22" width="9" height="6.5" rx="1.8" fill="url(#wiChip)"/><path d="M27 25h6" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M4 9.5c8-3 24-3 32 0" stroke="#fff" stroke-width="1.4" opacity=".35" fill="none"/></svg>',
+    usdt: '<svg viewBox="0 0 40 40"><defs><radialGradient id="wiUsdt" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#5fe0b4"/><stop offset=".6" stop-color="#26a17b"/><stop offset="1" stop-color="#14684e"/></radialGradient></defs><circle cx="20" cy="20" r="18" fill="url(#wiUsdt)"/><path d="M11 12h18v4.5h-6.6v2.2c4.7.3 8 1.3 8 2.4s-3.3 2.1-8 2.4V31h-4.8v-7.5c-4.7-.3-8-1.3-8-2.4s3.3-2.1 8-2.4v-2.2H11z" fill="#fff"/><path d="M7 14a14 14 0 0126 0" stroke="#fff" stroke-width="1.5" fill="none" opacity=".3"/></svg>',
+    ton: '<svg viewBox="0 0 40 40"><defs><radialGradient id="wiTon" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#5cc9ff"/><stop offset=".6" stop-color="#0098ea"/><stop offset="1" stop-color="#005f99"/></radialGradient></defs><circle cx="20" cy="20" r="18" fill="url(#wiTon)"/><path d="M12 13h16l-8 15z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/><path d="M20 13v15" stroke="#fff" stroke-width="2.6"/><path d="M7 14a14 14 0 0126 0" stroke="#fff" stroke-width="1.5" fill="none" opacity=".3"/></svg>',
+    star: '<svg viewBox="0 0 40 40"><defs><linearGradient id="wiStar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff1a8"/><stop offset=".45" stop-color="#ffc83d"/><stop offset="1" stop-color="#e88a0c"/></linearGradient></defs><path d="M20 3l5.2 10.6 11.8 1.7-8.5 8.3 2 11.7L20 29.8 9.5 35.3l2-11.7L3 15.3l11.8-1.7z" fill="url(#wiStar)" stroke="#c9700a" stroke-width="1.2" stroke-linejoin="round"/><path d="M20 8l3 6.2 5 .8" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".6"/></svg>',
+    gift: '<svg viewBox="0 0 40 40"><defs><linearGradient id="wiGift" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7a6e"/><stop offset="1" stop-color="#b8202a"/></linearGradient><linearGradient id="wiRib" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b0"/><stop offset="1" stop-color="#e0a83a"/></linearGradient></defs><rect x="6" y="17" width="28" height="19" rx="3.5" fill="url(#wiGift)"/><rect x="4" y="11.5" width="32" height="7.5" rx="2.5" fill="#ff5a4e"/><path d="M20 11.5V36" stroke="url(#wiRib)" stroke-width="4.5"/><path d="M20 11.5c-3-6.5-10.5-6.5-9.5-1.2.8 3.4 9.5 1.2 9.5 1.2zm0 0c3-6.5 10.5-6.5 9.5-1.2-.8 3.4-9.5 1.2-9.5 1.2z" fill="url(#wiRib)"/><path d="M6 14h28" stroke="#fff" stroke-width="1.2" opacity=".35"/></svg>'
+  };
+  const TXICO = {
+    upgrade: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 0L1.3 4.9v4.5L8 4.5l6.7 4.9V4.9zM8 6.3L1.3 11.2v4.6L8 10.9l6.7 4.9v-4.6z"/></svg>',
+    case: '<svg viewBox="0 0 20 20"><path d="M3 7l7-4 7 4v7l-7 4-7-4zM3 7l7 4 7-4M10 11v7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+    gift: '<svg viewBox="0 0 20 20"><path d="M10 6v12M10 6H7a1.8 1.8 0 010-3.5C9.3 2.5 10 6 10 6zm0 0h3a1.8 1.8 0 000-3.5C10.7 2.5 10 6 10 6zM16.5 9.5V16c0 1-.7 1.5-1.6 1.5H5.1c-.9 0-1.6-.5-1.6-1.5V9.5M2.5 6h15v3.5h-15z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+    shop: '<svg viewBox="0 0 20 20"><path d="M4 7h12l-1 10H5zM7.5 7V5.5a2.5 2.5 0 015 0V7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+    cashback: '<svg viewBox="0 0 20 20"><path d="M4 10a6 6 0 1010.2-4.3M14.5 2.5v3.5H11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    promo: '<svg viewBox="0 0 20 20"><path d="M6 14L14 6M7 7.5a1 1 0 100-.01M13 13.5a1 1 0 100-.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    tg: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M20.7 4.3L2.9 11.2c-1.2.5-1.2 1.2-.2 1.5l4.6 1.4 1.8 5.4c.2.6.4.8.9.8.4 0 .6-.2.9-.5l2.2-2.1 4.6 3.4c.8.5 1.4.2 1.6-.8l3-14.2c.3-1.2-.5-1.8-1.6-1.3z"/></svg>',
+    friends: '<svg viewBox="0 0 20 20"><circle cx="8" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M2.5 17c.6-3.3 2.7-5 5.5-5s4.9 1.7 5.5 5M14 5.5v5M11.5 8h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+    deposit: '<svg viewBox="0 0 20 20"><path d="M10 3v10M5.5 8.5L10 13l4.5-4.5M4 17h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    withdraw: '<svg viewBox="0 0 20 20"><path d="M10 13V3M5.5 7.5L10 3l4.5 4.5M4 17h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  };
+  // [id, title, min ₽, bonus %, icons, detail title, detail lines]
+  const DEP_METHODS = [
+    ['rub', 'Рубли', 500, 0, ['sbp'], 'СБП и карты', ['SberPay', 'T-Pay', 'Банковская карта']],
+    ['crypto', 'Криптовалюта', 10, 5, ['usdt', 'ton'], 'USDT · TON', ['@xRocket', '@CryptoBot', 'Кошелёк TON']],
+    ['gifts', 'Telegram и CS2', 10, 7, ['star', 'gift'], 'Звёзды, подарки, скины', ['Звёзды Telegram', 'Подарки и NFT', 'Скины CS2']]];
+  // [id, title, min ₽, fee %, icon, input label, placeholder]
+  const WD_METHODS = [
+    ['rub', 'Рубли', 2000, 5, 'card', 'Номер карты', '0000 0000 0000 0000'],
+    ['crypto', 'Криптовалюта', 2000, 3, 'usdt', 'Адрес USDT (TRC-20) или @username в @xRocket', 'T… или @username'],
+    ['gift', 'Подарком', 0, 0, 'gift', '', '']];
+  const TX_FILTERS = [['all', 'Все'], ['deposit', 'Пополнения'], ['withdraw', 'Выводы'], ['game', 'Игры'], ['bonus', 'Бонусы']];
+  const WF = { tab: 'deposit', dep: 'rub', wd: 'rub', amount: 1500, out: 0, period: 30, filter: 'all', kinds: DEPOSIT_BONUSES.map(() => 'gift') };
+  const NOT_YET = 'На данный момент такой возможности нет';
+
+  function walletPage(q) {
+    const params = new URLSearchParams(q || '');
+    if (['deposit', 'withdraw', 'history'].includes(params.get('tab'))) WF.tab = params.get('tab');
+    if (+params.get('sum') > 0) WF.amount = Math.floor(+params.get('sum'));
+    const tabs = [['deposit', 'Пополнить'], ['withdraw', 'Вывести'], ['history', 'История']];
+    $('#page').innerHTML = `<div class="page wallet-page">
+      <span class="w-glow g1"></span><span class="w-glow g2"></span><span class="w-glow g3"></span>
+      <h1 class="up-title">Кошелёк</h1>
+      <div class="wallet-tabs">${tabs.map(([id, t]) => `<button type="button" class="wtab${WF.tab === id ? ' on' : ''}" data-wtab="${id}">${t}</button>`).join('')}</div>
+      <div id="walletBody"></div>
+    </div>`;
+    renderWallet();
+  }
+  function renderWallet() {
+    const box = $('#walletBody');
+    if (!box) return;
+    document.querySelectorAll('.wtab').forEach(b => b.classList.toggle('on', b.dataset.wtab === WF.tab));
+    box.innerHTML = WF.tab === 'withdraw' ? walletWithdraw() : WF.tab === 'history' ? walletHistory() : walletDeposit();
+  }
+  function walletDeposit() {
+    const m = DEP_METHODS.find(x => x[0] === WF.dep);
+    return `
+      <div class="wm-grid">${DEP_METHODS.map(([id, t, min, bonus, icons]) => `<button type="button" class="wm${WF.dep === id ? ' on' : ''}" data-wdep="${id}">
+        ${bonus ? `<span class="wm-bonus">+${bonus}%</span>` : ''}${WF.dep === id ? '<span class="wm-check"></span>' : ''}<span class="wm-icons">${icons.map(i => `<i>${WICO[i]}</i>`).join('')}</span><b>${t}</b><small>от ${rubFmt(min)}</small></button>`).join('')}</div>
+      <div class="wm-detail"><span class="wm-icons big">${m[4].map(i => `<i>${WICO[i]}</i>`).join('')}</span>
+        <span class="wm-lines"><b>${m[5]}</b>${m[6].map(l => `<span>${l}</span>`).join('')}</span><span class="wm-min">от ${rubFmt(m[2])}</span></div>
+      <div class="w-glass">
+        <div class="w-field"><label>Сумма</label>
+          <div class="dep-input"><input class="text-input" id="wAmt" inputmode="numeric" maxlength="7" value="${WF.amount || ''}"><span>₽</span></div>
+          <div class="dep-sums">${DEPOSIT_SUMS.map(v => `<button type="button" class="dep-sum${v === WF.amount ? ' on' : ''}" data-wsum="${v}">${rubFmt(v)}</button>`).join('')}</div></div>
+        ${m[3] ? `<p class="w-note">Бонус <b>+${m[3]}%</b> к сумме пополнения этим способом</p>` : ''}
+        <button class="btn btn-accent w-go" type="button" data-wpay>Пополнить на ${rubFmt(WF.amount || 0)}</button>
+      </div>
+      <div class="row-head"><h2 class="home-title">Бонусы за пополнение</h2><span class="muted">по цене как пополнение</span></div>
+      <div class="dep-bonuses page-bonuses" id="wBonuses">${DEPOSIT_BONUSES.map((b, i) => depCard(b, i, WF.amount, WF.kinds[i])).join('')}</div>`;
+  }
+  function walletWithdraw() {
+    const m = WD_METHODS.find(x => x[0] === WF.wd);
+    const reqs = S.withdrawals.slice(0, 10).map(w => `<div class="w-req"><span class="w-req-ico">${TXICO[w.real ? 'gift' : 'withdraw']}</span>
+      <span class="w-req-body"><b>${w.items.slice(0, 2).map(esc).join(', ')}${w.items.length > 2 ? ` и ещё ${w.items.length - 2}` : ''}</b><small>#${w.id} · ${new Date(w.t).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</small></span>
+      <span class="w-req-st ${w.real && w.status !== 'sent' ? 'wait' : 'ok'}">${w.real ? (w.status === 'sent' ? 'Отправлен' : 'Ожидает') : 'Выполнен'}</span></div>`).join('');
+    const body = m[0] === 'gift'
+      ? `<div class="w-gift"><span class="w-gift-ico">${WICO.gift}</span><b>Вывод подарками и скинами</b>
+          <span>Выберите NFT, подарки или скины в инвентаре и нажмите «Вывести»: NFT и подарки — на ваш Telegram-аккаунт, скины — трейдом в Steam.</span>
+          <a class="btn btn-accent w-go" href="#/inventory">Открыть инвентарь</a></div>`
+      : `<div class="w-field"><label>Сумма <span class="muted">Доступно: ${coin(S.balance)}</span></label>
+          <div class="dep-input"><input class="text-input" id="wOut" inputmode="numeric" maxlength="8" placeholder="0" value="${WF.out || ''}"><span>₽</span></div></div>
+        <div class="w-field"><label>${m[5]}</label><input class="text-input${m[0] === 'rub' ? ' mono' : ''}" id="wReq" placeholder="${m[6]}" maxlength="64"></div>
+        <div class="w-fee"><span>Комиссия ${m[3]}% · вывод от ${rubFmt(m[2])}</span><b id="wGet">${WF.out ? `К получению ${rubFmt(Math.floor(WF.out * (1 - m[3] / 100)))}` : ''}</b></div>
+        <button class="btn btn-accent w-go" type="button" data-wsend>Отправить заявку</button>`;
+    return `
+      <div class="wm-grid">${WD_METHODS.map(([id, t, min, fee, icon]) => `<button type="button" class="wm${WF.wd === id ? ' on' : ''}" data-wwd="${id}">
+        ${WF.wd === id ? '<span class="wm-check"></span>' : ''}<span class="wm-icons"><i>${WICO[icon]}</i></span><b>${t}</b><small>${min ? `от ${rubFmt(min)}` : 'NFT и скины'}</small></button>`).join('')}</div>
+      <div class="w-glass w-panel">${body}</div>
+      <div class="w-glass w-panel"><h3 class="w-h3">Заявки на вывод</h3>${reqs || '<p class="muted w-empty">Заявок пока нет</p>'}</div>`;
+  }
+  function walletHistory() {
+    const since = WF.period ? Date.now() - WF.period * 864e5 : 0;
+    const tx = (S.tx || []).filter(x => x.t >= since);
+    const count = k => (k === 'all' ? tx.length : tx.filter(x => x.kind === k).length);
+    const rows = tx.filter(x => WF.filter === 'all' || x.kind === WF.filter);
+    const day = t => new Date(t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="case-chips w-chips">
+        <button type="button" class="chip w-period" data-wperiod>${WF.period === 7 ? '7 дней' : WF.period === 30 ? '30 дней' : 'Всё время'} ▾</button>
+        <div class="chips-scroll">${TX_FILTERS.map(([id, t]) => `<button type="button" class="chip${WF.filter === id ? ' on' : ''}" data-wfilter="${id}">${t}${count(id) ? ` <span class="chip-n">${count(id)}</span>` : ''}</button>`).join('')}</div>
+      </div>
+      <div class="tx-list${rows.length ? ' w-glass' : ''}">${rows.length ? rows.map(x => `<div class="tx tx-${x.kind}">
+          <span class="tx-ico">${TXICO[x.icon] || TXICO.case}</span>
+          <span class="tx-body"><b>${esc(x.title)}</b><small>${day(x.t)}${x.note ? ` · ${esc(x.note)}` : ''}</small></span>
+          <span class="tx-sum ${x.amount > 0 ? 'plus' : x.amount < 0 ? 'minus' : ''}">${x.amount ? `${x.amount > 0 ? '+' : '−'}${coin(Math.abs(x.amount))}` : 'подарок'}</span>
+        </div>`).join('') : '<div class="panel cases-empty"><b>Операций пока нет</b><span class="muted">Здесь появятся апгрейды, кейсы, бонусы и выводы</span></div>'}</div>`;
+  }
+  document.addEventListener('click', e => {
+    if (!$('#walletBody')) return;
+    const t = e.target.closest('button, a');
+    if (!t) return;
+    const d = t.dataset;
+    if (d.wtab) { WF.tab = d.wtab; haptic('light'); history.replaceState(null, '', `#/wallet?tab=${d.wtab}`); return renderWallet(); }
+    if (d.wdep) { WF.dep = d.wdep; haptic('light'); return renderWallet(); }
+    if (d.wwd) { WF.wd = d.wwd; haptic('light'); return renderWallet(); }
+    if (d.wsum) { WF.amount = +d.wsum; return renderWallet(); }
+    if (d.kind && t.closest('#wBonuses')) { WF.kinds[+t.closest('.dep-bonus').dataset.i] = d.kind; return renderWallet(); }
+    if (d.sum && t.closest('#wBonuses')) { WF.amount = +d.sum; renderWallet(); return window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if ('wsend' in d) {
+      const m = WD_METHODS.find(x => x[0] === WF.wd);
+      if (WF.out < m[2]) { haptic('warning'); return toast(`Вывод от ${rubFmt(m[2])}`, 'error'); }
+    }
+    if ('wpay' in d || 'wsend' in d) { haptic('warning'); return toast(NOT_YET, 'error'); }
+    if (d.wfilter) { WF.filter = d.wfilter; return renderWallet(); }
+    if ('wperiod' in d) { WF.period = WF.period === 30 ? 7 : WF.period === 7 ? 0 : 30; return renderWallet(); }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'wAmt') {
+      WF.amount = Math.floor(Number(e.target.value.replace(/\D/g, ''))) || 0;
+      const b = $('[data-wpay]'); if (b) b.textContent = `Пополнить на ${rubFmt(WF.amount)}`;
+      document.querySelectorAll('[data-wsum]').forEach(x => x.classList.toggle('on', +x.dataset.wsum === WF.amount));
+      const wb = $('#wBonuses'); if (wb) wb.innerHTML = DEPOSIT_BONUSES.map((b2, i) => depCard(b2, i, WF.amount, WF.kinds[i])).join('');
+    }
+    if (e.target.id === 'wOut') {
+      WF.out = Math.floor(Number(e.target.value.replace(/\D/g, ''))) || 0;
+      const m = WD_METHODS.find(x => x[0] === WF.wd), g = $('#wGet');
+      if (g) g.textContent = WF.out ? `К получению ${rubFmt(Math.floor(WF.out * (1 - m[3] / 100)))}` : '';
+    }
+  });
 
   // ---------- auth (demo) ----------
   const AVA_COLORS = ['#cd412b', '#467edf', '#7c954d', '#ae6eee', '#d68a1f', '#2c9c8f'];
@@ -780,7 +895,7 @@
       </button>`).join('');
     return `<div class="cur-title">Валюта</div>${rows}
       <div class="cur-foot">
-        <a class="btn btn-ghost" href="#/inventory" data-cur-close>${ICON.wallet}<span>Кошелёк</span></a>
+        <a class="btn btn-ghost" href="#/wallet?tab=history" data-cur-close>${ICON.wallet}<span>Кошелёк</span></a>
         <button class="btn btn-accent" type="button" data-deposit><span>Пополнить</span></button>
       </div>
       <p class="cur-rate">1 USDT = ${numFmt(usdRub, 2)} ₽ (курс ЦБ) · 1 ⭐ = ${numFmt(STAR_USD, 3)} USDT</p>`;
@@ -2357,6 +2472,7 @@
       case '/upgrade': upgradePage(); break;
       case '/cases': casesPage(); break;
       case '/friends': friendsPage(); break;
+      case '/wallet': walletPage(query); break;
       case '/earn': earnPage(); break;
       case '/earn/tiktok': tiktokPage(); break;
       case '/rewards': rewardsPage(); break;
