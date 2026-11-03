@@ -1166,6 +1166,33 @@ body {
 .bt-promo { --tc: #e5383b2e; }
 .bt-promo .bt-art { align-self: flex-start; }
 
+/* deposit bonus cards: NFT pictures are square tiles, name under the art */
+.dep-art img.nft { width: 86px; height: 86px; max-height: none; object-fit: cover; border-radius: 20px; box-shadow: 0 0 0 3px #ffffff1f; }
+.dep-name { margin-top: -4px; font-size: 12px; font-weight: 700; color: var(--text-subtitle); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* friends page */
+.friends-page .hs-friends { --hc: #d84ae6; width: 100%; }
+.friends-page .hs-friends .hero-art img { height: auto; aspect-ratio: 1; }
+.friends-page .hs-friends .hero-title { font-size: clamp(26px, 6.4vw, 42px); }
+.friends-page .hs-friends .hero-text { max-width: 56%; }
+.friends-page .hs-friends .hr-0 { --w: min(46%, 160px); width: var(--w); left: 50%; margin-left: calc(var(--w) / -2); top: 18%; z-index: 2; }
+.friends-page .hs-friends .hr-1 { --w: min(34%, 118px); width: var(--w); left: 50%; margin-left: calc(var(--w) * -1.55); top: 34%; rotate: -12deg; animation-delay: -1.3s; }
+.friends-page .hs-friends .hr-2 { --w: min(34%, 118px); width: var(--w); left: 50%; margin-left: calc(var(--w) * 0.55); top: 30%; rotate: 12deg; animation-delay: -2.6s; }
+.friend-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.friend-step { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; border-radius: 22px; background: var(--panel-grad); border: 1px solid #ffffff14; box-shadow: var(--panel-edge); }
+.friend-step b { font-size: 14px; font-weight: 800; line-height: 1.2; --coin-size: 14px; }
+.friend-step > span:last-child { font-size: 12px; color: var(--text-subtitle); line-height: 1.35; }
+.fs-num { position: absolute; top: 10px; right: 12px; font-size: 28px; font-weight: 900; color: #ffffff12; line-height: 1; }
+.fs-ico { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; color: #fff; background: var(--grad-accent); box-shadow: var(--glow-accent), var(--gloss); }
+.fs-ico svg { width: 22px; height: 22px; }
+.friend-step:nth-child(2) .fs-ico { background: linear-gradient(135deg, #e889f5, #a12bb5); box-shadow: 0 8px 22px #d84ae655, var(--gloss); }
+.friend-step:nth-child(3) .fs-ico { background: linear-gradient(135deg, #ffe08a, #e0a83a); box-shadow: 0 8px 22px #ffd16655, var(--gloss); }
+@media (max-width: 600px) {
+  .friend-steps { grid-template-columns: 1fr; }
+  .friend-step { display: grid; grid-template-columns: 42px 1fr; column-gap: 12px; row-gap: 2px; align-items: center; }
+  .friend-step .fs-ico { grid-row: span 2; }
+}
+
 /* top-up window (visual only, payments are not connected) */
 .btn-deposit { padding: 0 18px; font-weight: 800; }
 .modal-deposit { width: min(560px, 100%); background: var(--panel-grad); }

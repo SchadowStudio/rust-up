@@ -351,11 +351,26 @@
       .finally(() => { roadBusy = false; renderRoad(); });
   }
   function friendsPage() {
-    $('#page').innerHTML = `<div class="page">
-      <h1 class="up-title" style="margin-bottom:16px">Друзья</h1>
+    const nfts = ROAD_ITEMS.filter(r => r.skin.img.includes('assets/nft/')).slice(-3).reverse().map(r => r.skin);
+    const refBonus = REF ? REF.refBonus : 5000, welcome = REF ? REF.welcomeBonus : 2500;
+    const steps = [
+      [ICON.tg, 'Отправь ссылку', 'Своя ссылка — ниже. Скинь её в чаты, сторис или под ролики'],
+      [ICON.gift, `Друг получает ${coinInt(welcome)}`, 'Сразу, как только зайдёт в игру по твоей ссылке'],
+      [ICON.coin, `Тебе ${coinInt(refBonus)} и шаг по дороге`, `За каждого друга в игре. ${ROAD.length} наград — до РЕАЛЬНЫХ NFT`]];
+    $('#page').innerHTML = `<div class="page friends-page">
+      <button class="hero-slide hs-friends" type="button" data-ref-invite>
+        <span class="hero-text"><span class="hero-kicker real">РЕАЛЬНЫЕ NFT</span><b class="hero-title">Зови друзей —<br>забирай NFT</b>
+          <span class="hero-sub">${coinInt(refBonus)} за каждого друга и ${ROAD.length} наград на дороге</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
+        <span class="hero-art">${nfts.map((s, i) => `<img class="hr-${i} nft" src="${s.img}" alt="" draggable="false">`).join('')}</span>
+      </button>
+      <div class="row-head"><h2 class="home-title">Как это работает</h2></div>
+      <div class="friend-steps">${steps.map(([ico, t, d], i) => `<div class="friend-step"><span class="fs-num">${i + 1}</span><span class="fs-ico">${ico}</span><b>${t}</b><span>${d}</span></div>`).join('')}</div>
+      <div class="row-head"><h2 class="home-title">Твоя ссылка</h2></div>
       <div class="panel ref-panel" id="refPanel"></div>
+      <div class="row-head"><h2 class="home-title">Дорога друзей</h2></div>
       <div class="panel road-panel" id="refRoad"></div>
     </div>`;
+    $('[data-ref-invite]').onclick = () => REF ? shareRef() : $('#refPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
     renderRefPanel(); renderRoad(); refSync();
   }
   // ---------- earnings: paid TikTok / Shorts videos ----------
@@ -511,16 +526,22 @@
   // ---------- top-up window (visual only: payments are not connected, the pay button says so) ----------
   const DEPOSIT_SUMS = [100, 300, 500, 1000, 3000, 5000];
   const DEPOSIT_WAYS = [['sbp', 'СБП'], ['card', 'Карта'], ['crypto', 'Крипта'], ['stars', 'Звёзды']];
-  // [rubles, gift, skin]: the bonus item a top-up from that sum would bring
-  const DEPOSIT_BONUSES = [[100, 'Роза', 'Five-SeveN | Urban Hazard'], [200, 'Ракета', 'MP9 | Hydra'], [500, 'Алмаз', 'AK-47 | Point Disarray'],
-    [1000, 'Кубок', 'M4A4 | The Battlestar'], [3000, 'Кольцо', '★ Classic Knife | Scorched']];
+  // [rubles, NFT, CS2 skin]: the bonus a top-up from that sum would bring; both columns get pricier every step
+  const DEPOSIT_BONUSES = [
+    [100, 'Snow Mittens #11948', 'UMP-45 | Full Stop'], [300, 'Cupid Charm #10012', 'Tec-9 | Remote Control'],
+    [500, 'Vintage Cigar #4347', 'FAMAS | ZX Spectron'], [1000, 'Artisan Brick #5426', 'G3SG1 | Flux'],
+    [2000, 'Loot Bag #12736', 'R8 Revolver | Llama Cannon'], [3000, 'Scared Cat #11028', '★ Driver Gloves | Racing Green'],
+    [5000, 'Resistance Dog #11363', '★ Shadow Daggers | Rust Coat'], [10000, 'Heart Locket #416', '★ Nomad Knife | Forest DDPAT'],
+    [25000, 'Intelligence Cup #105', '★ Bayonet | Boreal Forest'], [50000, 'Algorithm Cup #74', '★ Talon Knife | Forest DDPAT'],
+    [100000, 'Plush Pepe #2163', '★ Karambit | Bright Water']];
   const rubFmt = n => fmtInt(n) + ' ₽';
   // one «бонус за пополнение» card; also used on the bonuses page (amount 0 = empty progress)
   const depCard = (b, i, amount, kind) => {
     const s = byName[kind === 'gift' ? b[1] : b[2]];
     return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
-      <div class="dep-seg"><button type="button" class="${kind === 'gift' ? 'on' : ''}" data-kind="gift">Подарок</button><button type="button" class="${kind === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
-      <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img src="${s.img}" alt="" draggable="false">` : ''}</div>
+      <div class="dep-seg"><button type="button" class="${kind === 'gift' ? 'on' : ''}" data-kind="gift">NFT</button><button type="button" class="${kind === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
+      <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img${imgCls(s) ? ' class="nft"' : ''} src="${s.img}" alt="" draggable="false">` : ''}</div>
+      <span class="dep-name">${s ? esc(s.name.replace(/^★ /, '')) : ''}</span>
       <span class="dep-bar"><i style="width:${Math.min(100, (amount / b[0]) * 100)}%"></i></span>
       <span class="dep-from">Пополните от <b>${rubFmt(b[0])}</b></span>
       <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
