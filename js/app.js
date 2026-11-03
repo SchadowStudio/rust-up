@@ -856,6 +856,7 @@
 
   // ---------- live feed: real wins of all players, Rust + CS2 + NFT in one strip (server: /api/drop, /api/feed) ----------
   const FEED_MS = 6000;           // poll period; the server caches the answer for a few seconds
+  const ONLINE_MULT = 4;          // owner's choice: the site shows 4× the players counted by the server (admin /stats stays exact)
   const feed = [];
   const seenDrops = new Set();    // server ids already in the strip (our own wins are shown before the server has them)
   let best = null;
@@ -901,7 +902,7 @@
     if (!window.RUSTUP_API) return renderFeedEmpty();
     fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/feed').then(r => r.json()).then(d => {
       if (!d || !d.ok) return;
-      online = d.online || 0;
+      online = (d.online || 0) * ONLINE_MULT;
       $('#statOnline').textContent = fmtInt(Math.max(1, online));
       document.querySelectorAll('.gc-online[data-share]').forEach(el => {
         const n = Math.round(online * el.dataset.share);
