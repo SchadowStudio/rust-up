@@ -1132,6 +1132,40 @@ body {
 .cases-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 40px 20px; margin-top: 16px; text-align: center; }
 .cases-empty b { font-size: 18px; }
 
+/* bonuses page like RubUP: hero, deposit bonus strip, daily tiles */
+.bonus-page .bonus-hero { width: 100%; }
+.bonus-hero .gold { color: var(--skin-yellow); }
+.strip-nav { display: flex; gap: 6px; }
+.strip-nav .chip-icon { width: 36px; height: 36px; }
+.strip-nav [data-strip="-1"] svg { transform: scaleX(-1); }
+.page-bonuses { margin: 0 -12px; padding: 2px 12px 6px; }
+.page-bonuses .dep-bonus { flex-basis: 200px; background: var(--panel-grad); box-shadow: var(--panel-edge); }
+.bonus-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.bonus-tile { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(ellipse 90% 60% at 50% 0%, var(--tc, #e5383b33), transparent 70%), var(--panel-grad); border: 1px solid #ffffff14; box-shadow: var(--panel-edge); }
+.bonus-tile.wide { grid-column: 1 / -1; flex-direction: row; align-items: center; }
+.bt-art { height: 92px; display: grid; place-items: center; border-radius: 16px; background: radial-gradient(circle, var(--tc, #e5383b44) 0, transparent 70%), #ffffff06; }
+.bonus-tile.wide .bt-art { width: 72px; height: 72px; flex-shrink: 0; }
+.bt-art img { max-height: 78px; max-width: 80%; object-fit: contain; filter: drop-shadow(0 8px 12px #000b); animation: float 4s ease-in-out infinite; }
+.bt-coin svg { width: 58px; height: 58px; filter: drop-shadow(0 6px 10px #000a); }
+.bt-tg-ico { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #3cb6f0, #1d8fcf); box-shadow: 0 0 24px #2ea6e088, inset 0 2px 0 #ffffff55; }
+.bt-tg-ico svg { width: 26px; height: 26px; margin-left: -2px; }
+.bt-promo-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; font-weight: 900; color: #fff; background: var(--grad-accent); box-shadow: var(--glow-accent), var(--gloss); transform: rotate(-8deg); }
+.bt-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.bt-title { font-size: 15px; font-weight: 800; }
+.bt-value { font-size: 22px; font-weight: 900; --coin-size: 20px; }
+.bt-text { font-size: 12px; color: var(--text-subtitle); line-height: 1.35; }
+.bt-text b { color: var(--text-title); }
+.btn.bt-btn { height: 42px; font-size: 14px; font-weight: 800; border-radius: 999px; }
+.bonus-tile.wide .btn.bt-btn { flex-shrink: 0; padding: 0 20px; }
+.bt-promo-row { margin-top: 6px; }
+.bt-promo-row .text-input { height: 42px; }
+.bt-daily { --tc: #ffd16633; }
+.bt-cash { --tc: #4fc27a33; }
+.bt-tg { --tc: #2ea6e033; }
+.bt-promo { --tc: #e5383b2e; }
+.bt-promo .bt-art { align-self: flex-start; }
+
 /* top-up window (visual only, payments are not connected) */
 .btn-deposit { padding: 0 18px; font-weight: 800; }
 .modal-deposit { width: min(560px, 100%); background: var(--panel-grad); }

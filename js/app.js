@@ -515,19 +515,21 @@
   const DEPOSIT_BONUSES = [[100, 'Роза', 'Five-SeveN | Urban Hazard'], [200, 'Ракета', 'MP9 | Hydra'], [500, 'Алмаз', 'AK-47 | Point Disarray'],
     [1000, 'Кубок', 'M4A4 | The Battlestar'], [3000, 'Кольцо', '★ Classic Knife | Scorched']];
   const rubFmt = n => fmtInt(n) + ' ₽';
+  // one «бонус за пополнение» card; also used on the bonuses page (amount 0 = empty progress)
+  const depCard = (b, i, amount, kind) => {
+    const s = byName[kind === 'gift' ? b[1] : b[2]];
+    return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
+      <div class="dep-seg"><button type="button" class="${kind === 'gift' ? 'on' : ''}" data-kind="gift">Подарок</button><button type="button" class="${kind === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
+      <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img src="${s.img}" alt="" draggable="false">` : ''}</div>
+      <span class="dep-bar"><i style="width:${Math.min(100, (amount / b[0]) * 100)}%"></i></span>
+      <span class="dep-from">Пополните от <b>${rubFmt(b[0])}</b></span>
+      <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
+    </div>`;
+  };
   function openDeposit(sum = 500) {
     let amount = sum, way = 'sbp';
     const kind = DEPOSIT_BONUSES.map(() => 'gift');
-    const bonusCard = (b, i) => {
-      const s = byName[kind[i] === 'gift' ? b[1] : b[2]];
-      return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
-        <div class="dep-seg"><button type="button" class="${kind[i] === 'gift' ? 'on' : ''}" data-kind="gift">Подарок</button><button type="button" class="${kind[i] === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
-        <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img src="${s.img}" alt="" draggable="false">` : ''}</div>
-        <span class="dep-bar"><i style="width:${Math.min(100, (amount / b[0]) * 100)}%"></i></span>
-        <span class="dep-from">Пополните от <b>${rubFmt(b[0])}</b></span>
-        <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
-      </div>`;
-    };
+    const bonusCard = (b, i) => depCard(b, i, amount, kind[i]);
     modal('Пополнение', `
       <div class="dep-sums">${DEPOSIT_SUMS.map(v => `<button type="button" class="dep-sum" data-v="${v}">${rubFmt(v)}</button>`).join('')}</div>
       <div class="dep-input"><input class="text-input" id="depAmt" inputmode="numeric" maxlength="7" value="${amount}"><span>₽</span></div>
@@ -1486,35 +1488,49 @@
     const hh = Math.max(0, Math.floor(left / 3600e3)), mm = Math.max(0, Math.floor((left % 3600e3) / 60e3));
     const cb = S.rewards.cashback || 0;
 
-    $('#page').innerHTML = `<div class="page">
-      <h2 class="section-title">Награды</h2>
-      <div class="panel reward-card tg-banner"><span class="glow"></span>
-        <div class="tg-banner-text"><h4>Подписка на Telegram</h4>
-          <p>Подпишитесь на канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Бонус ${coinInt(TG_BONUS)} один раз на аккаунт.</p></div>
-        <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${bonusTxt()}`}</span></button>
+    // RubUP-like layout: hero banner, deposit bonuses strip, daily tiles, friends
+    const roadNfts = ROAD_ITEMS.filter(r => r.skin.img.includes('assets/nft/')).slice(-3).reverse().map(r => r.skin);
+    const tile = (cls, art, title, value, text, btn) => `<div class="bonus-tile ${cls}"><span class="bt-art">${art}</span>
+      <span class="bt-body"><b class="bt-title">${title}</b>${value ? `<span class="bt-value">${value}</span>` : ''}<span class="bt-text">${text}</span></span>${btn}</div>`;
+    $('#page').innerHTML = `<div class="page bonus-page">
+      <button class="hero-slide hs-road bonus-hero" type="button" data-to-road>
+        <span class="hero-text"><span class="hero-kicker real">РЕАЛЬНЫЕ NFT</span><b class="hero-title">Дорога<br>друзей</b>
+          <span class="hero-sub">${ROAD.length} наград · NFT до <b class="gold">3 000 ⭐</b> на твой аккаунт</span><span class="hero-btn">Открыть ${ICON.right}</span></span>
+        <span class="hero-art">${roadNfts.map((s, i) => `<img class="hr-${i} nft" src="${s.img}" alt="" draggable="false">`).join('')}</span>
+      </button>
+
+      <div class="row-head"><h2 class="home-title">Бонусы за пополнение</h2>
+        <span class="strip-nav"><button type="button" class="chip chip-icon" data-strip="-1" aria-label="Назад">${ICON.right}</button><button type="button" class="chip chip-icon" data-strip="1" aria-label="Вперёд">${ICON.right}</button></span></div>
+      <div class="dep-bonuses page-bonuses" id="pageBonuses">${DEPOSIT_BONUSES.map((b, i) => depCard(b, i, 0, 'gift')).join('')}</div>
+
+      <div class="row-head"><h2 class="home-title">Ежедневные</h2></div>
+      <div class="bonus-grid">
+        ${tile('bt-daily', `<img src="${giftImg('Подарок')}" alt="" draggable="false">`, 'Подарок дня', coinInt(DAILY_BONUS), 'Каждые 24 часа, не копится',
+          `<button class="btn ${dailyReady() ? 'btn-accent' : 'btn-ghost'} bt-btn" id="claimDaily" ${dailyReady() ? '' : 'disabled'}>${dailyReady() ? 'Забрать' : `${hh} ч ${mm} мин`}</button>`)}
+        ${tile('bt-cash', `<span class="bt-coin">${ICON.coin}</span>`, `Кешбэк ${CASHBACK * 100}%`, coin(cb), 'С проигрышей в апгрейде и кейсах',
+          `<button class="btn ${cb >= 0.01 ? 'btn-accent' : 'btn-ghost'} bt-btn" id="claimCashback" ${cb >= 0.01 ? '' : 'disabled'}>${cb >= 0.01 ? 'Забрать' : 'Пока пусто'}</button>`)}
+        ${tile('bt-tg wide', `<span class="bt-tg-ico">${ICON.tg}</span>`, 'Подписка на Telegram', `+${coinInt(TG_BONUS)}`, `Канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Один раз на аккаунт`,
+          `<button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'} bt-btn" data-tg-bonus>${tgBonusDone() ? 'Получено' : 'Получить'}</button>`)}
+        <div class="bonus-tile bt-promo wide"><span class="bt-art"><span class="bt-promo-ico">%</span></span>
+          <span class="bt-body"><b class="bt-title">Промокод</b><span class="bt-text">Новый промокод дня — в боте в 15:00 МСК. Для демо: <b>RUSTUP</b>, <b>WIPE</b>, <b>DEMO</b></span>
+            <span class="row bt-promo-row"><input class="text-input" id="promo" placeholder="Промокод" maxlength="20"><button class="btn btn-accent" id="applyPromo">OK</button></span></span></div>
       </div>
+
+      <div class="row-head"><h2 class="home-title">Друзья</h2></div>
       <div class="panel ref-panel" id="refPanel"></div>
       <div class="panel road-panel" id="refRoad"></div>
-      <div class="cards-3">
-        <div class="panel reward-card"><span class="glow"></span>
-          <h4>Ежедневный подарок</h4>
-          <span class="big">${coinInt(DAILY_BONUS)}</span>
-          <p>Забирайте подарок каждые 24 часа. Не пропускайте — подарки не копятся.</p>
-          <button class="btn ${dailyReady() ? 'btn-accent' : 'btn-ghost'}" id="claimDaily" ${dailyReady() ? '' : 'disabled'}>${dailyReady() ? 'Забрать' : `Через ${hh} ч ${mm} мин`}</button>
-        </div>
-        <div class="panel reward-card">
-          <h4>Промокод</h4>
-          <p>Введите промокод и получите бонус на баланс. Для демо работают: <b>RUSTUP</b>, <b>WIPE</b>, <b>DEMO</b>.</p>
-          <div class="row"><input class="text-input" id="promo" placeholder="Промокод" maxlength="20"><button class="btn btn-accent" id="applyPromo">OK</button></div>
-        </div>
-        <div class="panel reward-card"><span class="glow"></span>
-          <h4>Кешбэк ${CASHBACK * 100}%</h4>
-          <span class="big">${coin(cb)}</span>
-          <p>Возвращаем ${CASHBACK * 100}% с каждого проигрыша в апгрейде и в платных кейсах. Копится здесь — забирайте когда угодно.${S.rewards.cashbackTotal ? ` Всего получено: ${coin(S.rewards.cashbackTotal)}.` : ''}</p>
-          <button class="btn ${cb >= 0.01 ? 'btn-accent' : 'btn-ghost'}" id="claimCashback" ${cb >= 0.01 ? '' : 'disabled'}>${cb >= 0.01 ? 'Забрать кешбэк' : 'Пока пусто'}</button>
-        </div>
-      </div>
     </div>`;
+
+    // bonus strip on the page: gift / skin toggle, arrows, «Пополнить» opens the top-up window with that sum
+    const kinds = DEPOSIT_BONUSES.map(() => 'gift');
+    $('#pageBonuses').addEventListener('click', e => {
+      const t = e.target.closest('button');
+      if (!t) return;
+      if (t.dataset.kind) { const i = +t.closest('.dep-bonus').dataset.i; kinds[i] = t.dataset.kind; t.closest('.dep-bonus').outerHTML = depCard(DEPOSIT_BONUSES[i], i, 0, kinds[i]); return; }
+      if (t.dataset.sum) openDeposit(+t.dataset.sum);
+    });
+    document.querySelectorAll('[data-strip]').forEach(b => b.onclick = () => $('#pageBonuses').scrollBy({ left: +b.dataset.strip * 220, behavior: 'smooth' }));
+    $('[data-to-road]').onclick = () => $('#refRoad').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     $('#claimDaily').onclick = claimDaily;
     renderRefPanel();
