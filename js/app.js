@@ -720,7 +720,10 @@
 
   // ---------- auth (demo) ----------
   const AVA_COLORS = ['#cd412b', '#467edf', '#7c954d', '#ae6eee', '#d68a1f', '#2c9c8f'];
-  const avatarHtml = (name, color, cls = 'avatar') => `<span class="${cls}" style="background:linear-gradient(135deg,${color},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}</span>`;
+  // the Telegram profile photo (served by the bot, /api/ava/<id>) over the letter; the letter stays if there is no photo
+  const avaUrl = id => (id && window.RUSTUP_API ? window.RUSTUP_API.replace(/\/$/, '') + '/api/ava/' + id : '');
+  const myPhoto = () => (tgUser() && tgUser().photo_url) || avaUrl(S.user && S.user.id);
+  const avatarHtml = (name, color, cls = 'avatar', photo = '') => `<span class="${cls}" style="background:linear-gradient(135deg,${color},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}${photo ? `<img class="ava-img" src="${esc(photo)}" alt="" loading="lazy" draggable="false" onerror="this.remove()">` : ''}</span>`;
 
   // inside Telegram the account is already known: sign in silently with the Telegram name
   // the account is the Telegram one; after the game server loaded it, a new player gets the starter pack
@@ -879,7 +882,7 @@
       us.innerHTML = `
         <button class="balance${$('#curMenu') ? ' open' : ''}" type="button" data-cur-menu aria-label="Баланс и валюта" aria-haspopup="menu">${coin(S.balance)}<svg class="balance-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="btn btn-accent btn-pill btn-deposit" type="button" data-deposit>Пополнить</button>
-        <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color)}</a>`;
+        <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color, 'avatar', myPhoto())}</a>`;
     }
     document.querySelectorAll('.nav-item[data-route="/rewards"]').forEach(a => {
       a.querySelector('.nav-dot')?.remove();
@@ -976,7 +979,7 @@
     return `<a class="${cls} rarity-${d.skin.rarity} game-${d.skin.game}${d.enter ? ' enter' : ''}" href="#/upgrade?game=${d.skin.game}" title="${esc(d.skin.name)} · ${esc(d.user)} · ${d.chance.toFixed(2)} %">
       <span class="drop-img"><img src="${d.skin.img}" alt="${esc(d.skin.name)}" draggable="false"></span>
       <span class="drop-info">
-        <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava')}<span>${esc(d.user)}</span></span>
+        <span class="drop-user">${avatarHtml(d.user, d.color, 'mini-ava', avaUrl(d.uid))}<span>${esc(d.user)}</span></span>
         <span class="drop-price">${coin(d.skin.price)}</span>
       </span>
     </a>`;
@@ -998,7 +1001,7 @@
     if (!best || d.skin.price > best.skin.price) { best = d; renderBest(true); }
   }
   // a server row → a strip item; skins missing from this build's catalog are skipped
-  const fromServer = r => { const skin = byName[r.name]; return skin && { id: r.id, user: r.nick, color: r.color || AVA_COLORS[r.id % AVA_COLORS.length], skin, chance: r.chance || 100, t: r.t }; };
+  const fromServer = r => { const skin = byName[r.name]; return skin && { id: r.id, uid: r.uid, user: r.nick, color: r.color || AVA_COLORS[r.id % AVA_COLORS.length], skin, chance: r.chance || 100, t: r.t }; };
   // the server writes our win to the feed itself; pull the strip sooner than the regular poll
   // (the feed answer is cached for a few seconds, so ask twice)
   function reportDrops() {
@@ -1715,33 +1718,54 @@
       $('#page').innerHTML = `<div class="page"><div class="panel" style="text-align:center;padding:60px 24px"><h2 style="margin-top:0">Профиль</h2><p class="muted">Войдите, чтобы увидеть профиль</p><button class="btn btn-steam" data-login>${ICON.steam}<span>Войти через Steam</span></button></div></div>`;
       return;
     }
-    const st = S.stats;
-    const rows = S.history.slice(0, 50).map(h => `<tr>
-      <td>${new Date(h.t).toLocaleString('ru-RU')}</td>
-      <td>${h.inputs.map(esc).join(', ') || '—'}${h.bal ? ` + ${money(h.bal)}` : ''}</td>
-      <td>${h.targets.map(esc).join(', ')}</td>
-      <td>${h.chance.toFixed(2)}%</td>
-      <td class="mono">${h.roll.toFixed(4)}</td>
-      <td class="${h.win ? 'ok' : 'bad'}">${h.win ? 'Победа' : 'Проигрыш'}</td></tr>`).join('');
-    $('#page').innerHTML = `<div class="page">
-      <div class="profile-head">
-        ${avatarHtml(S.user.name, S.user.color)}
-        <div><h2>${esc(S.user.name)}</h2><span class="muted">ID ${S.user.id}</span></div>
-        <div class="row" style="margin-left:auto;flex-wrap:wrap">
+    // glass profile: the Telegram photo and name, stats, best wins, recent upgrades, links
+    const st = S.stats, tgu = tgUser() || {};
+    const winRate = st.upgrades ? ((st.wins / st.upgrades) * 100).toFixed(1) : '0';
+    const invValue = sum(S.inventory.map(i => (byName[i.name] ? byName[i.name].price : 0)));
+    const since = S.history.length ? S.history[S.history.length - 1].t : 0;
+    // best wins: every won upgrade target and every case prize from the ledger, priciest first
+    const wins = [];
+    S.history.filter(h => h.win).forEach(h => h.targets.forEach(n => byName[n] && wins.push({ skin: byName[n], t: h.t, how: `Апгрейд · ${h.chance.toFixed(1)}%` })));
+    const best = wins.sort((a, b) => b.skin.price - a.skin.price).slice(0, 6);
+    const recent = S.history.slice(0, 8).map(h => `<div class="tx ${h.win ? 'tx-bonus' : 'tx-game'}">
+        <span class="tx-ico">${TXICO.upgrade}</span>
+        <span class="tx-body"><b>${h.targets.map(esc).join(', ')}</b><small>${new Date(h.t).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · шанс ${h.chance.toFixed(2)}% · выпало ${h.roll.toFixed(2)}</small></span>
+        <span class="tx-sum ${h.win ? 'plus' : 'minus'}">${h.win ? `+${coin(h.tv)}` : `−${coin(h.inValue)}`}</span></div>`).join('');
+    const stat = (ico, k, v, sub = '') => `<div class="pf-stat w-glass"><span class="pf-stat-ico">${ico}</span><span class="pf-k">${k}</span><b class="pf-v">${v}</b>${sub ? `<span class="pf-sub">${sub}</span>` : ''}</div>`;
+    $('#page').innerHTML = `<div class="page wallet-page profile-page">
+      <span class="w-glow g1"></span><span class="w-glow g2"></span><span class="w-glow g3"></span>
+      <div class="pf-hero w-glass">
+        <div class="pf-ava">${avatarHtml(S.user.name, S.user.color, 'avatar', myPhoto())}<span class="pf-tg">${ICON.tg}</span></div>
+        <div class="pf-who">
+          <h1>${esc(S.user.name)}</h1>
+          <span class="pf-meta">${tgu.username ? `@${esc(tgu.username)} · ` : ''}ID ${S.user.id}</span>
+          ${since ? `<span class="pf-meta">Играет с ${new Date(since).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>` : ''}
+        </div>
+        <div class="pf-balance"><span>Баланс</span><b>${coin(S.balance)}</b></div>
+        <div class="pf-actions">
+          <a class="btn btn-accent" href="#/wallet?tab=deposit">Пополнить</a>
           <a class="btn btn-ghost" href="#/inventory">Инвентарь</a>
-          <button class="btn btn-ghost" id="rename">Сменить ник</button>
+          <button class="btn btn-ghost" id="rename" type="button">Сменить ник</button>
         </div>
       </div>
-      <div class="stat-grid">
-        <div class="panel"><div class="k">Апгрейдов</div><div class="v">${fmtInt(st.upgrades)}</div></div>
-        <div class="panel"><div class="k">Побед</div><div class="v">${fmtInt(st.wins)} <span class="muted" style="font-size:14px">${st.upgrades ? ((st.wins / st.upgrades) * 100).toFixed(1) + '%' : ''}</span></div></div>
-        <div class="panel"><div class="k">Поставлено</div><div class="v">${coin(st.wagered)}</div></div>
-        <div class="panel"><div class="k">Лучший выигрыш</div><div class="v">${coin(st.best)}</div></div>
+      <div class="pf-stats">
+        ${stat(TXICO.upgrade, 'Апгрейдов', fmtInt(st.upgrades))}
+        ${stat(TXICO.gift, 'Побед', fmtInt(st.wins), `${winRate}% удачных`)}
+        ${stat(TXICO.cashback, 'Поставлено', coin(st.wagered))}
+        ${stat(TXICO.case, 'Лучший выигрыш', coin(st.best))}
+        ${stat(TXICO.shop, 'Инвентарь', coin(invValue), `${fmtInt(S.inventory.length)} предметов`)}
+        ${stat(TXICO.deposit, 'Выиграно всего', coin(st.won))}
       </div>
-      <h2 class="section-title">История</h2>
-      <div class="panel" style="padding:0"><div class="table-wrap">
-        ${rows ? `<table class="table"><thead><tr><th>Время</th><th>Ставка</th><th>Цель</th><th>Шанс</th><th>Ролл</th><th>Итог</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted" style="padding:24px;margin:0">История пуста</p>'}
-      </div></div>
+      <div class="row-head"><h2 class="home-title">Лучшие выигрыши</h2></div>
+      ${best.length ? `<div class="pf-best">${best.map(w => `<div class="pf-best-card">${card(w.skin, { static: true })}<span>${esc(w.how)}</span></div>`).join('')}</div>`
+        : `<div class="w-glass pf-empty"><b>Пока без побед</b><span class="muted">Сделайте первый апгрейд — лучшие выигрыши появятся здесь</span><a class="btn btn-accent w-go" href="#/upgrade">К апгрейду</a></div>`}
+      <div class="row-head"><h2 class="home-title">Последние апгрейды</h2><a href="#/wallet?tab=history">Вся история ${ICON.right}</a></div>
+      ${recent ? `<div class="tx-list w-glass">${recent}</div>` : '<div class="w-glass pf-empty"><span class="muted">Апгрейдов пока не было</span></div>'}
+      <div class="pf-links">
+        <a class="w-glass pf-link" href="#/wallet?tab=history"><span class="tx-ico">${TXICO.deposit}</span><b>Кошелёк и история</b>${ICON.right}</a>
+        <a class="w-glass pf-link" href="#/friends"><span class="tx-ico">${TXICO.friends}</span><b>Друзья и рефералы</b>${ICON.right}</a>
+        <a class="w-glass pf-link" href="#/provably-fair"><span class="tx-ico">${ICON.shield}</span><b>Проверка честности</b>${ICON.right}</a>
+      </div>
     </div>`;
     $('#rename').onclick = () => {
       const n = prompt('Новый ник', S.user.name);
