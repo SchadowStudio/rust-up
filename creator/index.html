@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#141518">
+  <title>RUST UP — кабинет автора</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20261104a">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <span class="logo"><span class="logo-rust">RUST</span><span class="logo-up">UP</span><span class="logo-tag">АВТОРАМ</span></span>
+    <button class="bal-pill" type="button" data-tab="money"><span id="topBalance">0 $</span></button>
+  </header>
+  <main id="page"></main>
+  <nav class="nav">
+    <button class="nav-item" data-tab="stats" type="button"><svg viewBox="0 0 20 20"><path d="M3 17V9M8 17V4M13 17v-6M18 17V7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Статистика</span></button>
+    <button class="nav-item" data-tab="clips" type="button"><svg viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 7.5v5l4-2.5z" fill="currentColor"/></svg><span>Ролики</span></button>
+    <button class="nav-item" data-tab="money" type="button"><svg viewBox="0 0 20 20"><rect x="2.5" y="5" width="15" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.5 8.5h15M13 12.5h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Баланс</span></button>
+  </nav>
+  <div class="modal-root" id="modal"></div>
+  <ol class="toasts" id="toasts"></ol>
+  <script src="config.js?v=20261104a"></script>
+  <script src="app.js?v=20261104a"></script>
+</body>
+</html>
