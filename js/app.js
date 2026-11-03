@@ -2,19 +2,12 @@
 (function () {
   'use strict';
 
-  // ---------- constants ----------
-  const RTP = 0.95;            // payout ratio built into the chance formula
-  const MAX_CHANCE = 75;
-  const MIN_CHANCE = 1;
-  const MAX_SLOTS = 6;
+  // ---------- constants: game rules are shared with the server (js/rules.js → bot/gamedata.js) ----------
+  const R = window.RUSTUP_RULES;
+  const { RTP, MAX_CHANCE, MIN_CHANCE, MAX_SLOTS, TG_CHANNEL, TG_BONUS, PROMOS, DAILY_MS, DAILY_BONUS } = R;
   const MIN_TOPUP = 10;           // below this balance the upgrader suggests getting coins
-  const TG_CHANNEL = 'up_rust';
-  const TG_BONUS = 10000;         // one-time reward for subscribing to the Telegram channel
   const bonusTxt = () => moneyInt(TG_BONUS);
   const STORE_KEY = 'rustup_demo_v1';
-  const PROMOS = { RUSTUP: 50, WIPE: 25, DEMO: 100 };
-  const DAILY_MS = 24 * 60 * 60 * 1000;
-  const DAILY_BONUS = 3500;       // daily gift, once per DAILY_MS
 
   // one catalog for all games; names don't collide ("AK47" in Rust vs "AK-47 | ..." in CS2)
   const SKINS = [
@@ -143,8 +136,42 @@
   function save() {
     S.savedAt = Date.now();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
-    cloudSave();
+    // before the game server answered the device copy is still the player's progress (it is imported once)
+    if (!gameReady) cloudSave();
   }
+
+  // ---------- game server (bot/game.js): balance, items, rewards and every roll live there ----------
+  // The app only shows the state and asks the server to act; the device copy is a cache for the first paint.
+  let gameReady = false;
+  const GAME_ERR = {
+    funds: 'Недостаточно средств', items: 'Предметы уже не в инвентаре — обновили данные', chance: 'Шанс должен быть от 1% до 75%',
+    game: 'В апгрейде предметы только одной игры', cooldown: 'Пока недоступно — подождите', opened: 'Этот кейс уже открыт',
+    subs: 'Сначала подпишитесь на каналы', used: 'Промокод уже использован', not_found: 'Промокод не найден',
+    expired: 'Срок промокода истёк — новый придёт в бота в 15:00 МСК', limit: 'Активации закончились — ждите новый промокод завтра в 15:00 МСК',
+    done: 'Уже получено', empty: 'Пока пусто', mix: 'NFT-подарки и скины выводятся отдельно', busy: 'Сервер занят, попробуйте ещё раз',
+    noacc: 'Профиль ещё загружается, попробуйте через секунду'
+  };
+  const gameErr = d => GAME_ERR[d && d.error] || 'Не удалось выполнить — попробуйте ещё раз';
+  function applyState(st) {
+    S.balance = st.balance; S.inventory = st.inventory.filter(i => byName[i.name]); S.withdrawals = st.withdrawals;
+    S.history = st.history; S.stats = st.stats; S.seeds = st.seeds; S.rewards = st.rewards;
+    const u = tgUser() || {};
+    S.user = { ...(S.user || {}), ...st.user, id: u.id || (S.user && S.user.id), tg: true };
+    if (!S.user.color) S.user.color = AVA_COLORS[(u.id || 0) % AVA_COLORS.length];
+    save();
+  }
+  // one action on the server; the new state is applied before the promise resolves,
+  // unless defer is set (the upgrade wheel and the case roulette show the result first, then apply it)
+  function api(action, extra = {}, defer = false) {
+    return fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/game', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, action, ...extra })
+    }).then(r => r.json()).then(d => {
+      if (d && d.state && !(defer && d.ok)) { applyState(d.state); renderHeader(); }
+      if (d && d.error === 'items') refreshUpgrade();
+      return d || { ok: false };
+    }).catch(() => ({ ok: false, error: 'net' }));
+  }
+  const netToast = d => toast(d.error === 'net' ? 'Нет связи с сервером, попробуйте ещё раз' : gameErr(d), 'error');
 
   // ---------- Telegram Mini App ----------
   // Only active when opened from a Telegram bot (initData present); otherwise TG is null and the site works as usual.
@@ -222,18 +249,10 @@
     }).then(r => r.json()).then(d => {
       if (!d.ok) return;
       REF = d;
-      if (d.credited > 0) {
-        addBalance(d.credited);
-        sfxWin();
-        toast(`Награда за друзей: ${coinInt(d.credited)}`, 'success');
-        refreshUpgrade();
-      }
-      if (d.granted > 0) {
-        addBalance(d.granted);
-        sfxWin(); haptic('success');
-        toast(`Начислено администрацией: ${coinInt(d.granted)}${d.grantNote ? ` — ${esc(d.grantNote)}` : ''}`, 'success');
-        refreshUpgrade();
-      }
+      // the server already put them on the account balance: pull the new state
+      if (d.credited > 0 || d.granted > 0) api('load').then(() => { bumpBalance(); refreshUpgrade(); });
+      if (d.credited > 0) { sfxWin(); toast(`Награда за друзей: ${coinInt(d.credited)}`, 'success'); }
+      if (d.granted > 0) { sfxWin(); haptic('success'); toast(`Начислено администрацией: ${coinInt(d.granted)}${d.grantNote ? ` — ${esc(d.grantNote)}` : ''}`, 'success'); }
       if ($('#refPanel')) renderRefPanel();
       syncRoadWithdrawals();
       if ($('#refRoad')) renderRoad();
@@ -337,9 +356,8 @@
       if (!d.ok) return toast(d.active != null ? `Нужно ${lvl} друзей в игре, сейчас ${d.active}` : 'Не удалось забрать награду', 'error');
       REF.road = [...(REF.road || []), lvl];
       if (!d.claimed) return toast('Эта награда уже получена', 'error');
-      // a real gift, not an inventory item: it is tracked as a withdrawal until an admin sends it
-      S.withdrawals.unshift({ id: Math.floor(rand(1e6, 9e6)), t: Date.now(), items: [r.skin.name], value: r.skin.price, status: 'pending', real: true, level: lvl });
-      save();
+      // a real gift, not an inventory item: the server added it to the withdrawals until an admin sends it
+      api('load');
       sfxWin();
       const tgu = tgUser() && tgUser().username;
       modal('Заявка принята!', `
@@ -590,53 +608,27 @@
   const avatarHtml = (name, color, cls = 'avatar') => `<span class="${cls}" style="background:linear-gradient(135deg,${color},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}</span>`;
 
   // inside Telegram the account is already known: sign in silently with the Telegram name
+  // the account is the Telegram one; after the game server loaded it, a new player gets the starter pack
   function tgLogin() {
-    const u = tgUser();
-    if (!u || S.user) return false;
-    S.user = { name: tgName(u), id: u.id, color: AVA_COLORS[u.id % AVA_COLORS.length], tg: true };
-    save(); renderHeader();
-    toast(`Добро пожаловать, <b>${esc(S.user.name)}</b>!`, 'success');
+    if (!gameReady) return false;
     if (!S.rewards.starter) giveStarterPack();
     return true;
   }
 
   function requireLogin(then) {
-    if (S.user) return then && then();
-    if (tgLogin()) return;
-    modal('Вход', `
-      <p class="note" style="font-size:13px;color:var(--text-subtitle)">Это демо-версия: вход через Steam имитируется. Введите ник — он будет виден в ленте дропов.</p>
-      <div class="field"><label for="nick">Никнейм</label><input id="nick" class="text-input" maxlength="20" placeholder="Например, Bandit" autocomplete="off"></div>
-      <button class="btn btn-steam" id="doLogin" style="height:48px">${ICON.steam}<span>Войти через Steam (демо)</span></button>`,
-    m => {
-      const inp = $('#nick', m);
-      inp.focus();
-      const go = () => {
-        const name = inp.value.trim() || 'Survivor' + Math.floor(rand(100, 999));
-        S.user = { name, id: Math.floor(rand(100000, 999999)), color: pick(AVA_COLORS) };
-        save(); closeModal(); renderHeader(); route();
-        toast(`Добро пожаловать, <b>${esc(name)}</b>!`, 'success');
-        if (!S.rewards.starter) return giveStarterPack();
-        then && then();
-      };
-      $('#doLogin', m).onclick = go;
-      inp.addEventListener('keydown', e => e.key === 'Enter' && go());
-    });
+    if (gameReady && S.user) return then && then();
+    toast('Профиль ещё загружается, попробуйте через секунду', 'error');
   }
 
-  // ---------- starter pack (once per demo profile) ----------
-  const STARTER_TIERS = [[0, 10], [0, 10], [10, 30], [30, 80], [80, 200]];
+  // ---------- starter pack: chosen by the server, once per account ----------
   function giveStarterPack() {
-    const taken = new Set();
-    const names = STARTER_TIERS.map(([lo, hi]) => {
-      const pool = POOL.rust.filter(s => s.price >= lo && s.price < hi && !taken.has(s.name));
-      const s = pick(pool.length ? pool : POOL.rust);
-      taken.add(s.name);
-      return s.name;
+    api('starter').then(d => {
+      if (!d.ok) return;
+      refreshUpgrade();
+      showStarter(d.names);
     });
-    names.forEach(addItem);
-    S.rewards.starter = Date.now();
-    save();
-    refreshUpgrade();
+  }
+  function showStarter(names) {
     const total = sum(names.map(n => byName[n].price));
     modal('Стартовый набор', `
       <p class="note" style="font-size:13px;color:var(--text-subtitle)">Подарок за первый вход — ${names.length} скинов на ${coin(total)}. Они уже в вашем инвентаре: продайте их или поставьте в апгрейд.</p>
@@ -650,9 +642,9 @@
   }
 
   // ---------- wallet ----------
-  function addBalance(v) {
-    S.balance = Math.round((S.balance + v) * 100) / 100;
-    save(); renderHeader();
+  // the balance changes on the server; this only plays the header bump
+  function bumpBalance() {
+    renderHeader();
     const b = $('.balance'); if (b) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   }
   // ---------- Telegram channel bonus (replaces top-up) ----------
@@ -736,18 +728,22 @@
       m => {
         $('#tgSub', m).onclick = () => {
           openChannel();
-          opened = S.rewards.tgOpened = true; save();
+          opened = true;
           $('#tgClaim', m).disabled = false;
         };
+        // the server asks Telegram whether the player really joined
         $('#tgClaim', m).onclick = () => {
           if (!opened || tgBonusDone()) return;
-          S.rewards.tgSub = Date.now();
-          $('.tg-promo')?.remove();
-          addBalance(TG_BONUS);
-          closeModal(); sfxWin();
-          toast(`Бонус за подписку: ${coinInt(TG_BONUS)}`, 'success');
-          refreshUpgrade();
-          if (location.hash === '#/rewards') rewardsPage();
+          const b = $('#tgClaim', m); b.disabled = true;
+          api('tgbonus').then(d => {
+            b.disabled = false;
+            if (!d.ok) return toast(d.error === 'subs' ? `Подпишитесь на @${TG_CHANNEL} и нажмите ещё раз` : gameErr(d), 'error');
+            $('.tg-promo')?.remove();
+            closeModal(); sfxWin(); bumpBalance();
+            toast(`Бонус за подписку: ${coinInt(TG_BONUS)}`, 'success');
+            refreshUpgrade();
+            if (location.hash === '#/rewards') rewardsPage();
+          });
         };
       });
     });
@@ -888,14 +884,11 @@
   }
   // a server row → a strip item; skins missing from this build's catalog are skipped
   const fromServer = r => { const skin = byName[r.name]; return skin && { id: r.id, user: r.nick, color: r.color || AVA_COLORS[r.id % AVA_COLORS.length], skin, chance: r.chance || 100, t: r.t }; };
-  // our own win shows up at once and goes to the server for everyone else
-  function reportDrops(skins, chance, src) {
-    skins.forEach(skin => pushDrop({ user: S.user.name, color: S.user.color, skin, chance, t: Date.now() }));
-    if (!TG || !window.RUSTUP_API) return;
-    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/drop', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData: TG.initData, nick: S.user.name, color: S.user.color, src, items: skins.map(s => ({ name: s.name, price: s.price, chance })) })
-    }).then(r => r.json()).then(d => { if (d && d.ids) d.ids.forEach(id => seenDrops.add(id)); }).catch(() => { /* offline: shown locally anyway */ });
+  // the server writes our win to the feed itself; pull the strip sooner than the regular poll
+  // (the feed answer is cached for a few seconds, so ask twice)
+  function reportDrops() {
+    setTimeout(() => loadFeed(false), 1500);
+    setTimeout(() => loadFeed(false), 5500);
   }
   let online = 0;
   function loadFeed(first) {
@@ -1370,21 +1363,24 @@
     requireLogin(() => {
       const s = byName[name];
       if (S.balance < s.price) return toast(`Недостаточно средств: нужно ${coin(s.price)}`, 'error');
-      addBalance(-s.price);
-      addItem(name);
-      save();
-      toast(`Куплено: <b>${esc(name)}</b>`, 'success');
-      refreshUpgrade();
+      api('buy', { name }).then(d => {
+        if (!d.ok) return netToast(d);
+        bumpBalance();
+        toast(`Куплено: <b>${esc(name)}</b>`, 'success');
+        refreshUpgrade();
+      });
     });
   }
   function sellSelected() {
-    const items = [...U.inputs].map(invItem).filter(Boolean);
-    const total = sum(items.map(i => byName[i.name].price));
-    S.inventory = S.inventory.filter(i => !U.inputs.has(i.uid));
-    U.inputs.clear();
-    addBalance(total);
-    toast(`Продано ${items.length} шт. за ${coin(total)}`, 'success');
-    refreshUpgrade();
+    const uids = [...U.inputs];
+    if (!uids.length) return;
+    api('sell', { uids }).then(d => {
+      if (!d.ok) return netToast(d);
+      U.inputs.clear();
+      bumpBalance();
+      toast(`Продано ${d.count} шт. за ${coin(d.total)}`, 'success');
+      refreshUpgrade();
+    });
   }
 
   // ---------- the spin ----------
@@ -1393,23 +1389,25 @@
     const v = validity();
     if (!v.ok || U.spinning) return v.msg && toast(v.msg, 'error');
 
-    const c = chance();
-    const seeds = { ...S.seeds };
-    const roll = rollFor(seeds);
-    const win = roll < c;
     const inSkins = [...U.inputs].map(invItem);
     const inValue = inputValue();
     const targets = U.targets.slice();
     const balUsed = U.balanceAdd;
-
-    // commit stake immediately so a reload mid-spin can't duplicate it
-    S.inventory = S.inventory.filter(i => !U.inputs.has(i.uid));
-    S.balance = Math.round((S.balance - balUsed) * 100) / 100;
-    S.seeds.nonce++;
-    save(); renderHeader();
-
     U.spinning = true; U.result = null;
-    renderButton(); renderMults(); renderBalanceBar(); renderInventory(); renderTargets();
+    renderButton(); renderMults();
+    // the server takes the stake, rolls and keeps the result; the wheel then spins to its roll
+    api('upgrade', { uids: inSkins.map(i => i.uid), bal: balUsed, targets }, true).then(d => {
+      if (!d.ok) { U.spinning = false; renderButton(); renderMults(); return netToast(d); }
+      spinWheel(d, inSkins, inValue, targets, balUsed);
+    });
+  }
+  function spinWheel(d, inSkins, inValue, targets, balUsed) {
+    const { roll, win, chance: c } = d;
+    // until the wheel stops, show the stake as taken and nothing won yet
+    const staked = new Set(inSkins.map(i => i.uid));
+    S.inventory = S.inventory.filter(i => !staked.has(i.uid));
+    S.balance = Math.round((S.balance - balUsed) * 100) / 100;
+    renderHeader(); renderBalanceBar(); renderInventory(); renderTargets();
 
     const dur = S.settings.fast ? 1400 : 5200;
     const start = U.angle, startNorm = start % 360;
@@ -1437,14 +1435,7 @@
       U.angle = end;
       const arr = $('#wArrow');
       if (arr) arr.style.transform = `rotate(${end}deg)`;
-      if (win) targets.forEach(addItem);
-      const tv = sum(targets.map(n => byName[n].price));
-      S.stats.upgrades++;
-      S.stats.wagered += inValue;
-      if (win) { S.stats.wins++; S.stats.won += tv; S.stats.best = Math.max(S.stats.best, tv); }
-      S.history.unshift({ t: Date.now(), inputs: inSkins.map(i => i.name), bal: balUsed, targets, chance: c, roll, win, inValue, tv, nonce: seeds.nonce, client: seeds.client, serverHash: seeds.serverHash });
-      S.history.length = Math.min(S.history.length, 100);
-      save();
+      applyState(d.state);   // wins, history, stats and cashback as the server saved them
 
       U.spinning = false;
       U.result = win ? 'win' : 'lose';
@@ -1457,10 +1448,10 @@
       if (win) {
         sfxWin();
         toast(`Победа! Вы получили ${targets.map(n => `<b>${esc(n)}</b>`).join(', ')}`, 'success');
-        reportDrops(targets.map(n => byName[n]), c, 'upgrade');
+        reportDrops();
       } else {
         sfxLose();
-        const cb = addCashback(inValue);
+        const cb = d.cashback;
         toast(`Не повезло — выпало ${roll.toFixed(2)}, нужно было меньше ${c.toFixed(2)}${cb ? ` · кешбэк +${money(cb)}` : ''}`, 'error');
       }
       refreshUpgrade();
@@ -1501,33 +1492,27 @@
   function claimDaily() {
     requireLogin(() => {
       if (!dailyReady()) return;
-      S.rewards.lastDaily = Date.now(); addBalance(DAILY_BONUS);
-      $('.tg-promo.daily')?.remove();
-      sfxWin();
-      toast(`Ежедневный подарок: ${coinInt(DAILY_BONUS)}`, 'success');
-      refreshUpgrade(); renderHeader();
-      if (location.hash === '#/rewards') rewardsPage();
+      api('daily').then(d => {
+        if (!d.ok) return netToast(d);
+        $('.tg-promo.daily')?.remove();
+        sfxWin(); bumpBalance();
+        toast(`Ежедневный подарок: ${coinInt(DAILY_BONUS)}`, 'success');
+        refreshUpgrade();
+        if (location.hash === '#/rewards') rewardsPage();
+      });
     });
   }
-  // cashback: a share of every lost upgrade stake and of every paid case that paid out less than its price
-  const CASHBACK = 0.02;
-  function addCashback(lost) {
-    const v = Math.round(lost * CASHBACK * 100) / 100;
-    if (v <= 0) return 0;
-    S.rewards.cashback = Math.round(((S.rewards.cashback || 0) + v) * 100) / 100;
-    save(); renderHeader();
-    return v;
-  }
+  // cashback: a share of every lost upgrade stake and of every paid case that paid out less than its price (counted by the server)
+  const { CASHBACK } = R;
   function claimCashback() {
-    const v = S.rewards.cashback || 0;
-    if (v < 0.01) return;
-    S.rewards.cashback = 0;
-    S.rewards.cashbackTotal = Math.round(((S.rewards.cashbackTotal || 0) + v) * 100) / 100;
-    addBalance(v);
-    sfxWin();
-    toast(`Кешбэк зачислен: ${coin(v)}`, 'success');
-    refreshUpgrade();
-    if (location.hash === '#/rewards') rewardsPage();
+    if ((S.rewards.cashback || 0) < 0.01) return;
+    api('cashback').then(d => {
+      if (!d.ok) return netToast(d);
+      sfxWin(); bumpBalance();
+      toast(`Кешбэк зачислен: ${coin(d.amount)}`, 'success');
+      refreshUpgrade();
+      if (location.hash === '#/rewards') rewardsPage();
+    });
   }
 
   function rewardsPage() {
@@ -1588,34 +1573,25 @@
       const code = $('#promo').value.trim().toUpperCase();
       if (!code) return;
       if (S.rewards.promos.includes(code)) return toast('Промокод уже использован', 'error');
-      if (!PROMOS[code]) return redeemDailyPromo(code);
-      S.rewards.promos.push(code); addBalance(PROMOS[code]);
-      toast(`Промокод активирован: ${coin(PROMOS[code])}`, 'success'); $('#promo').value = '';
+      redeemPromo(code);
     });
     $('#applyPromo').onclick = apply;
     $('#promo').addEventListener('keydown', e => e.key === 'Enter' && apply());
   }
-  // promo code of the day (posted by the bot at 15:00 MSK): checked and counted on the server, once per account
-  const PROMO_ERR = { not_found: 'Промокод не найден', expired: 'Срок промокода истёк — новый придёт в бота в 15:00 МСК', used: 'Промокод уже использован', limit: 'Активации закончились — ждите новый промокод завтра в 15:00 МСК' };
+  // demo codes and the promo code of the day (posted by the bot at 15:00 MSK): checked and credited by the server, once per account
   let promoBusy = false;
-  function redeemDailyPromo(code) {
-    if (!refAvailable()) return toast('Промокод дня вводится в игре через Telegram-бота' + (window.RUSTUP_BOT ? ` @${esc(window.RUSTUP_BOT)}` : ''), 'error');
+  function redeemPromo(code) {
     if (promoBusy) return;
     promoBusy = true;
     const btn = $('#applyPromo');
     if (btn) btn.disabled = true;
-    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/promo', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, code })
-    }).then(r => r.json()).then(d => {
-      if (!d.ok) return toast(PROMO_ERR[d.error] || 'Не удалось активировать промокод', 'error');
-      S.rewards.promos.push(code);
-      addBalance(d.amount);
-      sfxWin(); haptic('success');
+    api('promo', { code }).then(d => {
+      if (!d.ok) return netToast(d);
+      sfxWin(); haptic('success'); bumpBalance();
       toast(`Промокод активирован: ${coinInt(d.amount)}`, 'success');
       if ($('#promo')) $('#promo').value = '';
       refreshUpgrade();
-    }).catch(() => toast('Нет связи с сервером, попробуйте ещё раз', 'error'))
-      .finally(() => { promoBusy = false; if (btn) btn.disabled = false; });
+    }).finally(() => { promoBusy = false; if (btn) btn.disabled = false; });
   }
 
   // ---------- profile ----------
@@ -1639,8 +1615,6 @@
         <div class="row" style="margin-left:auto;flex-wrap:wrap">
           <a class="btn btn-ghost" href="#/inventory">Инвентарь</a>
           <button class="btn btn-ghost" id="rename">Сменить ник</button>
-          <button class="btn btn-ghost" id="reset">Сбросить демо</button>
-          <button class="btn btn-accent" id="logout">Выйти</button>
         </div>
       </div>
       <div class="stat-grid">
@@ -1654,16 +1628,9 @@
         ${rows ? `<table class="table"><thead><tr><th>Время</th><th>Ставка</th><th>Цель</th><th>Шанс</th><th>Ролл</th><th>Итог</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted" style="padding:24px;margin:0">История пуста</p>'}
       </div></div>
     </div>`;
-    $('#logout').onclick = () => { S.user = null; save(); renderHeader(); location.hash = '#/'; };
     $('#rename').onclick = () => {
       const n = prompt('Новый ник', S.user.name);
-      if (n && n.trim()) { S.user.name = n.trim().slice(0, 20); save(); renderHeader(); profilePage(); }
-    };
-    $('#reset').onclick = () => {
-      if (!confirm('Сбросить баланс, инвентарь и историю демо?')) return;
-      const user = S.user; S = freshState(); S.user = user; save();
-      U.inputs.clear(); U.targets = []; U.balanceAdd = 0; U.result = null;
-      renderHeader(); profilePage(); toast('Демо сброшено');
+      if (n && n.trim()) api('nick', { name: n.trim().slice(0, 20) }).then(d => { if (!d.ok) return netToast(d); renderHeader(); profilePage(); });
     };
   }
 
@@ -1701,14 +1668,10 @@
     $('#saveSeed').onclick = () => {
       const v = $('#cseed').value.trim();
       if (!v) return toast('Client seed не может быть пустым', 'error');
-      S.seeds.client = v; S.seeds.nonce = 0; save(); toast('Client seed сохранён, nonce сброшен', 'success'); fairPage();
+      api('seed', { client: v }).then(d => { if (!d.ok) return netToast(d); toast('Client seed сохранён, nonce сброшен', 'success'); fairPage(); });
     };
-    $('#rotate').onclick = () => {
-      const server = randHex(32);
-      S.seeds.prev = { server: S.seeds.server, serverHash: S.seeds.serverHash, client: S.seeds.client, nonce: S.seeds.nonce };
-      S.seeds.server = server; S.seeds.serverHash = sha256(server); S.seeds.nonce = 0;
-      save(); toast('Server seed сменён, предыдущий раскрыт', 'success'); fairPage();
-    };
+    // the server keeps the seed secret until it is rotated, then reveals it here
+    $('#rotate').onclick = () => api('rotate').then(d => { if (!d.ok) return netToast(d); toast('Server seed сменён, предыдущий раскрыт', 'success'); fairPage(); });
     $('#verify').onclick = () => {
       const s = { server: $('#vS').value.trim(), client: $('#vC').value.trim(), nonce: +$('#vN').value || 0 };
       if (!s.server) return toast('Укажите server seed', 'error');
@@ -1867,11 +1830,13 @@
     if (act === 'sell') {
       const total = sum(sel.map(i => byName[i.name].price));
       if (!confirm(`Продать ${sel.length} шт. за ${money(total)}?`)) return;
-      S.inventory = S.inventory.filter(i => !v.sel.has(i.uid));
-      v.sel.clear();
-      addBalance(total);
-      toast(`Продано ${sel.length} шт. за ${coin(total)}`, 'success');
-      return inventoryPage();
+      return api('sell', { uids: sel.map(i => i.uid) }).then(d => {
+        if (!d.ok) return netToast(d);
+        v.sel.clear();
+        bumpBalance();
+        toast(`Продано ${d.count} шт. за ${coin(d.total)}`, 'success');
+        inventoryPage();
+      });
     }
     if (act === 'upgrade') {
       if (sel.length > MAX_SLOTS) return toast(`В апгрейд можно взять не больше ${MAX_SLOTS} предметов`, 'error');
@@ -1907,20 +1872,14 @@
     m => {
       $('#doWithdraw', m).onclick = () => {
         const link = $('#trade', m).value.trim();
-        if (nft) {
-          if (!TG_USER_RE.test(link)) return toast('Неверный юзернейм Telegram', 'error');
-          S.user.tgName = link.replace(/^@/, '');
-        } else {
-          if (!TRADE_RE.test(link)) return toast('Неверная ссылка на обмен', 'error');
-          S.user.tradeLink = link;
-        }
-        const uids = new Set(sel.map(i => i.uid));
-        S.inventory = S.inventory.filter(i => !uids.has(i.uid));
-        S.withdrawals.unshift({ id: Math.floor(rand(1e6, 9e6)), t: Date.now(), items: sel.map(i => i.name), value: total, status: 'sent' });
-        U.inv.sel.clear();
-        save(); closeModal();
-        toast(`Вывод оформлен: ${sel.length} шт. на ${coin(total)}`, 'success');
-        inventoryPage();
+        if (nft ? !TG_USER_RE.test(link) : !TRADE_RE.test(link)) return toast(nft ? 'Неверный юзернейм Telegram' : 'Неверная ссылка на обмен', 'error');
+        api('withdraw', { uids: sel.map(i => i.uid), link }).then(d => {
+          if (!d.ok) return netToast(d);
+          U.inv.sel.clear();
+          closeModal();
+          toast(`Вывод оформлен: ${d.count} шт. на ${coin(d.value)}`, 'success');
+          inventoryPage();
+        });
       };
     });
   }
@@ -1938,36 +1897,11 @@
   }
 
   // ---------- free cases: one per game, unlocked by subscribing to both channels ----------
-  const SUB_CHANNELS = [
-    { id: TG_CHANNEL, name: 'RUST UP', sub: 'Новости, промокоды, розыгрыши' },
-    { id: 'rustuper', name: 'RUST UP · Отзывы', sub: 'Отзывы игроков о выводах' }
-  ];
-  // tiers: [min price, max price, items, chance % of the whole tier]; the items are taken from the catalog by price
-  const CASES = [
-    { id: 'rust', game: 'rust', name: 'Кейс RUST', color: '#e5383b', tiers: [[20, 80, 6, 70], [80, 300, 3, 22], [300, 800, 2, 7], [1000, Infinity, 1, 1]] },
-    { id: 'cs2', game: 'cs2', name: 'Кейс CS2', color: '#f0a030', tiers: [[10, 60, 6, 70], [60, 400, 3, 22], [400, 2500, 2, 7], [8000, 30000, 1, 1]] },
-    { id: 'nft', game: 'nft', name: 'Кейс Telegram NFT', color: '#2ea6e0', tiers: [[0, 100, 6, 70], [300, 450, 3, 22], [450, 1500, 2, 7], [1500, 5000, 1, 1]] }
-  ];
-  // paid cases: opened any number of times; the price follows from the contents (see casePrice)
-  const PAID_CASES = [
-    { id: 'rust-wood', game: 'rust', name: 'Дерево', color: '#c8833a', tiers: [[5, 30, 6, 70], [30, 90, 3, 22], [90, 250, 2, 7], [250, 800, 1, 1]] },
-    { id: 'rust-metal', game: 'rust', name: 'Металл', color: '#8fa3b8', tiers: [[30, 100, 6, 70], [100, 300, 3, 22], [300, 800, 2, 7], [800, Infinity, 1, 1]] },
-    { id: 'rust-hqm', game: 'rust', name: 'МВК', color: '#e5383b', tiers: [[100, 300, 6, 70], [300, 700, 3, 22], [700, 1200, 2, 7], [1200, Infinity, 1, 1]] },
-    { id: 'cs2-recruit', game: 'cs2', name: 'Новобранец', color: '#4f86e8', tiers: [[3, 40, 6, 70], [40, 200, 3, 22], [200, 1000, 2, 7], [1000, 5000, 1, 1]] },
-    { id: 'cs2-assault', game: 'cs2', name: 'Штурм', color: '#f0a030', tiers: [[200, 1000, 6, 70], [1000, 4000, 3, 22], [4000, 12000, 2, 7], [12000, 40000, 1, 1]] },
-    { id: 'cs2-elite', game: 'cs2', name: 'Элита', color: '#d84ae6', tiers: [[2000, 6000, 6, 70], [6000, 15000, 3, 22], [15000, 40000, 2, 7], [40000, Infinity, 1, 1]] },
-    { id: 'nft-gifts', game: 'nft', name: 'Подарки', color: '#4fc27a', tiers: [[0, 40, 6, 70], [40, 100, 3, 22], [300, 400, 2, 7], [400, 900, 1, 1]] },
-    { id: 'nft-collector', game: 'nft', name: 'Коллекционер', color: '#2ea6e0', tiers: [[300, 500, 6, 70], [500, 1500, 3, 22], [1500, 5000, 2, 7], [5000, 20000, 1, 1]] },
-    { id: 'nft-fragment', game: 'nft', name: 'Fragment', color: '#ffd166', tiers: [[1000, 4000, 6, 70], [4000, 15000, 3, 22], [15000, 60000, 2, 7], [60000, 300000, 1, 1]] }
-  ];
+  const { SUB_CHANNELS, CASES, PAID_CASES, TIMER_CASE, TIMER_MS } = R;
   PAID_CASES.forEach(c => { c.paid = true; });
-  // free every 15 minutes, no conditions: cheap loot from all three games, nothing above 500 coins;
-  // for a 'mix' case the item count of a tier is per game
-  const TIMER_MS = 15 * 60 * 1000;
-  const TIMER_CASE = { id: 'quarter', game: 'mix', name: 'Кейс 15 минут', color: '#4fc27a', timer: true, tiers: [[1, 15, 3, 72], [15, 60, 2, 22], [60, 300, 1, 5.5], [300, 500.01, 1, 0.5]] };
   const timerLeft = () => Math.max(0, TIMER_MS - (Date.now() - (S.rewards.timerCase || 0)));
   const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-  const CASE_RTP = 0.9;           // average win is 90% of a paid case's price
+  const { CASE_RTP } = R;         // average win is 90% of a paid case's price
   const caseById = id => CASES.find(c => c.id === id) || PAID_CASES.find(c => c.id === id) || (id === TIMER_CASE.id ? TIMER_CASE : null);
   const casesLeft = () => CASES.filter(c => !S.rewards.cases[c.id]);
   const casePrice = c => {
@@ -2002,31 +1936,21 @@
     return (items.find(i => (acc += i.chance) > r) || items[items.length - 1]).skin;
   }
 
-  // inside the Telegram bot the server asks Telegram whether the player joined;
-  // on the plain website there is no way to check, so opening the channel link counts
+  // the game server asks Telegram whether the player joined and keeps the answer in the account
   const subsOk = () => SUB_CHANNELS.every(c => S.rewards.subs[c.id]);
   let subsBusy = null, subsCheckedAt = 0;
   function checkSubs() {
-    if (!refAvailable()) return Promise.resolve(S.rewards.subs);
+    if (!gameReady) return Promise.resolve(S.rewards.subs);
     if (subsBusy) return subsBusy;
-    subsBusy = fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/subs', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData })
-    }).then(r => r.json()).then(d => {
+    subsBusy = api('subs').then(d => {
       if (!d.ok) throw new Error('subs check failed');
-      SUB_CHANNELS.forEach(c => { S.rewards.subs[c.id] = !!d.subs[c.id]; });
-      // a verified channel subscription also unlocks the channel bonus
-      if (S.rewards.subs[TG_CHANNEL]) S.rewards.tgOpened = true;
       subsCheckedAt = Date.now();
-      save();
       return S.rewards.subs;
     }).finally(() => { subsBusy = null; });
     return subsBusy;
   }
   function openSub(id) {
     openChannel(id);
-    if (!refAvailable()) S.rewards.subs[id] = true;
-    if (id === TG_CHANNEL) S.rewards.tgOpened = true;
-    save();
     refreshCases();
   }
   function manualSubsCheck(btn) {
@@ -2228,29 +2152,30 @@
     }
     if (c.timer) return timerLeft() ? toast(`Следующий кейс через ${mmss(timerLeft())}`, 'error') : spinCase(c);
     if (S.rewards.cases[c.id]) return;
-    if (!refAvailable()) return subsOk() ? spinCase(c) : refreshCases();
+    // the server checks both subscriptions itself before opening a free case
     btn.disabled = true; btn.textContent = 'Проверяем подписку…';
-    checkSubs().then(() => {
-      if (subsOk()) return spinCase(c);
-      toast('Сначала подпишитесь на оба канала', 'error');
-      refreshCases();
-    }).catch(() => {
-      // server unreachable: an earlier confirmed subscription is enough
-      if (subsOk()) return spinCase(c);
-      btn.disabled = false; btn.textContent = 'Открыть бесплатно';
-      toast('Не удалось проверить подписку, попробуйте ещё раз', 'error');
-    });
+    spinCase(c, 1, () => { btn.disabled = false; btn.textContent = 'Открыть бесплатно'; });
   }
 
-  function spinCase(c, n = 1) {
-    const wins = Array.from({ length: n }, () => rollCase(c));
-    // commit first so a reload mid-spin can't open the case twice
-    const uids = wins.map(w => { const u = uid(); S.inventory.push({ uid: u, name: w.name, t: Date.now() }); return u; });
-    if (c.paid) addBalance(-casePrice(c) * n);
-    else if (c.timer) S.rewards.timerCase = Date.now();
-    else S.rewards.cases[c.id] = Date.now();
-    save();
+  // the server opens the case (price, timer, subscriptions) and picks the items; the roulettes then stop on them
+  function spinCase(c, n = 1, onFail) {
+    if (caseSpinning) return;
     caseSpinning = true;
+    $('#caseActions').innerHTML = `<button class="btn btn-accent case-open" disabled>Открываем${n > 1 ? ` ${n} шт.` : ''}…</button>`;
+    api('case', { id: c.id, n }, true).then(d => {
+      if (!d.ok) {
+        caseSpinning = false;
+        if (onFail) onFail();
+        if (d.error === 'subs') toast('Сначала подпишитесь на оба канала', 'error'); else netToast(d);
+        return refreshCases();
+      }
+      spinRoulettes(c, n, d);
+    });
+  }
+  function spinRoulettes(c, n, d) {
+    const wins = d.wins.map(name => byName[name]), uids = d.uids;
+    // until the strips stop, the header shows the price as paid
+    if (c.paid) { S.balance = Math.round((S.balance - casePrice(c) * n) * 100) / 100; renderHeader(); }
     $('#caseActions').innerHTML = `<button class="btn btn-accent case-open" disabled>Открываем${n > 1 ? ` ${n} шт.` : ''}…</button>`;
     // one roulette per case; they spin together and each stops on its own winner
     $('#roulettes').innerHTML = roulettes(c, n);
@@ -2285,10 +2210,10 @@
         s.track.children[ROUL_WIN].classList.add('win');
       });
       sfxWin();
-      // paid cases that paid out less than their price count as a loss for cashback
-      const cb = c.paid ? addCashback(casePrice(c) * n - sum(wins.map(w => w.price))) : 0;
-      if (cb) toast(`Кешбэк +${coin(cb)} — забрать в «Бонусах»`, 'success');
-      reportDrops(wins, 100, 'case');
+      applyState(d.state); renderHeader();
+      // paid cases that paid out less than their price count as a loss for cashback (counted by the server)
+      if (d.cashback) toast(`Кешбэк +${coin(d.cashback)} — забрать в «Бонусах»`, 'success');
+      reportDrops();
       if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
       showCaseWin(c, wins, uids);
     }, dur + 30);
@@ -2317,12 +2242,16 @@
       };
       $('#cwSell', m).onclick = () => {
         // only what is still in the inventory (an item may have been used meanwhile)
-        const left = new Set(owned());
-        const value = sum(wins.filter((_, i) => left.has(uids[i])).map(w => w.price));
-        if (left.size) { S.inventory = S.inventory.filter(i => !left.has(i.uid)); addBalance(value); toast(`Продано ${left.size > 1 ? `${left.size} шт. ` : ''}за ${coin(value)}`, 'success'); }
+        const left = owned();
         closeModal();
-        // the balance changed: the "open for N coins" button may become available
-        if (c.paid && curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
+        if (!left.length) return;
+        api('sell', { uids: left }).then(d => {
+          if (!d.ok) return netToast(d);
+          bumpBalance();
+          toast(`Продано ${d.count > 1 ? `${d.count} шт. ` : ''}за ${coin(d.total)}`, 'success');
+          // the balance changed: the "open for N coins" button may become available
+          if (c.paid && curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
+        });
       };
       $('#cwUp', m).onclick = () => {
         closeModal();
@@ -2447,17 +2376,39 @@
     if (perPage() !== lastPer) { lastPer = perPage(); if ($('#invBox')) { renderInventory(); renderTargets(); } }
   });
 
+  // the game is played through the Telegram bot only (the server checks the Telegram account)
+  if (!TG || !window.RUSTUP_API) {
+    const bot = window.RUSTUP_BOT || 'rustuper_bot';
+    document.querySelector('.app').innerHTML = `<div class="tg-only">
+      <span class="logo"><span class="logo-rust">RUST</span><span class="logo-up">UP</span></span>
+      <h1>Играть можно в Telegram</h1>
+      <p>Апгрейды, кейсы и выигрыши теперь считаются на сервере и привязаны к вашему Telegram-аккаунту. Откройте игру через бота — прогресс сохранится на любом устройстве.</p>
+      <a class="btn btn-tg" href="https://t.me/${esc(bot)}">${ICON.tg}<span>Открыть @${esc(bot)}</span></a>
+    </div>`;
+    return;
+  }
+
   window.addEventListener('hashchange', route);
   renderHeader();
   initFeed();
   route();
-  // Telegram: pull newer progress from the account's cloud, then sign in with the Telegram profile
-  cloudLoad(changed => {
-    if (changed) { U.inputs.clear(); U.inv.sel.clear(); renderHeader(); route(); }
-    tgLogin();
-    scheduleTgPromo(5000);
-    startStatsPing();
-    refSync();
-  });
+  // Telegram: take the newest progress of the device (cloud copy), then the game server; its first load imports that progress once
+  function startGame(tries = 0) {
+    const local = { balance: S.balance, inventory: S.inventory, withdrawals: S.withdrawals, history: S.history, stats: S.stats, rewards: S.rewards, user: S.user };
+    api('load', { local }).then(d => {
+      if (!d.ok) {
+        if (tries < 4) return setTimeout(() => startGame(tries + 1), 1500 * (tries + 1));
+        return toast('Не удалось загрузить профиль — перезапустите игру', 'error');
+      }
+      gameReady = true;
+      U.inputs.clear(); U.inv.sel.clear();
+      renderHeader(); route();
+      tgLogin();
+      scheduleTgPromo(5000);
+      startStatsPing();
+      refSync();
+    });
+  }
+  cloudLoad(() => startGame());
   setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();
