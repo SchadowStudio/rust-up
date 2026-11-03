@@ -2235,7 +2235,7 @@
       <div class="row-head"><h2 class="home-title">Игры</h2></div>
       <div class="games-grid">${games.map(g => `<a class="game-card ${g.cls}" href="${g.href}">
         ${g.art}
-        <span class="gc-online"><i class="dot-online"></i>${playing(g.share)} играют</span>
+        <span class="gc-online" title="Сейчас играют"><i class="dot-online"></i>${playing(g.share)}</span>
         ${g.badge ? `<span class="gc-badge">${g.badge}</span>` : ''}
         <b class="gc-title">${g.title}</b></a>`).join('')}</div>
       <div class="row-head"><h2 class="home-title">Бесплатные кейсы</h2><a href="#/cases">Все ${ICON.right}</a></div>
