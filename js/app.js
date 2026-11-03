@@ -508,6 +508,55 @@
   const closeModal = () => { $('#modalRoot').innerHTML = ''; };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+  // ---------- top-up window (visual only: payments are not connected, the pay button says so) ----------
+  const DEPOSIT_SUMS = [100, 300, 500, 1000, 3000, 5000];
+  const DEPOSIT_WAYS = [['sbp', 'СБП'], ['card', 'Карта'], ['crypto', 'Крипта'], ['stars', 'Звёзды']];
+  // [rubles, gift, skin]: the bonus item a top-up from that sum would bring
+  const DEPOSIT_BONUSES = [[100, 'Роза', 'Five-SeveN | Urban Hazard'], [200, 'Ракета', 'MP9 | Hydra'], [500, 'Алмаз', 'AK-47 | Point Disarray'],
+    [1000, 'Кубок', 'M4A4 | The Battlestar'], [3000, 'Кольцо', '★ Classic Knife | Scorched']];
+  const rubFmt = n => fmtInt(n) + ' ₽';
+  function openDeposit(sum = 500) {
+    let amount = sum, way = 'sbp';
+    const kind = DEPOSIT_BONUSES.map(() => 'gift');
+    const bonusCard = (b, i) => {
+      const s = byName[kind[i] === 'gift' ? b[1] : b[2]];
+      return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
+        <div class="dep-seg"><button type="button" class="${kind[i] === 'gift' ? 'on' : ''}" data-kind="gift">Подарок</button><button type="button" class="${kind[i] === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
+        <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img src="${s.img}" alt="" draggable="false">` : ''}</div>
+        <span class="dep-bar"><i style="width:${Math.min(100, (amount / b[0]) * 100)}%"></i></span>
+        <span class="dep-from">Пополните от <b>${rubFmt(b[0])}</b></span>
+        <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
+      </div>`;
+    };
+    modal('Пополнение', `
+      <div class="dep-sums">${DEPOSIT_SUMS.map(v => `<button type="button" class="dep-sum" data-v="${v}">${rubFmt(v)}</button>`).join('')}</div>
+      <div class="dep-input"><input class="text-input" id="depAmt" inputmode="numeric" maxlength="7" value="${amount}"><span>₽</span></div>
+      <div class="dep-ways">${DEPOSIT_WAYS.map(([id, t]) => `<button type="button" class="dep-way" data-way="${id}">${t}</button>`).join('')}</div>
+      <button class="btn btn-accent dep-pay" id="depPay" type="button"></button>
+      <div class="dep-head"><h4>Бонусы за пополнение</h4><span class="muted">подарок или скин на выбор</span></div>
+      <div class="dep-bonuses" id="depBonuses"></div>`, m => {
+      m.classList.add('modal-deposit');
+      const draw = () => {
+        m.querySelectorAll('.dep-sum').forEach(b => b.classList.toggle('on', +b.dataset.v === amount));
+        m.querySelectorAll('.dep-way').forEach(b => b.classList.toggle('on', b.dataset.way === way));
+        $('#depPay', m).textContent = `Пополнить на ${rubFmt(amount || 0)}`;
+        $('#depBonuses', m).innerHTML = DEPOSIT_BONUSES.map(bonusCard).join('');
+      };
+      const setAmount = v => { amount = Math.max(0, Math.min(1e6, Math.floor(v) || 0)); $('#depAmt', m).value = amount || ''; draw(); };
+      m.addEventListener('click', e => {
+        const t = e.target.closest('button');
+        if (!t) return;
+        if (t.dataset.v) return setAmount(+t.dataset.v);
+        if (t.dataset.way) { way = t.dataset.way; return draw(); }
+        if (t.dataset.kind) { kind[+t.closest('.dep-bonus').dataset.i] = t.dataset.kind; return draw(); }
+        if (t.dataset.sum) return setAmount(+t.dataset.sum);
+        if (t.id === 'depPay') { haptic('warning'); toast('На данный момент такой возможности нет', 'error'); }
+      });
+      $('#depAmt', m).addEventListener('input', e => { amount = Math.floor(Number(e.target.value.replace(/\D/g, ''))) || 0; draw(); });
+      draw();
+    });
+  }
+
   // ---------- auth (demo) ----------
   const AVA_COLORS = ['#cd412b', '#467edf', '#7c954d', '#ae6eee', '#d68a1f', '#2c9c8f'];
   const avatarHtml = (name, color, cls = 'avatar') => `<span class="${cls}" style="background:linear-gradient(135deg,${color},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}</span>`;
@@ -690,9 +739,7 @@
     } else {
       us.innerHTML = `
         <button class="balance${$('#curMenu') ? ' open' : ''}" type="button" data-cur-menu aria-label="Баланс и валюта" aria-haspopup="menu">${coin(S.balance)}<svg class="balance-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        ${tgBonusDone()
-          ? `<a class="btn btn-accent btn-pill" href="#/rewards">${ICON.gift}<span>Бонусы</span>${dailyReady() ? '<span class="dot"></span>' : ''}</a>`
-          : `<button class="btn btn-accent btn-pill" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${bonusTxt()}</span></button>`}
+        <button class="btn btn-accent btn-pill btn-deposit" type="button" data-deposit>Пополнить</button>
         <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color)}</a>`;
     }
     document.querySelectorAll('.nav-item[data-route="/rewards"]').forEach(a => {
@@ -710,7 +757,7 @@
     return `<div class="cur-title">Валюта</div>${rows}
       <div class="cur-foot">
         <a class="btn btn-ghost" href="#/inventory" data-cur-close>${ICON.wallet}<span>Кошелёк</span></a>
-        <a class="btn btn-accent" href="#/rewards" data-cur-close><span>Пополнить</span></a>
+        <button class="btn btn-accent" type="button" data-deposit><span>Пополнить</span></button>
       </div>
       <p class="cur-rate">1 USDT = ${numFmt(usdRub, 2)} ₽ (курс ЦБ) · 1 ⭐ = ${numFmt(STAR_USD, 3)} USDT</p>`;
   }
@@ -1198,6 +1245,7 @@
     const t = e.target;
     if (t.closest('[data-login]')) return requireLogin();
     if (t.closest('[data-tg-bonus]')) return openTgBonus();
+    if (t.closest('[data-deposit]')) { closeCurMenu(); return openDeposit(); }
     if (t.closest('[data-bell]')) { location.hash = '#/rewards'; return; }
     const sub = t.closest('[data-sub]');
     if (sub) return openSub(sub.dataset.sub);
