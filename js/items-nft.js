@@ -1,31 +1,17 @@
-// Каталог NFT-подарков Telegram (картинки и цены лотов — Fragment, TON → $ по CoinGecko, 1 монета = $0.02). Собран tools/build-nft.js
+// Каталог NFT-подарков Telegram (картинки и цены лотов — Fragment, TON → $ по CoinGecko, 1 монета = $0.02). Собран tools/build-nft.js, цены проверяет tools/reprice.js
 window.SKINS_NFT = [
-  {
-    "name": "Algorithm Cup #19",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 11999940,
-    "img": "assets/nft/algorithmcup-19.jpg"
-  },
-  {
-    "name": "Intelligence Cup #19",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 11400000,
-    "img": "assets/nft/intelligencecup-19.jpg"
-  },
   {
     "name": "Plush Pepe #1622",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 5880000,
+    "price": 4800000,
     "img": "assets/nft/plushpepe-1622.jpg"
   },
   {
     "name": "Plush Pepe #69",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 5333280,
+    "price": 4800000,
     "img": "assets/nft/plushpepe-69.jpg"
   },
   {
@@ -36,10 +22,17 @@ window.SKINS_NFT = [
     "img": "assets/nft/plushpepe-173.jpg"
   },
   {
+    "name": "Algorithm Cup #19",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 2880000,
+    "img": "assets/nft/algorithmcup-19.jpg"
+  },
+  {
     "name": "Algorithm Cup #100",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 3000000,
+    "price": 2880000,
     "img": "assets/nft/algorithmcup-100.jpg"
   },
   {
@@ -57,18 +50,25 @@ window.SKINS_NFT = [
     "img": "assets/nft/heartlocket-1557.jpg"
   },
   {
-    "name": "Intelligence Cup #7",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 1620000,
-    "img": "assets/nft/intelligencecup-7.jpg"
-  },
-  {
     "name": "Plush Pepe #1221",
     "rarity": "yellow",
     "cat": "nft",
     "price": 1613280,
     "img": "assets/nft/plushpepe-1221.jpg"
+  },
+  {
+    "name": "Intelligence Cup #19",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 1500000,
+    "img": "assets/nft/intelligencecup-19.jpg"
+  },
+  {
+    "name": "Intelligence Cup #7",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 1500000,
+    "img": "assets/nft/intelligencecup-7.jpg"
   },
   {
     "name": "Algorithm Cup #93",
@@ -232,32 +232,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/intelligencecup-77.jpg"
   },
   {
-    "name": "Durov’s Cap #2346",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 312000,
-    "img": "assets/nft/durovscap-2346.jpg"
-  },
-  {
     "name": "Precious Peach #1703",
     "rarity": "yellow",
     "cat": "nft",
     "price": 303000,
     "img": "assets/nft/preciouspeach-1703.jpg"
-  },
-  {
-    "name": "Durov’s Cap #100",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 300000,
-    "img": "assets/nft/durovscap-100.jpg"
-  },
-  {
-    "name": "Durov’s Cap #3456",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 300000,
-    "img": "assets/nft/durovscap-3456.jpg"
   },
   {
     "name": "Resistance Dog #2641",
@@ -272,27 +251,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 266640,
     "img": "assets/nft/heartlocket-628.jpg"
-  },
-  {
-    "name": "Scared Cat #10583",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 266640,
-    "img": "assets/nft/scaredcat-10583.jpg"
-  },
-  {
-    "name": "Scared Cat #11924",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 266640,
-    "img": "assets/nft/scaredcat-11924.jpg"
-  },
-  {
-    "name": "Scared Cat #14018",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 266640,
-    "img": "assets/nft/scaredcat-14018.jpg"
   },
   {
     "name": "Intelligence Cup #39",
@@ -316,6 +274,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/algorithmcup-89.jpg"
   },
   {
+    "name": "Durov’s Cap #2346",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 239760,
+    "img": "assets/nft/durovscap-2346.jpg"
+  },
+  {
+    "name": "Durov’s Cap #100",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 239760,
+    "img": "assets/nft/durovscap-100.jpg"
+  },
+  {
+    "name": "Durov’s Cap #3456",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 239760,
+    "img": "assets/nft/durovscap-3456.jpg"
+  },
+  {
     "name": "Resistance Dog #3556",
     "rarity": "yellow",
     "cat": "nft",
@@ -337,27 +316,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/algorithmcup-74.jpg"
   },
   {
-    "name": "Heroic Helmet #2331",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 199980,
-    "img": "assets/nft/heroichelmet-2331.jpg"
-  },
-  {
-    "name": "Heroic Helmet #2660",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 199980,
-    "img": "assets/nft/heroichelmet-2660.jpg"
-  },
-  {
-    "name": "Heroic Helmet #726",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 195000,
-    "img": "assets/nft/heroichelmet-726.jpg"
-  },
-  {
     "name": "Precious Peach #2783",
     "rarity": "yellow",
     "cat": "nft",
@@ -370,6 +328,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 189000,
     "img": "assets/nft/preciouspeach-1405.jpg"
+  },
+  {
+    "name": "Heroic Helmet #2331",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 186480,
+    "img": "assets/nft/heroichelmet-2331.jpg"
+  },
+  {
+    "name": "Heroic Helmet #2660",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 186480,
+    "img": "assets/nft/heroichelmet-2660.jpg"
+  },
+  {
+    "name": "Heroic Helmet #726",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 186480,
+    "img": "assets/nft/heroichelmet-726.jpg"
   },
   {
     "name": "Intelligence Cup #105",
@@ -400,67 +379,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/resistancedog-298.jpg"
   },
   {
-    "name": "Loot Bag #7294",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 133320,
-    "img": "assets/nft/lootbag-7294.jpg"
-  },
-  {
-    "name": "Loot Bag #9854",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 133320,
-    "img": "assets/nft/lootbag-9854.jpg"
-  },
-  {
-    "name": "Loot Bag #5171",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 133320,
-    "img": "assets/nft/lootbag-5171.jpg"
-  },
-  {
-    "name": "Nail Bracelet #650",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 133320,
-    "img": "assets/nft/nailbracelet-650.jpg"
-  },
-  {
-    "name": "Astral Shard #1201",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 126000,
-    "img": "assets/nft/astralshard-1201.jpg"
-  },
-  {
-    "name": "Astral Shard #2025",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 121500,
-    "img": "assets/nft/astralshard-2025.jpg"
-  },
-  {
     "name": "Durov’s Glasses #826",
     "rarity": "yellow",
     "cat": "nft",
     "price": 120000,
     "img": "assets/nft/durovsglasses-826.jpg"
-  },
-  {
-    "name": "Nail Bracelet #1678",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 120000,
-    "img": "assets/nft/nailbracelet-1678.jpg"
-  },
-  {
-    "name": "Nail Bracelet #1681",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 120000,
-    "img": "assets/nft/nailbracelet-1681.jpg"
   },
   {
     "name": "Mighty Arm #579",
@@ -505,18 +428,32 @@ window.SKINS_NFT = [
     "img": "assets/nft/mightyarm-3506.jpg"
   },
   {
-    "name": "Astral Shard #1792",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 107520,
-    "img": "assets/nft/astralshard-1792.jpg"
-  },
-  {
     "name": "Durov’s Glasses #1596",
     "rarity": "yellow",
     "cat": "nft",
     "price": 106620,
     "img": "assets/nft/durovsglasses-1596.jpg"
+  },
+  {
+    "name": "Scared Cat #10583",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 93120,
+    "img": "assets/nft/scaredcat-10583.jpg"
+  },
+  {
+    "name": "Scared Cat #11924",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 93120,
+    "img": "assets/nft/scaredcat-11924.jpg"
+  },
+  {
+    "name": "Scared Cat #14018",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 93120,
+    "img": "assets/nft/scaredcat-14018.jpg"
   },
   {
     "name": "Resistance Dog #10344",
@@ -540,13 +477,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/preciouspeach-1153.jpg"
   },
   {
-    "name": "Westside Sign #371",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 90000,
-    "img": "assets/nft/westsidesign-371.jpg"
-  },
-  {
     "name": "Heart Locket #416",
     "rarity": "yellow",
     "cat": "nft",
@@ -554,18 +484,25 @@ window.SKINS_NFT = [
     "img": "assets/nft/heartlocket-416.jpg"
   },
   {
-    "name": "Westside Sign #38",
+    "name": "Astral Shard #1201",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 83280,
-    "img": "assets/nft/westsidesign-38.jpg"
+    "price": 84000,
+    "img": "assets/nft/astralshard-1201.jpg"
   },
   {
-    "name": "Westside Sign #3882",
+    "name": "Astral Shard #2025",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 78000,
-    "img": "assets/nft/westsidesign-3882.jpg"
+    "price": 84000,
+    "img": "assets/nft/astralshard-2025.jpg"
+  },
+  {
+    "name": "Astral Shard #1792",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 84000,
+    "img": "assets/nft/astralshard-1792.jpg"
   },
   {
     "name": "Durov’s Cap #2129",
@@ -589,60 +526,46 @@ window.SKINS_NFT = [
     "img": "assets/nft/durovscap-3628.jpg"
   },
   {
-    "name": "Ion Gem #2119",
+    "name": "Westside Sign #371",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 66000,
-    "img": "assets/nft/iongem-2119.jpg"
+    "price": 70800,
+    "img": "assets/nft/westsidesign-371.jpg"
   },
   {
-    "name": "Artisan Brick #1966",
+    "name": "Westside Sign #38",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/artisanbrick-1966.jpg"
+    "price": 70800,
+    "img": "assets/nft/westsidesign-38.jpg"
   },
   {
-    "name": "Artisan Brick #382",
+    "name": "Westside Sign #3882",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/artisanbrick-382.jpg"
+    "price": 70800,
+    "img": "assets/nft/westsidesign-3882.jpg"
   },
   {
-    "name": "Artisan Brick #5409",
+    "name": "Nail Bracelet #650",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/artisanbrick-5409.jpg"
+    "price": 69600,
+    "img": "assets/nft/nailbracelet-650.jpg"
   },
   {
-    "name": "Gem Signet #1229",
+    "name": "Nail Bracelet #1678",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/gemsignet-1229.jpg"
+    "price": 69600,
+    "img": "assets/nft/nailbracelet-1678.jpg"
   },
   {
-    "name": "Gem Signet #4727",
+    "name": "Nail Bracelet #1681",
     "rarity": "yellow",
     "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/gemsignet-4727.jpg"
-  },
-  {
-    "name": "Ion Gem #1609",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/iongem-1609.jpg"
-  },
-  {
-    "name": "Ion Gem #189",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 60000,
-    "img": "assets/nft/iongem-189.jpg"
+    "price": 69600,
+    "img": "assets/nft/nailbracelet-1681.jpg"
   },
   {
     "name": "Perfume Bottle #2327",
@@ -687,13 +610,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/durovscap-3401.jpg"
   },
   {
-    "name": "Gem Signet #5082",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 59940,
-    "img": "assets/nft/gemsignet-5082.jpg"
-  },
-  {
     "name": "Magic Potion #1650",
     "rarity": "yellow",
     "cat": "nft",
@@ -708,6 +624,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/perfumebottle-1491.jpg"
   },
   {
+    "name": "Loot Bag #7294",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 55200,
+    "img": "assets/nft/lootbag-7294.jpg"
+  },
+  {
+    "name": "Loot Bag #9854",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 55200,
+    "img": "assets/nft/lootbag-9854.jpg"
+  },
+  {
+    "name": "Loot Bag #5171",
+    "rarity": "yellow",
+    "cat": "nft",
+    "price": 55200,
+    "img": "assets/nft/lootbag-5171.jpg"
+  },
+  {
     "name": "Precious Peach #6",
     "rarity": "yellow",
     "cat": "nft",
@@ -715,32 +652,53 @@ window.SKINS_NFT = [
     "img": "assets/nft/preciouspeach-6.jpg"
   },
   {
-    "name": "Kissed Frog #11248",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 54000,
-    "img": "assets/nft/kissedfrog-11248.jpg"
-  },
-  {
-    "name": "Kissed Frog #11849",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 54000,
-    "img": "assets/nft/kissedfrog-11849.jpg"
-  },
-  {
-    "name": "Kissed Frog #11887",
-    "rarity": "yellow",
-    "cat": "nft",
-    "price": 54000,
-    "img": "assets/nft/kissedfrog-11887.jpg"
-  },
-  {
     "name": "Durov’s Cap #1912",
     "rarity": "yellow",
     "cat": "nft",
     "price": 50940,
     "img": "assets/nft/durovscap-1912.jpg"
+  },
+  {
+    "name": "Ion Gem #2119",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/iongem-2119.jpg"
+  },
+  {
+    "name": "Artisan Brick #1966",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/artisanbrick-1966.jpg"
+  },
+  {
+    "name": "Artisan Brick #382",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/artisanbrick-382.jpg"
+  },
+  {
+    "name": "Artisan Brick #5409",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/artisanbrick-5409.jpg"
+  },
+  {
+    "name": "Ion Gem #1609",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/iongem-1609.jpg"
+  },
+  {
+    "name": "Ion Gem #189",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 48000,
+    "img": "assets/nft/iongem-189.jpg"
   },
   {
     "name": "Resistance Dog #10319",
@@ -757,13 +715,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/heroichelmet-2663.jpg"
   },
   {
-    "name": "Sharp Tongue #7168",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 46620,
-    "img": "assets/nft/sharptongue-7168.jpg"
-  },
-  {
     "name": "Durov’s Cap #1330",
     "rarity": "red",
     "cat": "nft",
@@ -776,6 +727,34 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 40800,
     "img": "assets/nft/mightyarm-1325.jpg"
+  },
+  {
+    "name": "Gem Signet #1229",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 40560,
+    "img": "assets/nft/gemsignet-1229.jpg"
+  },
+  {
+    "name": "Gem Signet #4727",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 40560,
+    "img": "assets/nft/gemsignet-4727.jpg"
+  },
+  {
+    "name": "Gem Signet #5082",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 40560,
+    "img": "assets/nft/gemsignet-5082.jpg"
+  },
+  {
+    "name": "Sharp Tongue #7168",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 40080,
+    "img": "assets/nft/sharptongue-7168.jpg"
   },
   {
     "name": "Magic Potion #200",
@@ -792,27 +771,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/preciouspeach-2034.jpg"
   },
   {
-    "name": "Vintage Cigar #1133",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 39960,
-    "img": "assets/nft/vintagecigar-1133.jpg"
-  },
-  {
-    "name": "Vintage Cigar #14758",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 39960,
-    "img": "assets/nft/vintagecigar-14758.jpg"
-  },
-  {
-    "name": "Vintage Cigar #4875",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 39960,
-    "img": "assets/nft/vintagecigar-4875.jpg"
-  },
-  {
     "name": "Durov’s Glasses #3005",
     "rarity": "red",
     "cat": "nft",
@@ -825,20 +783,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 36000,
     "img": "assets/nft/magicpotion-4424.jpg"
-  },
-  {
-    "name": "Neko Helmet #1910",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 36000,
-    "img": "assets/nft/nekohelmet-1910.jpg"
-  },
-  {
-    "name": "Neko Helmet #4918",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 36000,
-    "img": "assets/nft/nekohelmet-4918.jpg"
   },
   {
     "name": "Heroic Helmet #1468",
@@ -855,25 +799,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/durovscap-3151.jpg"
   },
   {
-    "name": "Neko Helmet #77",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 34620,
-    "img": "assets/nft/nekohelmet-77.jpg"
-  },
-  {
     "name": "Perfume Bottle #567",
     "rarity": "red",
     "cat": "nft",
     "price": 34020,
     "img": "assets/nft/perfumebottle-567.jpg"
-  },
-  {
-    "name": "Genie Lamp #12",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 33600,
-    "img": "assets/nft/genielamp-12.jpg"
   },
   {
     "name": "Mighty Arm #2293",
@@ -883,13 +813,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/mightyarm-2293.jpg"
   },
   {
-    "name": "Signet Ring #13590",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 33300,
-    "img": "assets/nft/signetring-13590.jpg"
-  },
-  {
     "name": "Durov’s Glasses #2253",
     "rarity": "red",
     "cat": "nft",
@@ -897,32 +820,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/durovsglasses-2253.jpg"
   },
   {
-    "name": "Genie Lamp #3675",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 33000,
-    "img": "assets/nft/genielamp-3675.jpg"
-  },
-  {
     "name": "Sharp Tongue #1178",
     "rarity": "red",
     "cat": "nft",
     "price": 33000,
     "img": "assets/nft/sharptongue-1178.jpg"
-  },
-  {
-    "name": "Signet Ring #759",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 33000,
-    "img": "assets/nft/signetring-759.jpg"
-  },
-  {
-    "name": "Genie Lamp #2560",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 30900,
-    "img": "assets/nft/genielamp-2560.jpg"
   },
   {
     "name": "Astral Shard #2122",
@@ -960,13 +862,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/sharptongue-4205.jpg"
   },
   {
-    "name": "Signet Ring #12664",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 30000,
-    "img": "assets/nft/signetring-12664.jpg"
-  },
-  {
     "name": "Westside Sign #1685",
     "rarity": "red",
     "cat": "nft",
@@ -995,13 +890,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/resistancedog-11363.jpg"
   },
   {
-    "name": "Eternal Rose #470",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 28200,
-    "img": "assets/nft/eternalrose-470.jpg"
-  },
-  {
     "name": "Durov’s Cap #1535",
     "rarity": "red",
     "cat": "nft",
@@ -1023,18 +911,32 @@ window.SKINS_NFT = [
     "img": "assets/nft/magicpotion-473.jpg"
   },
   {
-    "name": "Eternal Rose #85",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 27000,
-    "img": "assets/nft/eternalrose-85.jpg"
-  },
-  {
     "name": "Magic Potion #268",
     "rarity": "red",
     "cat": "nft",
     "price": 27000,
     "img": "assets/nft/magicpotion-268.jpg"
+  },
+  {
+    "name": "Genie Lamp #12",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 24000,
+    "img": "assets/nft/genielamp-12.jpg"
+  },
+  {
+    "name": "Genie Lamp #3675",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 24000,
+    "img": "assets/nft/genielamp-3675.jpg"
+  },
+  {
+    "name": "Genie Lamp #2560",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 24000,
+    "img": "assets/nft/genielamp-2560.jpg"
   },
   {
     "name": "Durov’s Glasses #2510",
@@ -1056,20 +958,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 24000,
     "img": "assets/nft/nailbracelet-1021.jpg"
-  },
-  {
-    "name": "Bling Binky #1082",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 24000,
-    "img": "assets/nft/blingbinky-1082.jpg"
-  },
-  {
-    "name": "Bling Binky #935",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 24000,
-    "img": "assets/nft/blingbinky-935.jpg"
   },
   {
     "name": "Astral Shard #1311",
@@ -1100,32 +988,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/scaredcat-16354.jpg"
   },
   {
-    "name": "Cupid Charm #1335",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 23280,
-    "img": "assets/nft/cupidcharm-1335.jpg"
-  },
-  {
-    "name": "Cupid Charm #7796",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 23280,
-    "img": "assets/nft/cupidcharm-7796.jpg"
-  },
-  {
     "name": "Scared Cat #15526",
     "rarity": "red",
     "cat": "nft",
     "price": 23280,
     "img": "assets/nft/scaredcat-15526.jpg"
-  },
-  {
-    "name": "Cupid Charm #26565",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 22500,
-    "img": "assets/nft/cupidcharm-26565.jpg"
   },
   {
     "name": "Scared Cat #18636",
@@ -1163,13 +1030,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/astralshard-4928.jpg"
   },
   {
-    "name": "Bling Binky #1070",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 21000,
-    "img": "assets/nft/blingbinky-1070.jpg"
-  },
-  {
     "name": "Scared Cat #18083",
     "rarity": "red",
     "cat": "nft",
@@ -1191,18 +1051,53 @@ window.SKINS_NFT = [
     "img": "assets/nft/durovsglasses-3233.jpg"
   },
   {
-    "name": "Eternal Rose #13802",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 19980,
-    "img": "assets/nft/eternalrose-13802.jpg"
-  },
-  {
     "name": "Scared Cat #12431",
     "rarity": "red",
     "cat": "nft",
     "price": 19800,
     "img": "assets/nft/scaredcat-12431.jpg"
+  },
+  {
+    "name": "Eternal Rose #470",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 19200,
+    "img": "assets/nft/eternalrose-470.jpg"
+  },
+  {
+    "name": "Eternal Rose #85",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 19200,
+    "img": "assets/nft/eternalrose-85.jpg"
+  },
+  {
+    "name": "Eternal Rose #13802",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 19200,
+    "img": "assets/nft/eternalrose-13802.jpg"
+  },
+  {
+    "name": "Neko Helmet #1910",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 18000,
+    "img": "assets/nft/nekohelmet-1910.jpg"
+  },
+  {
+    "name": "Neko Helmet #4918",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 18000,
+    "img": "assets/nft/nekohelmet-4918.jpg"
+  },
+  {
+    "name": "Neko Helmet #77",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 18000,
+    "img": "assets/nft/nekohelmet-77.jpg"
   },
   {
     "name": "Durov’s Glasses #3030",
@@ -1289,6 +1184,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/nailbracelet-226.jpg"
   },
   {
+    "name": "Kissed Frog #11248",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 16800,
+    "img": "assets/nft/kissedfrog-11248.jpg"
+  },
+  {
+    "name": "Kissed Frog #11849",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 16800,
+    "img": "assets/nft/kissedfrog-11849.jpg"
+  },
+  {
+    "name": "Kissed Frog #11887",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 16800,
+    "img": "assets/nft/kissedfrog-11887.jpg"
+  },
+  {
     "name": "Nail Bracelet #1347",
     "rarity": "red",
     "cat": "nft",
@@ -1338,39 +1254,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/gemsignet-3922.jpg"
   },
   {
-    "name": "Ionic Dryer #1404",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 15000,
-    "img": "assets/nft/ionicdryer-1404.jpg"
-  },
-  {
-    "name": "Ionic Dryer #3366",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 15000,
-    "img": "assets/nft/ionicdryer-3366.jpg"
-  },
-  {
     "name": "Loot Bag #2171",
     "rarity": "red",
     "cat": "nft",
     "price": 15000,
     "img": "assets/nft/lootbag-2171.jpg"
-  },
-  {
-    "name": "Lucky Locket #6193",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 15000,
-    "img": "assets/nft/luckylocket-6193.jpg"
-  },
-  {
-    "name": "Trapped Heart #661",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 14940,
-    "img": "assets/nft/trappedheart-661.jpg"
   },
   {
     "name": "Loot Bag #9305",
@@ -1387,20 +1275,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/astralshard-4535.jpg"
   },
   {
-    "name": "Lucky Locket #15271",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 14640,
-    "img": "assets/nft/luckylocket-15271.jpg"
-  },
-  {
-    "name": "Lucky Locket #18788",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 14640,
-    "img": "assets/nft/luckylocket-18788.jpg"
-  },
-  {
     "name": "Mini Oscar #343",
     "rarity": "red",
     "cat": "nft",
@@ -1408,11 +1282,53 @@ window.SKINS_NFT = [
     "img": "assets/nft/minioscar-343.jpg"
   },
   {
+    "name": "Vintage Cigar #1133",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 14160,
+    "img": "assets/nft/vintagecigar-1133.jpg"
+  },
+  {
+    "name": "Vintage Cigar #14758",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 14160,
+    "img": "assets/nft/vintagecigar-14758.jpg"
+  },
+  {
+    "name": "Vintage Cigar #4875",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 14160,
+    "img": "assets/nft/vintagecigar-4875.jpg"
+  },
+  {
     "name": "Westside Sign #2345",
     "rarity": "red",
     "cat": "nft",
     "price": 14040,
     "img": "assets/nft/westsidesign-2345.jpg"
+  },
+  {
+    "name": "Signet Ring #13590",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 13920,
+    "img": "assets/nft/signetring-13590.jpg"
+  },
+  {
+    "name": "Signet Ring #759",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 13920,
+    "img": "assets/nft/signetring-759.jpg"
+  },
+  {
+    "name": "Signet Ring #12664",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 13920,
+    "img": "assets/nft/signetring-12664.jpg"
   },
   {
     "name": "Loot Bag #10238",
@@ -1450,13 +1366,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/magicpotion-4053.jpg"
   },
   {
-    "name": "Ionic Dryer #18448",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 13320,
-    "img": "assets/nft/ionicdryer-18448.jpg"
-  },
-  {
     "name": "Nail Bracelet #1439",
     "rarity": "red",
     "cat": "nft",
@@ -1478,11 +1387,46 @@ window.SKINS_NFT = [
     "img": "assets/nft/gemsignet-283.jpg"
   },
   {
-    "name": "Flying Broom #202",
+    "name": "Bling Binky #1082",
     "rarity": "red",
     "cat": "nft",
-    "price": 12120,
-    "img": "assets/nft/flyingbroom-202.jpg"
+    "price": 12000,
+    "img": "assets/nft/blingbinky-1082.jpg"
+  },
+  {
+    "name": "Bling Binky #935",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 12000,
+    "img": "assets/nft/blingbinky-935.jpg"
+  },
+  {
+    "name": "Bling Binky #1070",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 12000,
+    "img": "assets/nft/blingbinky-1070.jpg"
+  },
+  {
+    "name": "Lucky Locket #6193",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 12000,
+    "img": "assets/nft/luckylocket-6193.jpg"
+  },
+  {
+    "name": "Lucky Locket #15271",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 12000,
+    "img": "assets/nft/luckylocket-15271.jpg"
+  },
+  {
+    "name": "Lucky Locket #18788",
+    "rarity": "red",
+    "cat": "nft",
+    "price": 12000,
+    "img": "assets/nft/luckylocket-18788.jpg"
   },
   {
     "name": "Mini Oscar #14",
@@ -1499,20 +1443,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/artisanbrick-3731.jpg"
   },
   {
-    "name": "Flying Broom #10144",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/flyingbroom-10144.jpg"
-  },
-  {
-    "name": "Flying Broom #20316",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/flyingbroom-20316.jpg"
-  },
-  {
     "name": "Ion Gem #3260",
     "rarity": "red",
     "cat": "nft",
@@ -1527,46 +1457,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/lootbag-14086.jpg"
   },
   {
-    "name": "Mad Pumpkin #10741",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/madpumpkin-10741.jpg"
-  },
-  {
-    "name": "Mad Pumpkin #1452",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/madpumpkin-1452.jpg"
-  },
-  {
-    "name": "Mad Pumpkin #3698",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/madpumpkin-3698.jpg"
-  },
-  {
     "name": "Magic Potion #3577",
     "rarity": "red",
     "cat": "nft",
     "price": 12000,
     "img": "assets/nft/magicpotion-3577.jpg"
-  },
-  {
-    "name": "Trapped Heart #16637",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/trappedheart-16637.jpg"
-  },
-  {
-    "name": "Trapped Heart #2155",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 12000,
-    "img": "assets/nft/trappedheart-2155.jpg"
   },
   {
     "name": "Westside Sign #1462",
@@ -1604,13 +1499,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/sharptongue-5652.jpg"
   },
   {
-    "name": "Skull Flower #14865",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 11940,
-    "img": "assets/nft/skullflower-14865.jpg"
-  },
-  {
     "name": "Perfume Bottle #995",
     "rarity": "red",
     "cat": "nft",
@@ -1623,13 +1511,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 11700,
     "img": "assets/nft/eternalrose-22311.jpg"
-  },
-  {
-    "name": "Love Candle #19955",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 11700,
-    "img": "assets/nft/lovecandle-19955.jpg"
   },
   {
     "name": "Loot Bag #13551",
@@ -1660,20 +1541,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/lootbag-13938.jpg"
   },
   {
-    "name": "Skull Flower #2641",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 10800,
-    "img": "assets/nft/skullflower-2641.jpg"
-  },
-  {
-    "name": "Skull Flower #5811",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 10800,
-    "img": "assets/nft/skullflower-5811.jpg"
-  },
-  {
     "name": "Mini Oscar #403",
     "rarity": "red",
     "cat": "nft",
@@ -1686,13 +1553,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 10500,
     "img": "assets/nft/nailbracelet-137.jpg"
-  },
-  {
-    "name": "Love Candle #480",
-    "rarity": "red",
-    "cat": "nft",
-    "price": 10200,
-    "img": "assets/nft/lovecandle-480.jpg"
   },
   {
     "name": "Gem Signet #854",
@@ -1714,13 +1574,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 9600,
     "img": "assets/nft/iongem-4016.jpg"
-  },
-  {
-    "name": "Joyful Bundle #21732",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9300,
-    "img": "assets/nft/joyfulbundle-21732.jpg"
   },
   {
     "name": "Artisan Brick #701",
@@ -1765,46 +1618,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/magicpotion-1068.jpg"
   },
   {
-    "name": "Berry Box #120",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9000,
-    "img": "assets/nft/berrybox-120.jpg"
-  },
-  {
-    "name": "Berry Box #8088",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9000,
-    "img": "assets/nft/berrybox-8088.jpg"
-  },
-  {
     "name": "Ion Gem #3348",
     "rarity": "pink",
     "cat": "nft",
     "price": 9000,
     "img": "assets/nft/iongem-3348.jpg"
-  },
-  {
-    "name": "Joyful Bundle #21198",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9000,
-    "img": "assets/nft/joyfulbundle-21198.jpg"
-  },
-  {
-    "name": "Joyful Bundle #31570",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9000,
-    "img": "assets/nft/joyfulbundle-31570.jpg"
-  },
-  {
-    "name": "Love Candle #3340",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 9000,
-    "img": "assets/nft/lovecandle-3340.jpg"
   },
   {
     "name": "Nail Bracelet #1929",
@@ -1821,6 +1639,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/astralshard-4808.jpg"
   },
   {
+    "name": "Cupid Charm #1335",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8760,
+    "img": "assets/nft/cupidcharm-1335.jpg"
+  },
+  {
+    "name": "Cupid Charm #7796",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8760,
+    "img": "assets/nft/cupidcharm-7796.jpg"
+  },
+  {
+    "name": "Cupid Charm #26565",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8760,
+    "img": "assets/nft/cupidcharm-26565.jpg"
+  },
+  {
     "name": "Electric Skull #3464",
     "rarity": "pink",
     "cat": "nft",
@@ -1833,6 +1672,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 8640,
     "img": "assets/nft/artisanbrick-4700.jpg"
+  },
+  {
+    "name": "Ionic Dryer #1404",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8400,
+    "img": "assets/nft/ionicdryer-1404.jpg"
+  },
+  {
+    "name": "Ionic Dryer #3366",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8400,
+    "img": "assets/nft/ionicdryer-3366.jpg"
+  },
+  {
+    "name": "Ionic Dryer #18448",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 8400,
+    "img": "assets/nft/ionicdryer-18448.jpg"
   },
   {
     "name": "Mighty Arm #1059",
@@ -1884,13 +1744,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/artisanbrick-734.jpg"
   },
   {
-    "name": "Berry Box #29001",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 7500,
-    "img": "assets/nft/berrybox-29001.jpg"
-  },
-  {
     "name": "Gem Signet #6222",
     "rarity": "pink",
     "cat": "nft",
@@ -1912,20 +1765,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/swisswatch-13236.jpg"
   },
   {
-    "name": "Jelly Bunny #11222",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 7380,
-    "img": "assets/nft/jellybunny-11222.jpg"
-  },
-  {
-    "name": "Jelly Bunny #65055",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 7380,
-    "img": "assets/nft/jellybunny-65055.jpg"
-  },
-  {
     "name": "Swiss Watch #20298",
     "rarity": "pink",
     "cat": "nft",
@@ -1933,11 +1772,25 @@ window.SKINS_NFT = [
     "img": "assets/nft/swisswatch-20298.jpg"
   },
   {
-    "name": "Jelly Bunny #14991",
+    "name": "Mad Pumpkin #10741",
     "rarity": "pink",
     "cat": "nft",
     "price": 7200,
-    "img": "assets/nft/jellybunny-14991.jpg"
+    "img": "assets/nft/madpumpkin-10741.jpg"
+  },
+  {
+    "name": "Mad Pumpkin #1452",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 7200,
+    "img": "assets/nft/madpumpkin-1452.jpg"
+  },
+  {
+    "name": "Mad Pumpkin #3698",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 7200,
+    "img": "assets/nft/madpumpkin-3698.jpg"
   },
   {
     "name": "Swiss Watch #13243",
@@ -2003,6 +1856,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/minioscar-4791.jpg"
   },
   {
+    "name": "Trapped Heart #661",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 6000,
+    "img": "assets/nft/trappedheart-661.jpg"
+  },
+  {
+    "name": "Trapped Heart #16637",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 6000,
+    "img": "assets/nft/trappedheart-16637.jpg"
+  },
+  {
+    "name": "Trapped Heart #2155",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 6000,
+    "img": "assets/nft/trappedheart-2155.jpg"
+  },
+  {
     "name": "Eternal Rose #8250",
     "rarity": "pink",
     "cat": "nft",
@@ -2031,53 +1905,11 @@ window.SKINS_NFT = [
     "img": "assets/nft/genielamp-4522.jpg"
   },
   {
-    "name": "Hex Pot #34112",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/hexpot-34112.jpg"
-  },
-  {
-    "name": "Hex Pot #39273",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/hexpot-39273.jpg"
-  },
-  {
-    "name": "Hex Pot #4946",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/hexpot-4946.jpg"
-  },
-  {
     "name": "Magic Potion #673",
     "rarity": "pink",
     "cat": "nft",
     "price": 6000,
     "img": "assets/nft/magicpotion-673.jpg"
-  },
-  {
-    "name": "Santa Hat #46910",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/santahat-46910.jpg"
-  },
-  {
-    "name": "Santa Hat #8008",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/santahat-8008.jpg"
-  },
-  {
-    "name": "Santa Hat #8080",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 6000,
-    "img": "assets/nft/santahat-8080.jpg"
   },
   {
     "name": "Swiss Watch #20708",
@@ -2115,20 +1947,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/lowrider-13323.jpg"
   },
   {
-    "name": "Spy Agaric #56777",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 5940,
-    "img": "assets/nft/spyagaric-56777.jpg"
-  },
-  {
-    "name": "Spy Agaric #38",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 5880,
-    "img": "assets/nft/spyagaric-38.jpg"
-  },
-  {
     "name": "Bonded Ring #5871",
     "rarity": "pink",
     "cat": "nft",
@@ -2148,6 +1966,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 5400,
     "img": "assets/nft/lowrider-11687.jpg"
+  },
+  {
+    "name": "Skull Flower #14865",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 5280,
+    "img": "assets/nft/skullflower-14865.jpg"
+  },
+  {
+    "name": "Skull Flower #2641",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 5280,
+    "img": "assets/nft/skullflower-2641.jpg"
+  },
+  {
+    "name": "Skull Flower #5811",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 5280,
+    "img": "assets/nft/skullflower-5811.jpg"
   },
   {
     "name": "Bonded Ring #5961",
@@ -2176,20 +2015,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 5280,
     "img": "assets/nft/nekohelmet-13162.jpg"
-  },
-  {
-    "name": "Spiced Wine #112",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 5280,
-    "img": "assets/nft/spicedwine-112.jpg"
-  },
-  {
-    "name": "Spy Agaric #1100",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 5280,
-    "img": "assets/nft/spyagaric-1100.jpg"
   },
   {
     "name": "Genie Lamp #5492",
@@ -2248,6 +2073,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/bondedring-2234.jpg"
   },
   {
+    "name": "Joyful Bundle #21732",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 4800,
+    "img": "assets/nft/joyfulbundle-21732.jpg"
+  },
+  {
+    "name": "Joyful Bundle #21198",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 4800,
+    "img": "assets/nft/joyfulbundle-21198.jpg"
+  },
+  {
+    "name": "Joyful Bundle #31570",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 4800,
+    "img": "assets/nft/joyfulbundle-31570.jpg"
+  },
+  {
     "name": "Low Rider #18629",
     "rarity": "pink",
     "cat": "nft",
@@ -2288,13 +2134,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 4500,
     "img": "assets/nft/nekohelmet-11237.jpg"
-  },
-  {
-    "name": "Spiced Wine #3143",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 4500,
-    "img": "assets/nft/spicedwine-3143.jpg"
   },
   {
     "name": "Genie Lamp #5620",
@@ -2339,13 +2178,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/luckylocket-6250.jpg"
   },
   {
-    "name": "Mirage Lamp #37896",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 4200,
-    "img": "assets/nft/miragelamp-37896.jpg"
-  },
-  {
     "name": "Electric Skull #3520",
     "rarity": "pink",
     "cat": "nft",
@@ -2358,20 +2190,6 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 4140,
     "img": "assets/nft/nekohelmet-12606.jpg"
-  },
-  {
-    "name": "Mirage Lamp #69996",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 4140,
-    "img": "assets/nft/miragelamp-69996.jpg"
-  },
-  {
-    "name": "Mirage Lamp #4626",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 4140,
-    "img": "assets/nft/miragelamp-4626.jpg"
   },
   {
     "name": "Kissed Frog #6041",
@@ -2463,6 +2281,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 3660,
     "img": "assets/nft/khabibspapakha-10734.jpg"
+  },
+  {
+    "name": "Flying Broom #202",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3600,
+    "img": "assets/nft/flyingbroom-202.jpg"
+  },
+  {
+    "name": "Flying Broom #10144",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3600,
+    "img": "assets/nft/flyingbroom-10144.jpg"
+  },
+  {
+    "name": "Flying Broom #20316",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3600,
+    "img": "assets/nft/flyingbroom-20316.jpg"
   },
   {
     "name": "Bonded Ring #4561",
@@ -2570,6 +2409,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/vintagecigar-25402.jpg"
   },
   {
+    "name": "Love Candle #19955",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3360,
+    "img": "assets/nft/lovecandle-19955.jpg"
+  },
+  {
+    "name": "Love Candle #480",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3360,
+    "img": "assets/nft/lovecandle-480.jpg"
+  },
+  {
+    "name": "Love Candle #3340",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3360,
+    "img": "assets/nft/lovecandle-3340.jpg"
+  },
+  {
     "name": "Khabib’s Papakha #8935",
     "rarity": "pink",
     "cat": "nft",
@@ -2626,13 +2486,6 @@ window.SKINS_NFT = [
     "img": "assets/nft/signetring-11510.jpg"
   },
   {
-    "name": "Spiced Wine #16817",
-    "rarity": "pink",
-    "cat": "nft",
-    "price": 3300,
-    "img": "assets/nft/spicedwine-16817.jpg"
-  },
-  {
     "name": "Diamond Ring #9590",
     "rarity": "pink",
     "cat": "nft",
@@ -2659,6 +2512,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 3180,
     "img": "assets/nft/blingbinky-626.jpg"
+  },
+  {
+    "name": "Jelly Bunny #11222",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3120,
+    "img": "assets/nft/jellybunny-11222.jpg"
+  },
+  {
+    "name": "Jelly Bunny #65055",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3120,
+    "img": "assets/nft/jellybunny-65055.jpg"
+  },
+  {
+    "name": "Jelly Bunny #14991",
+    "rarity": "pink",
+    "cat": "nft",
+    "price": 3120,
+    "img": "assets/nft/jellybunny-14991.jpg"
   },
   {
     "name": "Voodoo Doll #13045",
@@ -2948,6 +2822,69 @@ window.SKINS_NFT = [
     "img": "assets/nft/rarebird-661.jpg"
   },
   {
+    "name": "Berry Box #120",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/berrybox-120.jpg"
+  },
+  {
+    "name": "Berry Box #8088",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/berrybox-8088.jpg"
+  },
+  {
+    "name": "Berry Box #29001",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/berrybox-29001.jpg"
+  },
+  {
+    "name": "Hex Pot #34112",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/hexpot-34112.jpg"
+  },
+  {
+    "name": "Hex Pot #39273",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/hexpot-39273.jpg"
+  },
+  {
+    "name": "Hex Pot #4946",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/hexpot-4946.jpg"
+  },
+  {
+    "name": "Spy Agaric #56777",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/spyagaric-56777.jpg"
+  },
+  {
+    "name": "Spy Agaric #38",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/spyagaric-38.jpg"
+  },
+  {
+    "name": "Spy Agaric #1100",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2400,
+    "img": "assets/nft/spyagaric-1100.jpg"
+  },
+  {
     "name": "Cupid Charm #5109",
     "rarity": "fiol",
     "cat": "nft",
@@ -3060,6 +2997,27 @@ window.SKINS_NFT = [
     "img": "assets/nft/toybear-48533.jpg"
   },
   {
+    "name": "Santa Hat #46910",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2160,
+    "img": "assets/nft/santahat-46910.jpg"
+  },
+  {
+    "name": "Santa Hat #8008",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2160,
+    "img": "assets/nft/santahat-8008.jpg"
+  },
+  {
+    "name": "Santa Hat #8080",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 2160,
+    "img": "assets/nft/santahat-8080.jpg"
+  },
+  {
     "name": "Cupid Charm #2841",
     "rarity": "fiol",
     "cat": "nft",
@@ -3121,6 +3079,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 1980,
     "img": "assets/nft/cupidcharm-11492.jpg"
+  },
+  {
+    "name": "Spiced Wine #112",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1920,
+    "img": "assets/nft/spicedwine-112.jpg"
+  },
+  {
+    "name": "Spiced Wine #3143",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1920,
+    "img": "assets/nft/spicedwine-3143.jpg"
+  },
+  {
+    "name": "Spiced Wine #16817",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1920,
+    "img": "assets/nft/spicedwine-16817.jpg"
   },
   {
     "name": "Eternal Rose #18648",
@@ -3212,6 +3191,27 @@ window.SKINS_NFT = [
     "cat": "nft",
     "price": 1740,
     "img": "assets/nft/ionicdryer-7499.jpg"
+  },
+  {
+    "name": "Mirage Lamp #37896",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1680,
+    "img": "assets/nft/miragelamp-37896.jpg"
+  },
+  {
+    "name": "Mirage Lamp #69996",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1680,
+    "img": "assets/nft/miragelamp-69996.jpg"
+  },
+  {
+    "name": "Mirage Lamp #4626",
+    "rarity": "fiol",
+    "cat": "nft",
+    "price": 1680,
+    "img": "assets/nft/miragelamp-4626.jpg"
   },
   {
     "name": "Love Potion #19167",

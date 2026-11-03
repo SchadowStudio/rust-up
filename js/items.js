@@ -1,5 +1,131 @@
-// Каталог скинов: предметы Rust (картинки и цены — Steam Community Market, 1 монета = $0.02). Пополняется tools/build-rust.js
+// Каталог скинов: предметы Rust (картинки и цены — Steam Community Market, 1 монета = $0.02). Пополняется tools/build-rust.js, цены проверяет tools/reprice.js
 window.SKINS = [
+  {
+    "name": "Horror Bag",
+    "rarity": "yellow",
+    "price": 63015.5,
+    "img": "assets/skins/market/horror-bag.png"
+  },
+  {
+    "name": "Big Grin",
+    "rarity": "yellow",
+    "price": 60741,
+    "img": "assets/skins/market/big-grin.png"
+  },
+  {
+    "name": "Creepy Clown Bandana",
+    "rarity": "yellow",
+    "price": 43324.5,
+    "img": "assets/skins/market/creepy-clown-bandana.png"
+  },
+  {
+    "name": "Freshly Dug Grave",
+    "rarity": "yellow",
+    "price": 33337,
+    "img": "assets/skins/market/freshly-dug-grave.png"
+  },
+  {
+    "name": "Fire jacket",
+    "rarity": "yellow",
+    "price": 29814,
+    "img": "assets/skins/market/fire-jacket.png"
+  },
+  {
+    "name": "Tempered Mp5",
+    "rarity": "yellow",
+    "price": 27037.5,
+    "img": "assets/skins/market/tempered-mp5.png"
+  },
+  {
+    "name": "Neon Dragon Garage Door",
+    "rarity": "yellow",
+    "price": 23027.5,
+    "img": "assets/skins/market/neon-dragon-garage-door.png"
+  },
+  {
+    "name": "Glory AK47",
+    "rarity": "yellow",
+    "price": 14770.5,
+    "img": "assets/skins/market/glory-ak47.png"
+  },
+  {
+    "name": "Military Camo MP5",
+    "rarity": "yellow",
+    "price": 12284,
+    "img": "assets/skins/market/military-camo-mp5.png"
+  },
+  {
+    "name": "Halloween Bat",
+    "rarity": "yellow",
+    "price": 12016,
+    "img": "assets/skins/market/halloween-bat.png"
+  },
+  {
+    "name": "Hot-tempered Longsword",
+    "rarity": "yellow",
+    "price": 10000,
+    "img": "assets/skins/market/hot-tempered-longsword.png"
+  },
+  {
+    "name": "Tempered Mask",
+    "rarity": "yellow",
+    "price": 9480,
+    "img": "assets/skins/market/tempered-mask.png"
+  },
+  {
+    "name": "Glowing Skull",
+    "rarity": "yellow",
+    "price": 8369.5,
+    "img": "assets/skins/market/glowing-skull.png"
+  },
+  {
+    "name": "Alien Red",
+    "rarity": "yellow",
+    "price": 7988,
+    "img": "assets/skins/market/alien-red.png"
+  },
+  {
+    "name": "Christmas Lights",
+    "rarity": "yellow",
+    "price": 7933.5,
+    "img": "assets/skins/market/christmas-lights.png"
+  },
+  {
+    "name": "Gold Rock",
+    "rarity": "yellow",
+    "price": 6726,
+    "img": "assets/skins/market/gold-rock.png"
+  },
+  {
+    "name": "Crime Bag",
+    "rarity": "yellow",
+    "price": 6384,
+    "img": "assets/skins/market/crime-bag.png"
+  },
+  {
+    "name": "Digital Camo MP5",
+    "rarity": "yellow",
+    "price": 6279,
+    "img": "assets/skins/market/digital-camo-mp5.png"
+  },
+  {
+    "name": "Frostbite",
+    "rarity": "yellow",
+    "price": 5746.5,
+    "img": "assets/skins/market/frostbite.png"
+  },
+  {
+    "name": "Camo Netting",
+    "rarity": "yellow",
+    "price": 3963,
+    "img": "assets/skins/market/camo-netting.png"
+  },
+  {
+    "name": "After Death AR",
+    "rarity": "yellow",
+    "price": 3546.5,
+    "img": "assets/skins/market/after-death-ar.png"
+  },
   {
     "name": "Scarecrow",
     "rarity": "yellow",
@@ -73,12 +199,6 @@ window.SKINS = [
     "img": "assets/skins/market/whiteout-kilt.png"
   },
   {
-    "name": "Big Grin",
-    "rarity": "yellow",
-    "price": 1067.26,
-    "img": "assets/skins/big-grin.png"
-  },
-  {
     "name": "Whiteout Facemask",
     "rarity": "yellow",
     "price": 1055.5,
@@ -87,26 +207,14 @@ window.SKINS = [
   {
     "name": "Whiteout Hoodie",
     "rarity": "yellow",
-    "price": 1033.5,
-    "img": "assets/skins/whiteout-hoodie.png"
-  },
-  {
-    "name": "Horror Bag",
-    "rarity": "yellow",
-    "price": 1008.18,
-    "img": "assets/skins/horror-bag.png"
+    "price": 999,
+    "img": "assets/skins/market/whiteout-hoodie.png"
   },
   {
     "name": "Comics AR",
     "rarity": "yellow",
     "price": 910.5,
     "img": "assets/skins/market/comics-ar.png"
-  },
-  {
-    "name": "Creepy Clown Bandana",
-    "rarity": "yellow",
-    "price": 828.07,
-    "img": "assets/skins/creepy-clown-bandana.png"
   },
   {
     "name": "Scorched Hammer",
@@ -173,12 +281,6 @@ window.SKINS = [
     "rarity": "yellow",
     "price": 633.5,
     "img": "assets/skins/market/legacy-bow.png"
-  },
-  {
-    "name": "Fire jacket",
-    "rarity": "yellow",
-    "price": 571.13,
-    "img": "assets/skins/fire-jacket.png"
   },
   {
     "name": "Bombshell M249",
@@ -253,22 +355,10 @@ window.SKINS = [
     "img": "assets/skins/market/high-quality-bag.png"
   },
   {
-    "name": "Tempered Mp5",
-    "rarity": "yellow",
-    "price": 494.6,
-    "img": "assets/skins/tempered-mp5.png"
-  },
-  {
     "name": "Whiteout Chestplate",
     "rarity": "yellow",
     "price": 484,
     "img": "assets/skins/market/whiteout-chestplate.png"
-  },
-  {
-    "name": "Neon Dragon Garage Door",
-    "rarity": "yellow",
-    "price": 460.53,
-    "img": "assets/skins/neon-dragon-garage-door.png"
   },
   {
     "name": "Samurai Kozane Do",
@@ -469,6 +559,12 @@ window.SKINS = [
     "img": "assets/skins/market/mummy-wraps.png"
   },
   {
+    "name": "Tactical Leather Gloves",
+    "rarity": "yellow",
+    "price": 301.5,
+    "img": "assets/skins/market/tactical-leather-gloves.png"
+  },
+  {
     "name": "Lunar New Year Horse Armor",
     "rarity": "yellow",
     "price": 289.5,
@@ -533,12 +629,6 @@ window.SKINS = [
     "rarity": "yellow",
     "price": 279,
     "img": "assets/skins/market/monster-garage-door.png"
-  },
-  {
-    "name": "Glory AK47",
-    "rarity": "yellow",
-    "price": 275.83,
-    "img": "assets/skins/glory-ak47.png"
   },
   {
     "name": "Salvation Thompson",
@@ -611,12 +701,6 @@ window.SKINS = [
     "rarity": "yellow",
     "price": 250,
     "img": "assets/skins/market/desert-beast-hoodie.png"
-  },
-  {
-    "name": "Military Camo MP5",
-    "rarity": "yellow",
-    "price": 240.04,
-    "img": "assets/skins/military-camo-mp5.png"
   },
   {
     "name": "Heat Seeker Mp5",
@@ -707,12 +791,6 @@ window.SKINS = [
     "rarity": "yellow",
     "price": 224,
     "img": "assets/skins/market/cursed-cauldron.png"
-  },
-  {
-    "name": "Hot-tempered Longsword",
-    "rarity": "yellow",
-    "price": 214.36,
-    "img": "assets/skins/hot-tempered-longsword.png"
   },
   {
     "name": "Yeti Hoodie",
@@ -863,12 +941,6 @@ window.SKINS = [
     "rarity": "red",
     "price": 194,
     "img": "assets/skins/market/abyss-m39.png"
-  },
-  {
-    "name": "Tempered Mask",
-    "rarity": "red",
-    "price": 190.53,
-    "img": "assets/skins/tempered-mask.png"
   },
   {
     "name": "Popstar Door",
@@ -1033,12 +1105,6 @@ window.SKINS = [
     "img": "assets/skins/market/black-diamond-roadsign-vest.png"
   },
   {
-    "name": "Gold Rock",
-    "rarity": "red",
-    "price": 163.25,
-    "img": "assets/skins/gold-rock.png"
-  },
-  {
     "name": "Rioter's Pants",
     "rarity": "red",
     "price": 163,
@@ -1099,18 +1165,6 @@ window.SKINS = [
     "img": "assets/skins/market/tempered-roadsign-pants.png"
   },
   {
-    "name": "Glowing Skull",
-    "rarity": "red",
-    "price": 156.98,
-    "img": "assets/skins/glowing-skull.png"
-  },
-  {
-    "name": "Alien Red",
-    "rarity": "red",
-    "price": 154.14,
-    "img": "assets/skins/alien-red.png"
-  },
-  {
     "name": "Sunken Double Door",
     "rarity": "red",
     "price": 154,
@@ -1153,6 +1207,12 @@ window.SKINS = [
     "img": "assets/skins/market/necromancer-revolver.png"
   },
   {
+    "name": "Heart Collector Backpack",
+    "rarity": "red",
+    "price": 153.5,
+    "img": "assets/skins/market/heart-collector-backpack.png"
+  },
+  {
     "name": "Shamanism Revolver",
     "rarity": "red",
     "price": 153,
@@ -1181,12 +1241,6 @@ window.SKINS = [
     "rarity": "red",
     "price": 150,
     "img": "assets/skins/market/young-dragon-metal-double-door.png"
-  },
-  {
-    "name": "Christmas Lights",
-    "rarity": "red",
-    "price": 148.06,
-    "img": "assets/skins/christmas-lights.png"
   },
   {
     "name": "Sting Revolver",
@@ -1333,6 +1387,12 @@ window.SKINS = [
     "img": "assets/skins/market/jockey-pants.png"
   },
   {
+    "name": "JPEG Chestplate",
+    "rarity": "red",
+    "price": 140,
+    "img": "assets/skins/market/jpeg-chestplate.png"
+  },
+  {
     "name": "Desert Raiders Boots",
     "rarity": "red",
     "price": 138,
@@ -1405,10 +1465,10 @@ window.SKINS = [
     "img": "assets/skins/market/ghost-rug.png"
   },
   {
-    "name": "Digital Camo MP5",
+    "name": "Deep Ruby Hoodie",
     "rarity": "red",
-    "price": 130.72,
-    "img": "assets/skins/digital-camo-mp5.png"
+    "price": 131,
+    "img": "assets/skins/market/deep-ruby-hoodie.png"
   },
   {
     "name": "High Quality Crate",
@@ -1525,6 +1585,12 @@ window.SKINS = [
     "img": "assets/skins/market/the-fallen-vest.png"
   },
   {
+    "name": "Neon Bunnies Large Wooden Box",
+    "rarity": "red",
+    "price": 121,
+    "img": "assets/skins/market/neon-bunnies-large-wooden-box.png"
+  },
+  {
     "name": "JPEG Metal Door",
     "rarity": "red",
     "price": 120.5,
@@ -1571,12 +1637,6 @@ window.SKINS = [
     "rarity": "red",
     "price": 119.5,
     "img": "assets/skins/market/heat-seeker-pump-shotgun.png"
-  },
-  {
-    "name": "Crime Bag",
-    "rarity": "red",
-    "price": 118.31,
-    "img": "assets/skins/crime-bag.png"
   },
   {
     "name": "Neon Lunar Serpent Garage Door",
@@ -1661,6 +1721,18 @@ window.SKINS = [
     "rarity": "red",
     "price": 115,
     "img": "assets/skins/market/jester-armoured-double-door.png"
+  },
+  {
+    "name": "Chameleon Roadsign Kilt",
+    "rarity": "red",
+    "price": 115,
+    "img": "assets/skins/market/chameleon-roadsign-kilt.png"
+  },
+  {
+    "name": "Mystical Rock",
+    "rarity": "red",
+    "price": 113.5,
+    "img": "assets/skins/market/mystical-rock.png"
   },
   {
     "name": "No Mercy Roadsign Gloves",
@@ -1829,12 +1901,6 @@ window.SKINS = [
     "rarity": "red",
     "price": 106,
     "img": "assets/skins/market/no-mercy-wood-jacket.png"
-  },
-  {
-    "name": "Freshly Dug Grave",
-    "rarity": "red",
-    "price": 104.11,
-    "img": "assets/skins/freshly-dug-grave.png"
   },
   {
     "name": "Volcanic Rock",
@@ -2171,12 +2237,6 @@ window.SKINS = [
     "rarity": "red",
     "price": 87.5,
     "img": "assets/skins/market/night-incident-bed.png"
-  },
-  {
-    "name": "Halloween Bat",
-    "rarity": "red",
-    "price": 87.25,
-    "img": "assets/skins/halloween-bat.png"
   },
   {
     "name": "Army Armored Boots",
@@ -2534,7 +2594,7 @@ window.SKINS = [
   },
   {
     "name": "Tempered Poncho",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 73,
     "img": "assets/skins/market/tempered-poncho.png"
   },
@@ -2600,7 +2660,7 @@ window.SKINS = [
   },
   {
     "name": "Cartoon SAP",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 71.5,
     "img": "assets/skins/market/cartoon-sap.png"
   },
@@ -2666,25 +2726,25 @@ window.SKINS = [
   },
   {
     "name": "Snowcamo Jacket",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 70,
     "img": "assets/skins/market/snowcamo-jacket.png"
   },
   {
     "name": "Curse of the Drowned Treasure Chest",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 69.5,
     "img": "assets/skins/market/curse-of-the-drowned-treasure-chest.png"
   },
   {
     "name": "Thorned Love Vest",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 69,
     "img": "assets/skins/market/thorned-love-vest.png"
   },
   {
     "name": "Young Dragon Garage Door",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 67.5,
     "img": "assets/skins/market/young-dragon-garage-door.png"
   },
@@ -2750,15 +2810,21 @@ window.SKINS = [
   },
   {
     "name": "Damascus Boots",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 67,
     "img": "assets/skins/market/damascus-boots.png"
   },
   {
     "name": "Arctic Skull AR",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 66,
     "img": "assets/skins/market/arctic-skull-ar.png"
+  },
+  {
+    "name": "Phantom Tactical Gloves",
+    "rarity": "red",
+    "price": 66,
+    "img": "assets/skins/market/phantom-tactical-gloves.png"
   },
   {
     "name": "Rainbow Pony Boonie",
@@ -2810,7 +2876,7 @@ window.SKINS = [
   },
   {
     "name": "Popstar Pump Shotgun",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 64,
     "img": "assets/skins/market/popstar-pump-shotgun.png"
   },
@@ -2875,8 +2941,14 @@ window.SKINS = [
     "img": "assets/skins/market/easter-neon-box.png"
   },
   {
+    "name": "Pumpkin Storage Box",
+    "rarity": "red",
+    "price": 63.5,
+    "img": "assets/skins/market/pumpkin-storage-box.png"
+  },
+  {
     "name": "Scrap Hazard Helmet",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 63,
     "img": "assets/skins/market/scrap-hazard-helmet.png"
   },
@@ -2935,28 +3007,34 @@ window.SKINS = [
     "img": "assets/skins/market/hawk-crossbow.png"
   },
   {
+    "name": "Firecracker Eoka",
+    "rarity": "red",
+    "price": 62,
+    "img": "assets/skins/market/firecracker-eoka.png"
+  },
+  {
     "name": "No Mercy Auto Turret",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 61.5,
     "img": "assets/skins/market/no-mercy-auto-turret.png"
   },
   {
     "name": "Island Assault Team Kilt",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 61.5,
     "img": "assets/skins/market/island-assault-team-kilt.png"
   },
   {
     "name": "Optimized AR",
-    "rarity": "fiol",
+    "rarity": "red",
     "price": 61.5,
     "img": "assets/skins/market/optimized-ar.png"
   },
   {
-    "name": "Tactical Leather Gloves",
+    "name": "Tire Pants",
     "rarity": "red",
-    "price": 61.28,
-    "img": "assets/skins/tactical-leather-gloves.png"
+    "price": 61,
+    "img": "assets/skins/market/tire-pants.png"
   },
   {
     "name": "Island Assault Team Helmet",
@@ -3229,12 +3307,6 @@ window.SKINS = [
     "img": "assets/skins/market/wrought-iron-bbq.png"
   },
   {
-    "name": "Tire Pants",
-    "rarity": "fiol",
-    "price": 55,
-    "img": "assets/skins/tire-pants.png"
-  },
-  {
     "name": "Blocky Rig Garage Door",
     "rarity": "fiol",
     "price": 55,
@@ -3382,7 +3454,7 @@ window.SKINS = [
     "name": "Elite Crate Pants",
     "rarity": "fiol",
     "price": 52,
-    "img": "https://community.fastly.steamstatic.com/economy/image/6TMcQ7eX6E0EZl2byXi7vaVKyDk_zQLX05x6eLCFM9neAckxGDf7qU2e2gu64OnAeQ7835Zc5mLHfCk4nReh8DEiv5dYPa8-qL0zQfi-lnHaseU/512fx512f"
+    "img": "assets/skins/market/elite-crate-pants.png"
   },
   {
     "name": "Electrician Hoodie",
@@ -3443,12 +3515,6 @@ window.SKINS = [
     "rarity": "fiol",
     "price": 51.5,
     "img": "assets/skins/market/hellforged-chest-plate.png"
-  },
-  {
-    "name": "Neon Bunnies Large Wooden Box",
-    "rarity": "fiol",
-    "price": 51.36,
-    "img": "assets/skins/neon-bunnies-large-wooden-box.png"
   },
   {
     "name": "Cold Hunter HMLMG",
@@ -3799,6 +3865,12 @@ window.SKINS = [
     "img": "assets/skins/market/asteroid-garage-door.png"
   },
   {
+    "name": "Vortex MP5",
+    "rarity": "fiol",
+    "price": 44.5,
+    "img": "assets/skins/market/vortex-mp5.png"
+  },
+  {
     "name": "Deep Sea Pick Axe",
     "rarity": "fiol",
     "price": 44,
@@ -3845,12 +3917,6 @@ window.SKINS = [
     "rarity": "fiol",
     "price": 43.5,
     "img": "assets/skins/market/wings-of-death-sks.png"
-  },
-  {
-    "name": "JPEG Chestplate",
-    "rarity": "fiol",
-    "price": 43.04,
-    "img": "https://community.fastly.steamstatic.com/economy/image/6TMcQ7eX6E0EZl2byXi7vaVKyDk_zQLX05x6eLCFM9neAckxGDf7qU2e2gu64OnAeQ7835Za4WPGfCk4nReh8DEiv5dfP645qr03QPDhRQ_n9A/512fx512f"
   },
   {
     "name": "Paisley Bandana",
@@ -4441,10 +4507,10 @@ window.SKINS = [
     "img": "assets/skins/market/hunting-assault-rifle.png"
   },
   {
-    "name": "Heart Collector Backpack",
+    "name": "Swirled Sword",
     "rarity": "fiol",
-    "price": 36.07,
-    "img": "assets/skins/heart-collector-backpack.png"
+    "price": 36.5,
+    "img": "assets/skins/market/swirled-sword.png"
   },
   {
     "name": "Black OPS Metal Facemask",
@@ -4783,10 +4849,10 @@ window.SKINS = [
     "img": "assets/skins/market/morexo-tool-box.png"
   },
   {
-    "name": "Frostbite",
+    "name": "Love Nest",
     "rarity": "fiol",
-    "price": 30.23,
-    "img": "assets/skins/frostbite.png"
+    "price": 31,
+    "img": "assets/skins/market/love-nest.png"
   },
   {
     "name": "Sinotype Ore",
@@ -4853,6 +4919,12 @@ window.SKINS = [
     "rarity": "fiol",
     "price": 30,
     "img": "assets/skins/market/hieroglyphic-metal-door.png"
+  },
+  {
+    "name": "Sweet Wooden Door",
+    "rarity": "fiol",
+    "price": 30,
+    "img": "assets/skins/market/sweet-wooden-door.png"
   },
   {
     "name": "Luxury Gold Door",
@@ -4927,6 +4999,12 @@ window.SKINS = [
     "img": "assets/skins/market/frozen-santa-pants.png"
   },
   {
+    "name": "Pandora's box",
+    "rarity": "fiol",
+    "price": 27.5,
+    "img": "assets/skins/market/pandora-s-box.png"
+  },
+  {
     "name": "Sunken Door",
     "rarity": "fiol",
     "price": 26.5,
@@ -4969,12 +5047,6 @@ window.SKINS = [
     "img": "assets/skins/market/glister-kilt.png"
   },
   {
-    "name": "Deep Ruby Hoodie",
-    "rarity": "fiol",
-    "price": 25.33,
-    "img": "assets/skins/deep-ruby-hoodie.png"
-  },
-  {
     "name": "Bombing Kilt",
     "rarity": "fiol",
     "price": 25,
@@ -5005,22 +5077,22 @@ window.SKINS = [
     "img": "assets/skins/market/the-tiger-chestplate.png"
   },
   {
-    "name": "Chameleon Roadsign Kilt",
+    "name": "Grid Door",
     "rarity": "fiol",
-    "price": 21.23,
-    "img": "assets/skins/chameleon-roadsign-kilt.png"
+    "price": 24,
+    "img": "assets/skins/market/grid-door.png"
+  },
+  {
+    "name": "Adobe Barricade",
+    "rarity": "fiol",
+    "price": 23,
+    "img": "assets/skins/market/adobe-barricade.png"
   },
   {
     "name": "Snow Camo Bandana",
     "rarity": "blue",
     "price": 19.5,
     "img": "assets/skins/market/snow-camo-bandana.png"
-  },
-  {
-    "name": "Camo Netting",
-    "rarity": "blue",
-    "price": 17.79,
-    "img": "assets/skins/camo-netting.png"
   },
   {
     "name": "Black Hoodie",
@@ -5035,12 +5107,6 @@ window.SKINS = [
     "img": "assets/skins/market/black-boots.png"
   },
   {
-    "name": "After Death AR",
-    "rarity": "blue",
-    "price": 14.91,
-    "img": "assets/skins/after-death-ar.png"
-  },
-  {
     "name": "Black Bandana",
     "rarity": "blue",
     "price": 13,
@@ -5051,12 +5117,6 @@ window.SKINS = [
     "rarity": "blue",
     "price": 13,
     "img": "assets/skins/market/forest-camo-bandana.png"
-  },
-  {
-    "name": "Vortex MP5",
-    "rarity": "blue",
-    "price": 12.5,
-    "img": "assets/skins/vortex-mp5.png"
   },
   {
     "name": "Grey Longsleeve T-Shirt",
@@ -5087,12 +5147,6 @@ window.SKINS = [
     "rarity": "blue",
     "price": 9,
     "img": "assets/skins/market/desert-camo-bandana.png"
-  },
-  {
-    "name": "Swirled Sword",
-    "rarity": "blue",
-    "price": 8.78,
-    "img": "assets/skins/swirled-sword.png"
   },
   {
     "name": "First Aid Green",
@@ -5207,12 +5261,6 @@ window.SKINS = [
     "rarity": "gray",
     "price": 7.5,
     "img": "assets/skins/market/forest-camo-pants.png"
-  },
-  {
-    "name": "Sweet Wooden Door",
-    "rarity": "blue",
-    "price": 7.36,
-    "img": "assets/skins/sweet-wooden-door.png"
   },
   {
     "name": "Cloth",
@@ -5363,53 +5411,5 @@ window.SKINS = [
     "rarity": "gray",
     "price": 6.5,
     "img": "assets/skins/market/red-cap.png"
-  },
-  {
-    "name": "Pumpkin Storage Box",
-    "rarity": "blue",
-    "price": 6.16,
-    "img": "https://community.fastly.steamstatic.com/economy/image/6TMcQ7eX6E0EZl2byXi7vaVKyDk_zQLX05x6eLCFM9neAckxGDf7qU2e2gu64OnAeQ7835Ze52LBfCk4nReh8DEiv5dYPaE4rbQ_RfC-nzBfuqs/512fx512f"
-  },
-  {
-    "name": "Phantom Tactical Gloves",
-    "rarity": "blue",
-    "price": 5.17,
-    "img": "assets/skins/phantom-tactical-gloves.png"
-  },
-  {
-    "name": "Pandora's box",
-    "rarity": "gray",
-    "price": 4.33,
-    "img": "assets/skins/pandoras-box.png"
-  },
-  {
-    "name": "Mystical Rock",
-    "rarity": "gray",
-    "price": 3.63,
-    "img": "assets/skins/mystical-rock.png"
-  },
-  {
-    "name": "Love Nest",
-    "rarity": "gray",
-    "price": 3.04,
-    "img": "https://community.fastly.steamstatic.com/economy/image/6TMcQ7eX6E0EZl2byXi7vaVKyDk_zQLX05x6eLCFM9neAckxGDf7qU2e2gu64OnAeQ7835Ba5mLEfCk4nReh8DEiv5dYOqE9qbYyQf8gHuQrFg/512fx512f"
-  },
-  {
-    "name": "Grid Door",
-    "rarity": "gray",
-    "price": 2.55,
-    "img": "https://community.fastly.steamstatic.com/economy/image/6TMcQ7eX6E0EZl2byXi7vaVKyDk_zQLX05x6eLCFM9neAckxGDf7qU2e2gu64OnAeQ7835FY52LFfCk4nReh8DEiv5dbPq89r703RPu7Rm1-F1E/512fx512f"
-  },
-  {
-    "name": "Firecracker Eoka",
-    "rarity": "gray",
-    "price": 2.14,
-    "img": "assets/skins/firecracker-eoka.png"
-  },
-  {
-    "name": "Adobe Barricade",
-    "rarity": "gray",
-    "price": 1.5,
-    "img": "assets/skins/adobe-barricade.png"
   }
 ];

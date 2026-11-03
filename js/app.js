@@ -10,7 +10,7 @@
   const MIN_TOPUP = 10;           // below this balance the upgrader suggests getting coins
   const TG_CHANNEL = 'up_rust';
   const TG_BONUS = 10000;         // one-time reward for subscribing to the Telegram channel
-  const BONUS_TXT = TG_BONUS.toLocaleString('ru-RU');
+  const bonusTxt = () => moneyInt(TG_BONUS);
   const STORE_KEY = 'rustup_demo_v1';
   const PROMOS = { RUSTUP: 50, WIPE: 25, DEMO: 100 };
   const DAILY_MS = 24 * 60 * 60 * 1000;
@@ -34,7 +34,6 @@
 
   // ---------- utils ----------
   const $ = (sel, root = document) => root.querySelector(sel);
-  const fmt = n => (Math.round(n * 100) / 100).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const fmtInt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -70,9 +69,43 @@
   };
   const WEAPON_SVG = '<svg class="placeholder-weapon" viewBox="0 0 160 70"><path fill="#f2f3f2" d="M4 26h70l6-8h18l3 5h36l6-4h11v12h-6l-2 6h-38l-6 6h-12l-4 20H76l4-18-8-1-6 10H50l4-14H34l-8 7H14l-2-9H4z"/></svg>';
 
-  // whole amounts without .00, for promo texts
-  const coinInt = (v, size) => coin(v, size).replace(fmt(v), Math.round(v).toLocaleString('ru-RU'));
-  const coin = (v, size) => `<span class="coin"${size ? ` style="--coin-size:${size}px"` : ''}>${ICON.coin}<span>${fmt(v)}</span></span>`;
+  // ---------- currency ----------
+  // prices and the balance are stored in coins (1 coin = $0.02); the switch in the header only changes how they are shown
+  const COIN_USD = 0.02;
+  const STAR_USD = 0.015;          // same rate as the gift catalog (tools/build-gifts.js)
+  const RATE_KEY = 'rustup_usdrub';
+  let usdRub = 81;                 // fallback until the Central Bank rate loads
+  try { const r = JSON.parse(localStorage.getItem(RATE_KEY)); if (r && r.v > 0) usdRub = r.v; } catch (e) { /* no storage */ }
+  const CURRENCIES = {
+    rub: { name: 'Рубли', sym: '₽', perCoin: () => COIN_USD * usdRub, dec: n => (n && Math.abs(n) < 100 ? 2 : 0),
+      icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2f7cf6"/><circle cx="10" cy="10" r="8.6" fill="#3d8bff"/><path d="M8.2 15V5.2h3a2.55 2.55 0 010 5.1H6.6M6.6 12.7h5" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+    usdt: { name: 'USDT', sym: 'USDT', perCoin: () => COIN_USD, dec: () => 2,
+      icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#26a17b"/><path d="M5.6 5.8h8.8M10 5.8v9.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><ellipse cx="10" cy="9.4" rx="4.7" ry="1.5" fill="none" stroke="#fff" stroke-width="1.1"/></svg>' },
+    stars: { name: 'Звёзды', sym: '⭐', perCoin: () => COIN_USD / STAR_USD, dec: n => (n && Math.abs(n) < 10 ? 1 : 0),
+      icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.4l2.65 5.4 5.95.85-4.3 4.2 1 5.9L10 15l-5.3 2.75 1-5.9-4.3-4.2 5.95-.85z" fill="#ffc83d" stroke="#f29d12" stroke-width=".9" stroke-linejoin="round"/></svg>' }
+  };
+  const curId = () => (S.settings.currency in CURRENCIES ? S.settings.currency : 'rub');
+  const toCur = (v, id = curId()) => v * CURRENCIES[id].perCoin();
+  const fromCur = v => v / CURRENCIES[curId()].perCoin();
+  const numFmt = (n, d) => n.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });
+  // amount in coins → number in the chosen currency
+  const fmt = (v, id = curId()) => { const n = toCur(v, id); return numFmt(n, CURRENCIES[id].dec(n)); };
+  // plain text with the currency sign, for toasts, confirm() and share texts
+  const money = v => `${fmt(v)} ${CURRENCIES[curId()].sym}`;
+  const coin = (v, size, whole) => `<span class="coin cur-${curId()}"${size ? ` style="--coin-size:${size}px"` : ''}>${CURRENCIES[curId()].icon}<span>${whole ? numFmt(Math.round(toCur(v)), 0) : fmt(v)}</span></span>`;
+  // whole amounts without kopecks/cents, for promo texts
+  const coinInt = (v, size) => coin(v, size, true);
+  const moneyInt = v => `${numFmt(Math.round(toCur(v)), 0)} ${CURRENCIES[curId()].sym}`;
+
+  // the ruble rate follows the Central Bank of Russia; cached so the next start shows it right away
+  fetch('https://www.cbr-xml-daily.ru/daily_json.js').then(r => r.json()).then(d => {
+    const v = d && d.Valute && d.Valute.USD && d.Valute.USD.Value;
+    if (!(v > 0)) return;
+    try { localStorage.setItem(RATE_KEY, JSON.stringify({ v, t: Date.now() })); } catch (e) { /* ignore */ }
+    if (Math.abs(v - usdRub) < 0.01) return;
+    usdRub = v;
+    if (curId() === 'rub') rerenderMoney();
+  }).catch(() => { /* offline: keep the cached rate */ });
 
   // ---------- persistence ----------
   function freshState() {
@@ -208,7 +241,7 @@
   }
   function shareRef() {
     if (!REF) return;
-    const text = `Залетай в RUST UP — апгрейд скинов Rust, CS2 и NFT-подарков! По моей ссылке +${REF.welcomeBonus.toLocaleString('ru-RU')} монет на старт 🎁`;
+    const text = `Залетай в RUST UP — апгрейд скинов Rust, CS2 и NFT-подарков! По моей ссылке +${moneyInt(REF.welcomeBonus)} на старт 🎁`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(REF.link)}&text=${encodeURIComponent(text)}`;
     if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
   }
@@ -549,14 +582,14 @@
   }
   function openTgBonus() {
     requireLogin(() => {
-      if (tgBonusDone()) return modal('Бонус за подписку', `<p class="note" style="font-size:14px">Бонус ${coinInt(TG_BONUS)} уже получен. Спасибо, что с нами в <b>@${TG_CHANNEL}</b>! Больше монет — в разделе <a href="#/rewards" data-close-go>Rewards</a>.</p>`,
+      if (tgBonusDone()) return modal('Бонус за подписку', `<p class="note" style="font-size:14px">Бонус ${coinInt(TG_BONUS)} уже получен. Спасибо, что с нами в <b>@${TG_CHANNEL}</b>! Ещё больше бонусов — в разделе <a href="#/rewards" data-close-go>Rewards</a>.</p>`,
         m => $('[data-close-go]', m).addEventListener('click', closeModal));
       let opened = !!S.rewards.tgOpened;
       modal('Бонус за подписку', `
-        <div class="tg-bonus"><span class="big">${coinInt(TG_BONUS, 30)}</span><p>Подпишитесь на наш Telegram-канал <b>@${TG_CHANNEL}</b> и получите монеты на баланс. Один раз на аккаунт.</p></div>
+        <div class="tg-bonus"><span class="big">${coinInt(TG_BONUS, 30)}</span><p>Подпишитесь на наш Telegram-канал <b>@${TG_CHANNEL}</b> и получите бонус на баланс. Один раз на аккаунт.</p></div>
         <button class="btn btn-tg" id="tgSub" style="height:48px">${ICON.tg}<span>1. Подписаться на @${TG_CHANNEL}</span></button>
-        <button class="btn btn-accent" id="tgClaim" style="height:48px" ${opened ? '' : 'disabled'}><span>2. Получить ${BONUS_TXT}</span></button>
-        <p class="note">Монеты виртуальные и не выводятся.</p>`,
+        <button class="btn btn-accent" id="tgClaim" style="height:48px" ${opened ? '' : 'disabled'}><span>2. Получить ${bonusTxt()}</span></button>
+        <p class="note">Бонусный баланс виртуальный и не выводится.</p>`,
       m => {
         $('#tgSub', m).onclick = () => {
           openChannel();
@@ -590,10 +623,10 @@
       us.innerHTML = `<button class="btn btn-steam" data-login>${ICON.steam}<span>Войти</span></button>`;
     } else {
       us.innerHTML = `
-        <a class="balance" href="#/inventory" aria-label="Баланс">${coin(S.balance)}</a>
+        <button class="balance${$('#curMenu') ? ' open' : ''}" type="button" data-cur-menu aria-label="Баланс и валюта" aria-haspopup="menu">${coin(S.balance)}<svg class="balance-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         ${tgBonusDone()
           ? `<a class="btn btn-accent btn-pill" href="#/rewards">${ICON.gift}<span>Бонусы</span>${dailyReady() ? '<span class="dot"></span>' : ''}</a>`
-          : `<button class="btn btn-accent btn-pill" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${BONUS_TXT}</span></button>`}
+          : `<button class="btn btn-accent btn-pill" data-tg-bonus aria-label="Бонус за подписку">${ICON.tg}<span>+${bonusTxt()}</span></button>`}
         <a href="#/profile" aria-label="Профиль">${avatarHtml(S.user.name, S.user.color)}</a>`;
     }
     document.querySelectorAll('.nav-item[data-route="/rewards"]').forEach(a => {
@@ -601,6 +634,65 @@
       if (S.user && (dailyReady() || (S.rewards.cashback || 0) >= 1)) a.insertAdjacentHTML('beforeend', '<span class="nav-dot"></span>');
     });
   }
+
+  // ---------- currency menu (under the balance in the header) ----------
+  function curMenuHtml() {
+    const rows = Object.entries(CURRENCIES).map(([id, c]) => `
+      <button class="cur-row${id === curId() ? ' on' : ''}" type="button" data-cur="${id}" role="menuitemradio" aria-checked="${id === curId()}">
+        <span class="cur-ico">${c.icon}</span><span class="cur-name">${c.name}</span><b>${fmt(S.balance, id)}</b><span class="cur-radio"></span>
+      </button>`).join('');
+    return `<div class="cur-title">Валюта</div>${rows}
+      <div class="cur-foot">
+        <a class="btn btn-ghost" href="#/inventory" data-cur-close>${ICON.wallet}<span>Кошелёк</span></a>
+        <a class="btn btn-accent" href="#/rewards" data-cur-close><span>Пополнить</span></a>
+      </div>
+      <p class="cur-rate">1 USDT = ${numFmt(usdRub, 2)} ₽ (курс ЦБ) · 1 ⭐ = ${numFmt(STAR_USD, 3)} USDT</p>`;
+  }
+  function placeCurMenu() {
+    const m = $('#curMenu'), b = $('[data-cur-menu]');
+    if (!m || !b) return closeCurMenu();
+    const r = b.getBoundingClientRect();
+    const w = Math.min(360, window.innerWidth - 24);
+    m.style.width = w + 'px';
+    m.style.top = r.bottom + 8 + 'px';
+    m.style.left = Math.max(12, Math.min(r.right - w, window.innerWidth - w - 12)) + 'px';
+  }
+  function openCurMenu() {
+    let m = $('#curMenu');
+    if (!m) { m = document.createElement('div'); m.id = 'curMenu'; m.className = 'cur-menu'; m.setAttribute('role', 'menu'); document.body.appendChild(m); }
+    m.innerHTML = curMenuHtml();
+    placeCurMenu();
+    $('[data-cur-menu]')?.classList.add('open');
+  }
+  function closeCurMenu() {
+    $('#curMenu')?.remove();
+    $('[data-cur-menu]')?.classList.remove('open');
+  }
+  // every amount on screen is rendered from coins, so a currency change just redraws the page in place
+  function rerenderMoney() {
+    const y = window.scrollY;
+    renderHeader();
+    if ($('#curMenu')) $('#curMenu').innerHTML = curMenuHtml();
+    if (feed.length) { $('#drops').innerHTML = feed.map(d => feedItem(d)).join(''); renderBest(false); }
+    if (!U.spinning && !caseSpinning) { route(); window.scrollTo({ top: y }); }
+  }
+  function setCurrency(id) {
+    if (!(id in CURRENCIES)) return;
+    S.settings.currency = id; save();
+    haptic('light');
+    closeCurMenu();
+    rerenderMoney();
+  }
+  document.addEventListener('click', e => {
+    const t = e.target;
+    const c = t.closest('[data-cur]');
+    if (c) return setCurrency(c.dataset.cur);
+    if (t.closest('[data-cur-menu]')) return $('#curMenu') ? closeCurMenu() : openCurMenu();
+    if (t.closest('[data-cur-close]') || !t.closest('#curMenu')) closeCurMenu();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCurMenu(); });
+  window.addEventListener('resize', () => placeCurMenu());
+  window.addEventListener('scroll', () => placeCurMenu(), { passive: true });
 
   // ---------- skin card ----------
   function card(skin, o = {}) {
@@ -846,7 +938,7 @@
       return;
     }
     const cards = skins.map(i => card(byName[i.name], { static: true, remove: `data-unselect="${i.uid}"` }));
-    if (U.balanceAdd) cards.push(`<div class="balance-chip">${ICON.coin}<span>${fmt(U.balanceAdd)}</span></div>`);
+    if (U.balanceAdd) cards.push(`<div class="balance-chip">${CURRENCIES[curId()].icon}<span>${fmt(U.balanceAdd)}</span></div>`);
     p.innerHTML = selGrid(cards, 'Ваша ставка', inputValue());
   }
   // empty-slot silhouette: a gun for skins, a gift box for Telegram NFT
@@ -979,13 +1071,13 @@
       overlay = S.balance >= MIN_TOPUP
         ? `<div class="empty-overlay"><div class="empty-content"><p>Инвентарь пуст</p><span class="muted" style="font-size:12px">Купите скины в магазине или используйте баланс в апгрейде</span><button class="btn btn-accent" data-tab="shop">${ICON.shop}<span>В магазин</span></button></div></div>`
         : tgBonusDone()
-          ? `<div class="empty-overlay"><div class="empty-content"><p>Недостаточно монет</p><span class="muted" style="font-size:12px">Заберите ежедневный бонус или введите промокод</span><a class="btn btn-accent" href="#/rewards"><span>Награды</span></a></div></div>`
+          ? `<div class="empty-overlay"><div class="empty-content"><p>Недостаточно средств</p><span class="muted" style="font-size:12px">Заберите ежедневный бонус или введите промокод</span><a class="btn btn-accent" href="#/rewards"><span>Награды</span></a></div></div>`
           : `<div class="empty-overlay"><div class="empty-content"><p>Получите ${coinInt(TG_BONUS, 20)}</p><span class="muted" style="font-size:12px">за подписку на Telegram-канал @${TG_CHANNEL}</span><button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>Получить</span></button></div></div>`;
     }
     const sel = [...U.inputs];
     html = head + `<div class="grid-container"><div class="grid">${cells.join('')}</div>${overlay}</div>
       <div class="inv-footer">
-        ${tab === 'inventory' && sel.length && !U.spinning ? `<button class="btn sell-btn" data-sell>Продать (${sel.length}) · ${fmt(sum(sel.map(u => byName[invItem(u).name].price)))}</button><span class="spacer"></span>` : ''}
+        ${tab === 'inventory' && sel.length && !U.spinning ? `<button class="btn sell-btn" data-sell>Продать (${sel.length}) · ${money(sum(sel.map(u => byName[invItem(u).name].price)))}</button><span class="spacer"></span>` : ''}
         <button class="page-btn" data-page="inv:-1" ${pg.page === 0 ? 'disabled' : ''} aria-label="Назад">${ICON.left}</button>
         <span class="page-num">${pg.page + 1} / ${pg.pages}</span>
         <button class="page-btn" data-page="inv:1" ${pg.page >= pg.pages - 1 ? 'disabled' : ''} aria-label="Вперёд">${ICON.right}</button>
@@ -1000,7 +1092,7 @@
     const f = U.filter;
     const iv = inputValue();
     let items = gamePool().filter(s =>
-      (f.min === '' || s.price >= +f.min) && (f.max === '' || s.price <= +f.max) &&
+      (f.min === '' || s.price >= fromCur(+f.min)) && (f.max === '' || s.price <= fromCur(+f.max)) &&
       (!f.q || s.name.toLowerCase().includes(f.q.toLowerCase())));
     items.sort((a, b) => (U.upSort === 'desc' ? b.price - a.price : a.price - b.price));
     const pg = pager(items.length, U.upPage, per); U.upPage = pg.page;
@@ -1206,7 +1298,7 @@
       } else {
         sfxLose();
         const cb = addCashback(inValue);
-        toast(`Не повезло — выпало ${roll.toFixed(2)}, нужно было меньше ${c.toFixed(2)}${cb ? ` · кешбэк +${fmt(cb)}` : ''}`, 'error');
+        toast(`Не повезло — выпало ${roll.toFixed(2)}, нужно было меньше ${c.toFixed(2)}${cb ? ` · кешбэк +${money(cb)}` : ''}`, 'error');
       }
       refreshUpgrade();
       renderHeader();
@@ -1285,7 +1377,7 @@
       <div class="panel reward-card tg-banner"><span class="glow"></span>
         <div class="tg-banner-text"><h4>Подписка на Telegram</h4>
           <p>Подпишитесь на канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Бонус ${coinInt(TG_BONUS)} один раз на аккаунт.</p></div>
-        <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${BONUS_TXT}`}</span></button>
+        <button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'}" data-tg-bonus>${ICON.tg}<span>${tgBonusDone() ? 'Получено' : `Получить ${bonusTxt()}`}</span></button>
       </div>
       <div class="panel ref-panel" id="refPanel"></div>
       <div class="panel road-panel" id="refRoad"></div>
@@ -1293,7 +1385,7 @@
         <div class="panel reward-card"><span class="glow"></span>
           <h4>Ежедневный подарок</h4>
           <span class="big">${coinInt(DAILY_BONUS)}</span>
-          <p>Забирайте подарок каждые 24 часа. Не пропускайте — монеты не копятся.</p>
+          <p>Забирайте подарок каждые 24 часа. Не пропускайте — подарки не копятся.</p>
           <button class="btn ${dailyReady() ? 'btn-accent' : 'btn-ghost'}" id="claimDaily" ${dailyReady() ? '' : 'disabled'}>${dailyReady() ? 'Забрать' : `Через ${hh} ч ${mm} мин`}</button>
         </div>
         <div class="panel reward-card">
@@ -1358,7 +1450,7 @@
     const st = S.stats;
     const rows = S.history.slice(0, 50).map(h => `<tr>
       <td>${new Date(h.t).toLocaleString('ru-RU')}</td>
-      <td>${h.inputs.map(esc).join(', ') || '—'}${h.bal ? ` + ${fmt(h.bal)}` : ''}</td>
+      <td>${h.inputs.map(esc).join(', ') || '—'}${h.bal ? ` + ${money(h.bal)}` : ''}</td>
       <td>${h.targets.map(esc).join(', ')}</td>
       <td>${h.chance.toFixed(2)}%</td>
       <td class="mono">${h.roll.toFixed(4)}</td>
@@ -1538,7 +1630,7 @@
           <span class="muted">Купите скины в магазине или выиграйте их в апгрейде</span>
           <div class="row" style="justify-content:center;flex-wrap:wrap">
             <a class="btn btn-accent" href="#/upgrade" data-goshop>${ICON.shop}<span>В магазин</span></a>
-            ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>+${BONUS_TXT} за подписку</span></button>`}
+            ${tgBonusDone() ? '' : `<button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>+${bonusTxt()} за подписку</span></button>`}
           </div></div>`
       : !items.length ? '<div class="panel inv-empty"><p>Ничего не найдено</p><span class="muted">Измените фильтры</span></div>'
       : `<div class="inv-grid">${slice.map(i => `<div class="inv-cell${fresh(i.t) ? ' fresh' : ''}">
@@ -1596,7 +1688,7 @@
     if (!sel.length) return;
     if (act === 'sell') {
       const total = sum(sel.map(i => byName[i.name].price));
-      if (!confirm(`Продать ${sel.length} шт. за ${fmt(total)} монет?`)) return;
+      if (!confirm(`Продать ${sel.length} шт. за ${money(total)}?`)) return;
       S.inventory = S.inventory.filter(i => !v.sel.has(i.uid));
       v.sel.clear();
       addBalance(total);
@@ -1882,7 +1974,7 @@
       return counts + (S.balance >= price
         ? `<button class="btn btn-accent case-open" data-open-case="${c.id}">Открыть${n > 1 ? ` ${n} шт.` : ''} за ${coinInt(price, 20)}</button>`
         : `<button class="btn btn-accent case-open" disabled>Не хватает ${coin(price - S.balance, 18)}</button>
-          <a class="btn btn-ghost case-next" href="#/rewards">Получить монеты</a>`);
+          <a class="btn btn-ghost case-next" href="#/rewards">Получить бонусы</a>`);
     }
     if (st === 'opened') {
       const next = casesLeft()[0];
@@ -1919,7 +2011,7 @@
     if (!c || caseSpinning || !S.user) return;
     if (c.paid) {
       const n = countFor(c), price = casePrice(c) * n;
-      if (S.balance < price) return toast(`Недостаточно монет: нужно ${coin(price)}`, 'error');
+      if (S.balance < price) return toast(`Недостаточно средств: нужно ${coin(price)}`, 'error');
       return spinCase(c, n);
     }
     if (c.timer) return timerLeft() ? toast(`Следующий кейс через ${mmss(timerLeft())}`, 'error') : spinCase(c);
@@ -2049,10 +2141,10 @@
         <span class="hero-art">${heroes.map((s, i) => `<img class="ha-${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`).join('')}</span></a>`,
       tgBonusDone()
         ? `<a class="hero-slide hs-daily" href="#/rewards">
-          <span class="hero-text"><span class="hero-kicker">Каждые 24 часа</span><b class="hero-title">Подарок<br>${fmtInt(DAILY_BONUS)}</b><span class="hero-sub">монет на баланс — бесплатно</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
+          <span class="hero-text"><span class="hero-kicker">Каждые 24 часа</span><b class="hero-title">Подарок<br>${moneyInt(DAILY_BONUS)}</b><span class="hero-sub">на баланс — бесплатно</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
           <span class="hero-art"><img class="ha-gift" src="${giftImg('Подарок')}" alt="" draggable="false">${coins}</span></a>`
         : `<button class="hero-slide hs-tg" data-tg-bonus>
-          <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${BONUS_TXT}<br>монет</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
+          <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${bonusTxt()}<br>на баланс</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
           <span class="hero-art"><span class="ha-tg">${ICON.tg}</span>${coins}</span></button>`
     ];
   }
@@ -2115,6 +2207,7 @@
     document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === navKey));
     if (path !== '/upgrade') U.result = null;
     if (path !== '/') clearInterval(heroTimer);
+    closeCurMenu();
     if (tgVer('6.1')) TG.BackButton[path === '/' ? 'hide' : 'show']();
     switch (path) {
       case '/upgrade': upgradePage(); break;
