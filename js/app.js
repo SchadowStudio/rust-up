@@ -524,22 +524,27 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
   // ---------- top-up window (visual only: payments are not connected, the pay button says so) ----------
-  const DEPOSIT_SUMS = [100, 300, 500, 1000, 3000, 5000];
+  const DEPOSIT_SUMS = [100, 1500, 3000, 5000, 10000, 25000];
   const DEPOSIT_WAYS = [['sbp', 'СБП'], ['card', 'Карта'], ['crypto', 'Крипта'], ['stars', 'Звёзды']];
-  // [rubles, NFT, CS2 skin]: the bonus a top-up from that sum would bring; both columns get pricier every step
+  // [rubles, NFT, CS2 skin]: the bonus is worth about the top-up itself (catalog price in rubles 75–100% of the sum, CBR rate 2026-11-04).
+  // 100 ₽ — a regular Telegram gift; 200–1 000 ₽ — Rust or CS2 skin (no gift or NFT costs that much); from 1 500 ₽ — NFT (the cheapest in the catalog).
   const DEPOSIT_BONUSES = [
-    [100, 'Snow Mittens #11948', 'UMP-45 | Full Stop'], [300, 'Cupid Charm #10012', 'Tec-9 | Remote Control'],
-    [500, 'Vintage Cigar #4347', 'FAMAS | ZX Spectron'], [1000, 'Artisan Brick #5426', 'G3SG1 | Flux'],
-    [2000, 'Loot Bag #12736', 'R8 Revolver | Llama Cannon'], [3000, 'Scared Cat #11028', '★ Driver Gloves | Racing Green'],
-    [5000, 'Resistance Dog #11363', '★ Shadow Daggers | Rust Coat'], [10000, 'Heart Locket #416', '★ Nomad Knife | Forest DDPAT'],
-    [25000, 'Intelligence Cup #105', '★ Bayonet | Boreal Forest'], [50000, 'Algorithm Cup #74', '★ Talon Knife | Forest DDPAT'],
-    [100000, 'Plush Pepe #2163', '★ Karambit | Bright Water']];
+    [100, 'Алмаз', 'Desert Eagle | Sputnik'],
+    [200, 'The Fallen Vest', 'MAC-10 | Heat'], [350, 'Abyss MP5', 'AWP | Atheris'],
+    [500, 'Tactical Leather Gloves', 'MP9 | Hydra'], [1000, 'Bombshell M249', 'Dual Berettas | Demolition'],
+    [1500, 'Crystal Ball #21104', 'Galil AR | Rainbow Spoon'], [2000, 'Evil Eye #21943', 'AWP | Chrome Cannon'],
+    [3000, 'Cupid Charm #15429', 'Dual Berettas | Cobra Strike'], [5000, 'Diamond Ring #29692', '★ Gut Knife | Rust Coat'],
+    [7500, 'Magic Potion #4607', '★ Moto Gloves | Smoke Out'], [10000, 'Trapped Heart #661', '★ Bayonet | Boreal Forest'],
+    [15000, 'Artisan Brick #701', '★ Specialist Gloves | Big Swell'], [25000, 'Nail Bracelet #1347', 'M4A4 | The Coalition'],
+    [50000, 'Astral Shard #2122', '★ Butterfly Knife | Lore'], [100000, 'Perfume Bottle #2327', 'AK-47 | Gold Arabesque']];
   const rubFmt = n => fmtInt(n) + ' ₽';
   // one «бонус за пополнение» card; also used on the bonuses page (amount 0 = empty progress)
+  // the first option is a gift, an NFT or a Rust skin — the toggle names it after its kind
+  const depKind = s => !s ? 'Подарок' : s.game === 'nft' || s.img.includes('assets/nft/') ? 'NFT' : s.img.includes('assets/gifts/') ? 'Подарок' : 'Rust';
   const depCard = (b, i, amount, kind) => {
-    const s = byName[kind === 'gift' ? b[1] : b[2]];
+    const s = byName[kind === 'gift' ? b[1] : b[2]], first = depKind(byName[b[1]]);
     return `<div class="dep-bonus${amount >= b[0] ? ' on' : ''}" data-i="${i}">
-      <div class="dep-seg"><button type="button" class="${kind === 'gift' ? 'on' : ''}" data-kind="gift">NFT</button><button type="button" class="${kind === 'skin' ? 'on' : ''}" data-kind="skin">Скин</button></div>
+      <div class="dep-seg"><button type="button" class="${kind === 'gift' ? 'on' : ''}" data-kind="gift">${first}</button><button type="button" class="${kind === 'skin' ? 'on' : ''}" data-kind="skin">${first === 'Rust' ? 'CS2' : 'Скин'}</button></div>
       <div class="dep-art rarity-${s ? s.rarity : 'gray'}">${s ? `<img${imgCls(s) ? ' class="nft"' : ''} src="${s.img}" alt="" draggable="false">` : ''}</div>
       <span class="dep-name">${s ? esc(s.name.replace(/^★ /, '')) : ''}</span>
       <span class="dep-bar"><i style="width:${Math.min(100, (amount / b[0]) * 100)}%"></i></span>
@@ -547,7 +552,7 @@
       <button class="btn btn-accent dep-take" type="button" data-sum="${b[0]}">Пополнить</button>
     </div>`;
   };
-  function openDeposit(sum = 500) {
+  function openDeposit(sum = 1500) {
     let amount = sum, way = 'sbp';
     const kind = DEPOSIT_BONUSES.map(() => 'gift');
     const bonusCard = (b, i) => depCard(b, i, amount, kind[i]);
@@ -556,7 +561,7 @@
       <div class="dep-input"><input class="text-input" id="depAmt" inputmode="numeric" maxlength="7" value="${amount}"><span>₽</span></div>
       <div class="dep-ways">${DEPOSIT_WAYS.map(([id, t]) => `<button type="button" class="dep-way" data-way="${id}">${t}</button>`).join('')}</div>
       <button class="btn btn-accent dep-pay" id="depPay" type="button"></button>
-      <div class="dep-head"><h4>Бонусы за пополнение</h4><span class="muted">подарок или скин на выбор</span></div>
+      <div class="dep-head"><h4>Бонусы за пополнение</h4><span class="muted">по цене как пополнение</span></div>
       <div class="dep-bonuses" id="depBonuses"></div>`, m => {
       m.classList.add('modal-deposit');
       const draw = () => {
