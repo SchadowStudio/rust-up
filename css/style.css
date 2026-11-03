@@ -1110,6 +1110,10 @@ body {
 .nav-mobile { background: #24262ce8; }
 .nav-mobile .nav-item.active { background: linear-gradient(180deg, #44474f, #2f3238); box-shadow: inset 0 1px 0 #ffffff26, 0 0 0 1px #e5383b66, 0 0 18px #e5383b40; }
 
+/* live feed: real drops only, a hint while it is empty */
+.drops-empty { display: flex; align-items: center; height: 60px; padding: 0 16px; font-size: 13px; font-weight: 600; color: var(--text-other); white-space: nowrap; }
+.gc-online[hidden] { display: none; }
+
 /* cases page: game switch + filter chips like RubUP */
 .cases-switch { width: 100%; margin: 4px 0 12px; }
 .case-chips { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }

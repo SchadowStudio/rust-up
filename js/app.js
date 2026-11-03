@@ -854,9 +854,10 @@
     </div>`;
   }
 
-  // ---------- live feed ----------
-  const BOTS = ['Cr♱stal', 'SaKyra', 'KOKO', 'Lonely', 'Skuf', 'lens', 'kotly', 'KAWASAKI', 'Hameworld', 'ssawer4', 'Treezybad', 'blank', 'tt.spzm', 'imgonnadie', 'Bandit', 'RaidBoss', 'Нубик', 'Олег', 'ZergLord', 'scrap_king', 'Doorcamper', 'Ак47', 'Neon', 'Garage', 'MrMetal'];
+  // ---------- live feed: real wins of all players, Rust + CS2 + NFT in one strip (server: /api/drop, /api/feed) ----------
+  const FEED_MS = 6000;           // poll period; the server caches the answer for a few seconds
   const feed = [];
+  const seenDrops = new Set();    // server ids already in the strip (our own wins are shown before the server has them)
   let best = null;
 
   function feedItem(d, cls = 'drop') {
@@ -872,38 +873,58 @@
     if (!best) return;
     $('#bestDrop').innerHTML = feedItem({ ...best, enter }, 'drop best');
   }
+  function renderFeedEmpty() {
+    if (!feed.length) $('#drops').innerHTML = '<span class="drops-empty">Здесь появятся выигрыши игроков</span>';
+  }
   function pushDrop(d) {
+    if (!feed.length) $('#drops').innerHTML = '';
     feed.unshift(d);
     if (feed.length > 16) feed.length = 16;
     const box = $('#drops');
     box.insertAdjacentHTML('afterbegin', feedItem({ ...d, enter: true }));
     while (box.children.length > 16) box.lastElementChild.remove();
-    if (!best || d.skin.price > best.skin.price || Date.now() - best.t > 3600e3) { best = d; renderBest(true); }
+    if (!best || d.skin.price > best.skin.price) { best = d; renderBest(true); }
   }
-  function botDrop() {
-    // skins of the open game, weighted toward cheap ones like a real feed
-    const pool = gamePool();
-    const skin = pool[Math.floor(Math.pow(Math.random(), 2.2) * pool.length)];
-    return { user: pick(BOTS), color: pick(AVA_COLORS), skin, chance: rand(5, 79.9), t: Date.now() };
+  // a server row → a strip item; skins missing from this build's catalog are skipped
+  const fromServer = r => { const skin = byName[r.name]; return skin && { id: r.id, user: r.nick, color: r.color || AVA_COLORS[r.id % AVA_COLORS.length], skin, chance: r.chance || 100, t: r.t }; };
+  // our own win shows up at once and goes to the server for everyone else
+  function reportDrops(skins, chance, src) {
+    skins.forEach(skin => pushDrop({ user: S.user.name, color: S.user.color, skin, chance, t: Date.now() }));
+    if (!TG || !window.RUSTUP_API) return;
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/drop', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: TG.initData, nick: S.user.name, color: S.user.color, src, items: skins.map(s => ({ name: s.name, price: s.price, chance })) })
+    }).then(r => r.json()).then(d => { if (d && d.ids) d.ids.forEach(id => seenDrops.add(id)); }).catch(() => { /* offline: shown locally anyway */ });
   }
-  // fills the strip with fresh drops of the open game
-  function seedFeed() {
-    feed.length = 0;
-    Array.from({ length: 16 }, botDrop).forEach(d => feed.push(d));
-    $('#drops').innerHTML = feed.map(d => feedItem(d)).join('');
-    best = feed.reduce((a, b) => (b.skin.price > a.skin.price ? b : a));
-    renderBest(false);
+  let online = 0;
+  function loadFeed(first) {
+    if (!window.RUSTUP_API) return renderFeedEmpty();
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/feed').then(r => r.json()).then(d => {
+      if (!d || !d.ok) return;
+      online = d.online || 0;
+      $('#statOnline').textContent = fmtInt(Math.max(1, online));
+      document.querySelectorAll('.gc-online[data-share]').forEach(el => {
+        const n = Math.round(online * el.dataset.share);
+        el.hidden = !n;
+        el.lastChild.textContent = fmtInt(n);
+      });
+      const fresh = d.drops.filter(r => !seenDrops.has(r.id)).reverse();   // oldest first, so the newest ends up on the left
+      fresh.forEach(r => seenDrops.add(r.id));
+      const items = fresh.map(fromServer).filter(Boolean);
+      if (first) {
+        feed.length = 0;
+        items.reverse().forEach(x => feed.push(x));
+        $('#drops').innerHTML = feed.map(x => feedItem(x)).join('');
+      } else items.forEach(pushDrop);
+      const b = d.best && fromServer(d.best);
+      if (b && (!best || b.skin.price >= best.skin.price)) { best = b; renderBest(first ? false : true); }
+      renderFeedEmpty();
+    }).catch(() => renderFeedEmpty());
   }
   function initFeed() {
-    seedFeed();
-    (function loop() {
-      setTimeout(() => { pushDrop(botDrop()); bumpStats(); loop(); }, rand(1800, 4200));
-    })();
-  }
-  let online = 1055;
-  function bumpStats() {
-    online = Math.max(700, Math.round(online + rand(-6, 7)));
-    $('#statOnline').textContent = fmtInt(online);
+    renderFeedEmpty();
+    loadFeed(true);
+    setInterval(() => { if (!document.hidden) loadFeed(false); }, FEED_MS);
   }
 
   // ---------- upgrade math ----------
@@ -979,7 +1000,6 @@
     U.game = id;
     U.inputs.clear(); U.targets = []; U.balanceAdd = 0; U.mult = null; U.result = null;
     U.invPage = 0; U.upPage = 0; U.filter = { min: '', max: '', q: '' };
-    if (POOL[id]) seedFeed();
   }
 
   function gameSwitch() {
@@ -1436,7 +1456,7 @@
       if (win) {
         sfxWin();
         toast(`Победа! Вы получили ${targets.map(n => `<b>${esc(n)}</b>`).join(', ')}`, 'success');
-        targets.forEach(n => pushDrop({ user: S.user.name, color: S.user.color, skin: byName[n], chance: c, t: Date.now() }));
+        reportDrops(targets.map(n => byName[n]), c, 'upgrade');
       } else {
         sfxLose();
         const cb = addCashback(inValue);
@@ -2267,7 +2287,7 @@
       // paid cases that paid out less than their price count as a loss for cashback
       const cb = c.paid ? addCashback(casePrice(c) * n - sum(wins.map(w => w.price))) : 0;
       if (cb) toast(`Кешбэк +${coin(cb)} — забрать в «Бонусах»`, 'success');
-      wins.forEach(w => pushDrop({ user: S.user.name, color: S.user.color, skin: w, chance: 100, t: Date.now() }));
+      reportDrops(wins, 100, 'case');
       if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
       showCaseWin(c, wins, uids);
     }, dur + 30);
@@ -2341,7 +2361,8 @@
   }
   function homePage() {
     const slides = heroSlides();
-    const playing = share => fmtInt(Math.max(3, online * share));
+    // the real online split between the tiles by a fixed share (the server counts players, not what they are playing)
+    const playing = share => fmtInt(Math.round(online * share));
     const games = [
       // upgrade tiles: item on a pedestal with golden chevrons (assets/games, made by tools/build-game-art.ps1)
       { href: '#/upgrade?game=rust', cls: 'gc-rust', title: 'Апгрейд Rust', share: 0.27, art: `<img class="gc-art" src="assets/games/upgrade-rust.png" alt="" draggable="false">` },
@@ -2359,7 +2380,7 @@
       <div class="row-head"><h2 class="home-title">Игры</h2></div>
       <div class="games-grid">${games.map(g => `<a class="game-card ${g.cls}" href="${g.href}">
         ${g.art}
-        <span class="gc-online" title="Сейчас играют"><i class="dot-online"></i>${playing(g.share)}</span>
+        <span class="gc-online" title="Сейчас играют" data-share="${g.share}"${Math.round(online * g.share) ? '' : ' hidden'}><i class="dot-online"></i>${playing(g.share)}</span>
         ${g.badge ? `<span class="gc-badge">${g.badge}</span>` : ''}
         <b class="gc-title">${g.title}</b></a>`).join('')}</div>
       <div class="row-head"><h2 class="home-title">Бесплатные кейсы</h2><a href="#/cases">Все ${ICON.right}</a></div>
