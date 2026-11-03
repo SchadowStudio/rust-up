@@ -72,13 +72,16 @@
     return {
       refLink: 'https://t.me/rustuper_bot?start=ref_7342', inviteLink: 'https://t.me/rustuptiktok_bot?start=c_7342',
       stats: { total: 1284, active: 803, today: series[n - 1].n, week: series.slice(-7).reduce((s, d) => s + d.n, 0) },
-      series, days: n, balance: 312.5, earnedClips: 594, earnedRef: 18.5, withdrawn: 300, wallet: '@ivan_rust', invited: 3, withdrawMin: 5,
+      series, days: n, balance: 312.5, earnedClips: 594, earnedRef: 18.5, withdrawn: 300, invited: 3,
+      payout: { xrocket: '@ivan_rust', card: '2200 7001 2345 6789' }, balanceMin: 1, cashMin: 50, usdRub: 81.2, coinUsd: 0.02,
       clips: [
         { id: 21, url: 'https://www.tiktok.com/@ivan_rust/video/7431002233', platform: 'tiktok', category: 'gameplay', views: 48200, created_at: now - day, status: 'wait' },
         { id: 14, url: 'https://www.tiktok.com/@ivan_rust/video/7429981122', platform: 'tiktok', category: 'gameplay', views: 131000, created_at: now - 5 * day, status: 'paid', amount: 304 },
         { id: 9, url: 'https://youtube.com/shorts/aB3dE9xYz', platform: 'shorts', category: 'gifts', views: 412000, created_at: now - 9 * day, status: 'paid', amount: 290 },
         { id: 5, url: 'https://www.tiktok.com/@ivan_rust/video/7421100991', platform: 'tiktok', category: 'creative', views: 6100, created_at: now - 12 * day, status: 'rejected', note: 'нет упоминания бота' }],
-      withdraws: [{ id: 3, amount: 300, wallet: '@ivan_rust', status: 'paid', created_at: now - 4 * day, done_at: now - 3 * day }]
+      withdraws: [
+        { id: 4, amount: 12, method: 'balance', wallet: 'Баланс RUST UP', status: 'paid', created_at: now - day, done_at: now - day },
+        { id: 3, amount: 300, method: 'card', wallet: 'Карта •••• 6789', status: 'paid', created_at: now - 4 * day, done_at: now - 3 * day }]
     };
   }
   function api(path, body = {}) {
@@ -177,7 +180,7 @@
         <div class="rc head"><span></span><span>1 000</span><span>100 000</span><span>1 млн</span></div>
         ${CLIP_CATS.map(([, t, min, r]) => `<div class="rrow"><div class="rname"><b>${t}</b> · заявка от ${int(min)}</div>
           <div class="rc"><span></span>${r.map(v => `<b>${rate(v)}</b>`).join('')}</div></div>`).join('')}
-        <p class="muted">YouTube Shorts — половина ставки. Деньги приходят на баланс кабинета, вывод — USDT в @xRocket от ${usd(D.withdrawMin)}. Ролик растёт — обновите просмотры, и мы доначислим разницу.</p>
+        <p class="muted">YouTube Shorts — половина ставки. Деньги приходят на баланс кабинета, вывод — на баланс RUST UP от ${usd(D.balanceMin)}, на карту или USDT — от ${usd(D.cashMin)}. Ролик растёт — обновите просмотры, и мы доначислим разницу.</p>
       </section>
       <section class="card how">
         <h2>Правила</h2>
@@ -188,15 +191,26 @@
       </section>`;
   }
 
+  const WAY_ICO = {
+    balance: '<svg viewBox="0 0 24 24"><path d="M12 3L4 8.5v3.5L12 6.5l8 5.5V8.5zM12 10L4 15.5V19l8-5.5 8 5.5v-3.5z" fill="#e5383b"/></svg>',
+    card: '<svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="3" fill="none" stroke="#ffd166" stroke-width="2"/><path d="M2.5 9.5h19" stroke="#ffd166" stroke-width="2.4"/><path d="M6 15h4" stroke="#ffd166" stroke-width="2" stroke-linecap="round"/></svg>',
+    crypto: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="#26a17b"/><path d="M7 7.5h10v2.6h-3.6v1.2c2.6.2 4.4.7 4.4 1.3s-1.8 1.1-4.4 1.3V18h-2.8v-4.1C8 13.7 6.2 13.2 6.2 12.6s1.8-1.1 4.4-1.3v-1.2H7z" fill="#fff"/></svg>'
+  };
+  // payout methods: the game balance takes any amount, card and crypto start at D.cashMin
+  const METHODS = [
+    ['balance', 'Баланс RUST UP', 'мгновенно, от ' ],
+    ['card', 'Карта', 'от '],
+    ['crypto', 'Крипта USDT', 'от ']];
+  const methodMin = m => m === 'balance' ? D.balanceMin : D.cashMin;
+  const rubOf = n => Math.round(n * D.usdRub).toLocaleString('ru-RU') + ' ₽';
   function moneyPage() {
-    const open = D.withdraws.some(w => w.status === 'wait');
-    const can = D.balance >= D.withdrawMin && !open;
+    const can = D.balance >= D.balanceMin;
     const WST = { wait: ['Ждёт перевода', 'wait'], paid: ['Отправлено', 'ok'], rejected: ['Отклонено', 'bad'] };
     return `
       <section class="card balance">
         <span class="muted">Доступно к выводу</span>
         <b class="big">${usd(D.balance)}</b>
-        <button class="btn btn-accent wide" data-withdraw ${can ? '' : 'disabled'}>${open ? 'Вывод уже в обработке' : D.balance < D.withdrawMin ? `Вывод от ${usd(D.withdrawMin)}` : 'Вывести USDT'}</button>
+        <button class="btn btn-accent wide" data-withdraw ${can ? '' : 'disabled'}>${can ? 'Вывести' : `Вывод от ${usd(D.balanceMin)}`}</button>
         <div class="split">
           <div><span>За ролики</span><b>${usd(D.earnedClips)}</b></div>
           <div><span>За авторов</span><b>${usd(D.earnedRef)}</b></div>
@@ -204,9 +218,9 @@
         </div>
       </section>
       <section class="card">
-        <div class="card-head"><h2>Кошелёк</h2><span class="hint">@xRocket</span></div>
-        <div class="link-row"><input class="input" id="wallet" value="${esc(D.wallet)}" placeholder="@username в @xRocket" maxlength="33"><button class="btn btn-ghost" data-wallet>Сохранить</button></div>
-        <p class="muted">USDT приходит в @xRocket на этот @username. Проверьте, что вы открывали @xRocket хотя бы раз.</p>
+        <div class="card-head"><h2>Способы вывода</h2></div>
+        <div class="ways">${METHODS.map(([id, t, s]) => `<div class="way ${D.balance >= methodMin(id) ? '' : 'off'}"><span class="way-ico">${WAY_ICO[id]}</span><b>${t}</b><small>${s}${usd(methodMin(id))}</small></div>`).join('')}</div>
+        <p class="muted">До ${usd(D.cashMin)} вывод только на баланс RUST UP (1 $ = ${rubOf(1)}). От ${usd(D.cashMin)} — ещё на карту или USDT (@xRocket или TRC-20).</p>
       </section>
       <section class="card">
         <div class="card-head"><h2>Пригласи автора</h2><span class="hint">+5%</span></div>
@@ -290,29 +304,67 @@
       };
     });
   }
+  const luhn = num => { let s = 0; for (let i = 0; i < num.length; i++) { let d = +num[num.length - 1 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; };
   function withdraw() {
-    modal('Вывод USDT', `
-      <p class="muted">Доступно ${usd(D.balance)}. Деньги придут в @xRocket на <b>${esc(D.wallet || '—')}</b>, обычно в течение 1–2 дней.</p>
-      <input class="input" id="wAmt" value="${Math.floor(D.balance * 100) / 100}" inputmode="decimal" maxlength="10">
-      <button class="btn btn-accent wide" id="wSend">Заказать вывод</button>`, m => {
+    const P = D.payout || {};
+    let method = D.balance >= D.cashMin && P.card ? 'card' : 'balance', net = P.net === 'trc20' ? 'trc20' : 'xrocket';
+    modal('Вывод', `
+      <label class="lbl">Сумма, $ (доступно ${usd(D.balance)})</label>
+      <div class="link-row"><input class="input" id="wAmt" value="${Math.floor(D.balance * 100) / 100}" inputmode="decimal" maxlength="10"><button class="btn btn-ghost" id="wAll">Всё</button></div>
+      <label class="lbl">Куда</label>
+      <div class="ways pick" id="wWays">${METHODS.map(([id, t]) => `<button class="way" type="button" data-m="${id}"><span class="way-ico">${WAY_ICO[id]}</span><b>${t}</b><small>от ${usd(methodMin(id))}</small></button>`).join('')}</div>
+      <div id="wDet"></div>
+      <p class="muted est" id="wHint"></p>
+      <button class="btn btn-accent wide" id="wSend">Вывести</button>`, m => {
+      const amt = () => Number(($('#wAmt', m).value || '').replace(',', '.')) || 0;
+      const details = () => {
+        if (method === 'card') return `<label class="lbl">Номер карты</label><input class="input mono" id="wCard" inputmode="numeric" maxlength="23" placeholder="0000 0000 0000 0000" value="${esc(P.card || '')}">`;
+        if (method === 'crypto') return `<label class="lbl">Сеть</label>
+          <div class="seg wide-seg"><button type="button" class="${net === 'xrocket' ? 'on' : ''}" data-net="xrocket">@xRocket</button><button type="button" class="${net === 'trc20' ? 'on' : ''}" data-net="trc20">USDT TRC-20</button></div>
+          ${net === 'trc20' ? `<input class="input mono" id="wAddr" maxlength="40" placeholder="Адрес T…" value="${esc(P.trc20 || '')}">`
+            : `<input class="input" id="wX" maxlength="33" placeholder="@username в @xRocket" value="${esc(P.xrocket || '')}">`}`;
+        return '';
+      };
+      const draw = () => {
+        const a = amt(), cash = a >= D.cashMin;
+        if (!cash && method !== 'balance') method = 'balance';
+        m.querySelectorAll('[data-m]').forEach(b => { b.classList.toggle('on', b.dataset.m === method); b.classList.toggle('off', b.dataset.m !== 'balance' && !cash); });
+        $('#wDet', m).innerHTML = details();
+        m.querySelectorAll('[data-net]').forEach(b => b.onclick = () => { net = b.dataset.net; draw(); });
+        $('#wHint', m).innerHTML = method === 'balance'
+          ? (a > 0 ? `≈ <b>${rubOf(a)}</b> на баланс RUST UP — сразу, бот напишет в @${esc(window.RUSTUP_MAIN_BOT || 'rustuper_bot')}.` : '') + (cash ? '' : ` Карта и крипта — от ${usd(D.cashMin)}.`)
+          : method === 'card' ? `≈ ${rubOf(a)} по курсу ЦБ. Переводим вручную, обычно за 1–2 дня.` : 'USDT, переводим вручную, обычно за 1–2 дня.';
+      };
+      m.querySelectorAll('[data-m]').forEach(b => b.onclick = () => {
+        if (b.dataset.m !== 'balance' && amt() < D.cashMin) return toast(`На карту и крипту — от ${usd(D.cashMin)}`, 'error');
+        method = b.dataset.m; draw();
+      });
+      $('#wAmt', m).addEventListener('input', draw);
+      $('#wAll', m).onclick = () => { $('#wAmt', m).value = Math.floor(D.balance * 100) / 100; draw(); };
+      draw();
       $('#wSend', m).onclick = () => {
-        const amount = Number(($('#wAmt', m).value || '').replace(',', '.'));
-        if (!(amount >= D.withdrawMin)) return toast(`Минимум ${usd(D.withdrawMin)}`, 'error');
+        const amount = amt(), body = { amount, method };
         if (amount > D.balance) return toast('Больше, чем на балансе', 'error');
+        if (amount < methodMin(method)) return toast(`Минимум ${usd(methodMin(method))}`, 'error');
+        if (method === 'card') {
+          const num = ($('#wCard', m).value || '').replace(/\D/g, '');
+          if (num.length < 16 || num.length > 19 || !luhn(num)) return toast('Проверьте номер карты', 'error');
+          body.details = { card: num };
+        } else if (method === 'crypto') {
+          body.details = net === 'trc20' ? { net, address: $('#wAddr', m).value.trim() } : { net, xrocket: $('#wX', m).value.trim() };
+          if (net === 'trc20' && !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(body.details.address)) return toast('Проверьте адрес TRC-20', 'error');
+          if (net === 'xrocket' && !/^@?[a-z0-9_]{4,32}$/i.test(body.details.xrocket)) return toast('Укажите @username', 'error');
+        }
         if (DEMO) { closeModal(); return toast('Демо: вывод не создаётся', 'success'); }
-        api('/api/cr/withdraw', { amount }).then(d => {
-          if (!d.ok) return toast({ wallet: 'Сначала сохраните @username кошелька', open: 'Предыдущий вывод ещё в обработке', min: `Минимум ${usd(D.withdrawMin)}`, balance: 'Не хватает баланса' }[d.error] || 'Не удалось', 'error');
-          closeModal(); toast('Вывод заказан — бот напишет, когда отправим', 'success'); load();
-        }).catch(() => toast('Нет связи с сервером', 'error'));
+        const b = $('#wSend', m); b.disabled = true; b.textContent = 'Отправляем…';
+        api('/api/cr/withdraw', body).then(d => {
+          if (!d.ok) return toast({ open: 'Предыдущий вывод на карту/крипту ещё в обработке', min: `Минимум ${usd(D.balanceMin)}`, cashmin: `На карту и крипту — от ${usd(D.cashMin)}`, balance: 'Не хватает баланса', card: 'Проверьте номер карты', trc20: 'Проверьте адрес TRC-20', xrocket: 'Укажите @username' }[d.error] || 'Не удалось', 'error');
+          closeModal();
+          toast(d.instant ? `${d.rub} уже на балансе RUST UP — откройте игру` : 'Вывод заказан — бот напишет, когда отправим', 'success');
+          load();
+        }).catch(() => toast('Нет связи с сервером', 'error')).finally(() => { b.disabled = false; b.textContent = 'Вывести'; });
       };
     });
-  }
-  function saveWallet() {
-    const w = $('#wallet').value.trim();
-    if (!/^@?[a-z0-9_]{4,32}$/i.test(w)) return toast('Укажите @username', 'error');
-    if (DEMO) return toast('Сохранено', 'success');
-    api('/api/cr/wallet', { wallet: w }).then(d => { if (!d.ok) return toast('Неверный @username', 'error'); D.wallet = d.wallet; toast('Кошелёк сохранён', 'success'); render(); })
-      .catch(() => toast('Нет связи с сервером', 'error'));
   }
 
   document.addEventListener('click', e => {
@@ -324,7 +376,6 @@
     if ('add' in t.dataset) return addClip();
     if (t.dataset.views) return updateViews(+t.dataset.views);
     if ('withdraw' in t.dataset) return withdraw();
-    if ('wallet' in t.dataset) return saveWallet();
     if ('channel' in t.dataset) return openTg('https://t.me/' + CHANNEL);
   });
 
@@ -338,4 +389,12 @@
   if (DEMO && /[?&]days=30/.test(location.search)) days = 30;
   render();
   load();
+  // previews: ?demo=1&tab=money&open=withdraw[&amount=20]
+  if (DEMO && /[?&]open=withdraw/.test(location.search)) {
+    withdraw();
+    const a = (location.search.match(/[?&]amount=([\d.]+)/) || [])[1];
+    if (a) { $('#wAmt').value = a; $('#wAmt').dispatchEvent(new Event('input')); }
+    const mth = (location.search.match(/[?&]method=(\w+)/) || [])[1];
+    if (mth) $(`[data-m="${mth}"]`).click();
+  }
 })();

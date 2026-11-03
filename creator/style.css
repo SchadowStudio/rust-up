@@ -110,6 +110,18 @@ select.input { appearance: none; -webkit-appearance: none; }
 .split div { background: var(--block2); border-radius: 14px; padding: 10px 6px; display: flex; flex-direction: column; gap: 2px; }
 .split span { font-size: 11px; color: var(--other); }
 .split b { font-size: 15px; font-weight: 800; }
+.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.way { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px 10px; border-radius: 16px; background: var(--block2); border: 2px solid transparent; text-align: center; transition: border-color .15s, opacity .15s; }
+.way-ico { width: 30px; height: 30px; }
+.way-ico svg { width: 100%; height: 100%; display: block; }
+.way b { font-size: 13px; line-height: 1.15; }
+.way small { font-size: 11px; color: var(--other); }
+.way.off { opacity: .45; }
+.way.off small { color: var(--bad); font-weight: 700; }
+.ways.pick .way.on { border-color: var(--accent); background: #e5383b1a; box-shadow: 0 0 18px #e5383b33; }
+.wide-seg { width: 100%; }
+.wide-seg button { flex: 1; }
+.est b { color: var(--title); }
 .wrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--block2); }
 .wrow + .wrow { margin-top: 6px; }
 .wrow > div { display: flex; flex-direction: column; gap: 2px; }
