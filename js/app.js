@@ -2219,9 +2219,10 @@
     const slides = heroSlides();
     const playing = share => fmtInt(Math.max(3, online * share));
     const games = [
-      { href: '#/upgrade?game=rust', cls: 'gc-rust', title: 'Апгрейд Rust', share: 0.27, art: `<img class="gc-img" src="${akIcon('rust').img}" alt="" draggable="false">` },
-      { href: '#/upgrade?game=cs2', cls: 'gc-cs2', title: 'Апгрейд CS2', share: 0.18, art: `<img class="gc-img" src="${akIcon('cs2').img}" alt="" draggable="false">` },
-      { href: '#/upgrade?game=nft', cls: 'gc-nft', title: 'Апгрейд NFT', share: 0.12, art: `<img class="gc-img nft" src="${akIcon('nft').img}" alt="" draggable="false">` },
+      // upgrade tiles: item on a pedestal with golden chevrons (assets/games, made by tools/build-game-art.ps1)
+      { href: '#/upgrade?game=rust', cls: 'gc-rust', title: 'Апгрейд Rust', share: 0.27, art: `<img class="gc-art" src="assets/games/upgrade-rust.png" alt="" draggable="false">` },
+      { href: '#/upgrade?game=cs2', cls: 'gc-cs2', title: 'Апгрейд CS2', share: 0.18, art: `<img class="gc-art" src="assets/games/upgrade-cs2.png" alt="" draggable="false">` },
+      { href: '#/upgrade?game=nft', cls: 'gc-nft', title: 'Апгрейд NFT', share: 0.12, art: `<img class="gc-art" src="assets/games/upgrade-nft.png" alt="" draggable="false">` },
       { href: '#/cases', cls: 'gc-cases', title: 'Кейсы', share: 0.21, badge: 'FREE', art: CASES.map((c, i) => { const s = caseItems(c)[0].skin; return `<img class="gc-mini m${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`; }).join('') },
       { href: '#/rewards', cls: 'gc-bonus', title: 'Бонусы', share: 0.08, art: `<img class="gc-img gift" src="${giftImg('Подарок')}" alt="" draggable="false">` },
       { href: '#/friends', cls: 'gc-friends', title: 'Друзья', share: 0.05, badge: 'NFT', art: `<img class="gc-img gift" src="${giftImg('Мишка')}" alt="" draggable="false">` }
