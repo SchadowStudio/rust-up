@@ -1108,6 +1108,38 @@ body {
 .nav-mobile { background: #24262ce8; }
 .nav-mobile .nav-item.active { background: linear-gradient(180deg, #44474f, #2f3238); box-shadow: inset 0 1px 0 #ffffff26, 0 0 0 1px #e5383b66, 0 0 18px #e5383b40; }
 
+/* upgrade page in the v2 look */
+.game-switch { background: var(--panel-grad); border: 1px solid #ffffff14; box-shadow: var(--panel-edge); border-radius: 24px; padding: 6px; }
+.game-tab { border-radius: 18px; }
+.game-tab.active { background: var(--grad-accent); box-shadow: var(--glow-accent), var(--gloss); }
+.game-tab:not(.active):hover { background: #ffffff0d; }
+.controls-bar .btn-icon, .btn-icon { border-radius: 50%; background: linear-gradient(180deg, #2c2f36, #212329); border: 1px solid #ffffff14; box-shadow: inset 0 1px 0 #ffffff14, 0 4px 12px #0005; }
+.controls-bar .btn-icon:hover { background: linear-gradient(180deg, #363941, #282b31); }
+.btn-icon.active { background: linear-gradient(180deg, #e5383b40, #e5383b1f); border-color: #e5383b88; color: #ff8a80; }
+.wheel-wrap::before { inset: 2%; background: radial-gradient(circle, #e5383b47, transparent 68%); filter: blur(24px); }
+.wheel-svg { filter: drop-shadow(0 18px 30px #000a); }
+.wheel-sector { filter: drop-shadow(0 0 5px #e5383baa); }
+.chance-percent { font-weight: 900; letter-spacing: -.5px; }
+.item-panel { border-radius: 26px; border: 1px solid #ffffff1f; box-shadow: var(--panel-edge);
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, var(--spot) 0, transparent 75%), linear-gradient(180deg, #272a31, #1b1d22); }
+.item-panel.left { border-color: #e5383b88; box-shadow: var(--panel-edge), inset 0 0 40px #e5383b1a; }
+.balance-bar { background: var(--panel-grad); border: 1px solid #ffffff14; box-shadow: var(--panel-edge); border-radius: 22px; padding: 14px 18px; }
+.slider::-webkit-slider-runnable-track { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #ff6b5d 0, var(--accent) var(--p, 0%), #2e3138 var(--p, 0%)); box-shadow: inset 0 1px 2px #0008; }
+.slider::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -7px; background: radial-gradient(circle at 40% 35%, #fff, #e8e9ec); border: 5px solid var(--accent); box-shadow: 0 0 14px #e5383baa, 0 2px 6px #0008; }
+.upgrade-btn { border-radius: 999px; min-height: 60px; font-size: 21px; font-weight: 800; background: var(--grad-accent); box-shadow: 0 14px 36px #e5383b66, var(--gloss); }
+.upgrade-btn:disabled { background: linear-gradient(180deg, #34282a, #2a2022); color: #ffffff59; box-shadow: inset 0 1px 0 #ffffff0d; }
+.mult { border-radius: 999px; height: 46px; font-weight: 800; background: linear-gradient(180deg, #282b32, #1f2126); border: 1px solid #ffffff14; box-shadow: inset 0 1px 0 #ffffff12, 0 4px 12px #0004; }
+.mult:not(:disabled):hover { background: linear-gradient(180deg, #31343c, #262930); }
+.mult.on { background: var(--grad-accent); border-color: transparent; box-shadow: var(--glow-accent), var(--gloss); }
+.mult[data-tone]::after { left: 36%; right: 36%; bottom: 6px; height: 3px; box-shadow: 0 0 6px var(--c100); }
+.mult.on[data-tone]::after { background: #fff; box-shadow: none; }
+.inv { background: var(--panel-grad); border: 1px solid #ffffff14; box-shadow: var(--panel-edge); border-radius: 24px; }
+.inv-header, .inv-footer { border-color: #ffffff0f; }
+
+@media (max-width: 768px) {
+  .wheel-wrap { max-width: 270px; }
+  .mult { height: 42px; font-size: 14px; }
+}
 @media (max-width: 768px) {
   .hero-slide { height: 220px; }
   .hero-title { font-size: 36px; }
