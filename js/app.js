@@ -2045,20 +2045,54 @@
     </a>`;
   }
 
+  // cases page like RubUP: game switch, filter chips (search, all / free / cheap / premium, price sort), sections of the chosen game
+  const CASE_CHIPS = [['all', 'Все'], ['free', 'Бесплатные'], ['cheap', 'Недорогие'], ['premium', 'Премиум']];
+  const CHEAP_MAX = 500, PREMIUM_MIN = 1000;   // case price in coins
+  const CF = { game: null, chip: 'all', sort: 'asc', q: '', search: false };
   function casesPage() {
-    const left = casesLeft().length;
+    if (!CF.game) CF.game = GAMES.some(g => g.id === U.game) ? U.game : GAMES[0].id;
+    const left = casesLeft().length, game = GAMES.find(g => g.id === CF.game);
+    const q = CF.q.trim().toLowerCase(), match = c => !q || c.name.toLowerCase().includes(q);
+    const free = CF.chip === 'all' || CF.chip === 'free' ? CASES.filter(c => c.game === CF.game && match(c)) : [];
+    const paid = CF.chip === 'free' ? [] : PAID_CASES.filter(c => c.game === CF.game && match(c)
+      && (CF.chip !== 'cheap' || casePrice(c) <= CHEAP_MAX) && (CF.chip !== 'premium' || casePrice(c) >= PREMIUM_MIN))
+      .sort((a, b) => (casePrice(a) - casePrice(b)) * (CF.sort === 'asc' ? 1 : -1));
     $('#page').innerHTML = `<div class="page cases-page">
       <h1 class="up-title">Кейсы</h1>
       ${timerCaseCard()}
       ${S.user && left && !subsOk() ? subsBlock() : ''}
-      <div class="row-head"><h2 class="home-title">Бесплатные</h2><span class="muted">${left ? `Доступно ${left} из ${CASES.length}` : 'Все открыты'}</span></div>
-      <div class="cases-grid">${CASES.map(caseCard).join('')}</div>
-      ${S.user ? '' : `<div class="panel cases-login"><p>Войдите, чтобы забрать бесплатные кейсы</p><button class="btn btn-steam" data-login>${ICON.steam}<span>Войти</span></button></div>`}
-      ${GAMES.map(g => `<div class="row-head"><h2 class="home-title">${g.name}</h2></div>
-        <div class="cases-grid">${PAID_CASES.filter(c => c.game === g.id).map(caseCard).join('')}</div>`).join('')}
+      <div class="game-switch cases-switch">${GAMES.map(g => `<button type="button" class="game-tab${g.id === CF.game ? ' active' : ''}" data-cgame="${g.id}">
+        <span class="game-icon">${gameIcon(g.id)}</span><span class="game-text"><b>${g.name}</b><small>${g.sub}</small></span></button>`).join('')}</div>
+      <div class="case-chips">
+        <button type="button" class="chip chip-icon${CF.search ? ' on' : ''}" data-cchip="search" aria-label="Поиск">${ICON.search || '<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15.5 15.5L20 20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>'}</button>
+        <div class="chips-scroll">${CASE_CHIPS.map(([id, t]) => `<button type="button" class="chip${CF.chip === id ? ' on' : ''}" data-cchip="${id}">${t}</button>`).join('')}</div>
+        <button type="button" class="chip chip-icon" data-cchip="sort" aria-label="Сортировка по цене" title="${CF.sort === 'asc' ? 'Сначала дешёвые' : 'Сначала дорогие'}"><svg viewBox="0 0 24 24"><path d="M8 4v16M8 20l-4-4M8 20l4-4M16 20V4M16 4l-4 4M16 4l4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" ${CF.sort === 'asc' ? '' : 'transform="scale(1 -1) translate(0 -24)"'}/></svg></button>
+      </div>
+      ${CF.search ? `<input class="text-input cases-search" id="caseSearch" placeholder="Название кейса" value="${esc(CF.q)}" maxlength="30">` : ''}
+      ${free.length ? `<div class="row-head"><h2 class="home-title">Бесплатные</h2><span class="muted">${left ? `Доступно ${left} из ${CASES.length}` : 'Все открыты'}</span></div>
+        <div class="cases-grid">${free.map(caseCard).join('')}</div>` : ''}
+      ${free.length && !S.user ? `<div class="panel cases-login"><p>Войдите, чтобы забрать бесплатные кейсы</p><button class="btn btn-steam" data-login>${ICON.steam}<span>Войти</span></button></div>` : ''}
+      ${paid.length ? `<div class="row-head"><h2 class="home-title">${CF.chip === 'premium' ? 'Премиум' : CF.chip === 'cheap' ? 'Недорогие' : 'Кейсы ' + game.name}</h2><span class="muted">${paid.length}</span></div>
+        <div class="cases-grid">${paid.map(caseCard).join('')}</div>` : ''}
+      ${!free.length && !paid.length ? '<div class="panel cases-empty"><b>Ничего не найдено</b><span class="muted">Попробуйте другой фильтр или игру</span></div>' : ''}
     </div>`;
+    const s = $('#caseSearch');
+    if (s) {
+      s.addEventListener('input', () => { CF.q = s.value; const pos = s.selectionStart; casesPage(); const n = $('#caseSearch'); n.focus(); n.setSelectionRange(pos, pos); });
+    }
     autoCheckSubs();
   }
+  document.addEventListener('click', e => {
+    const g = e.target.closest('[data-cgame]');
+    if (g) { CF.game = g.dataset.cgame; haptic('light'); return casesPage(); }
+    const c = e.target.closest('[data-cchip]');
+    if (!c) return;
+    const v = c.dataset.cchip;
+    if (v === 'search') { CF.search = !CF.search; if (!CF.search) CF.q = ''; casesPage(); if (CF.search) $('#caseSearch').focus(); return; }
+    if (v === 'sort') CF.sort = CF.sort === 'asc' ? 'desc' : 'asc'; else CF.chip = v;
+    haptic('light');
+    casesPage();
+  });
 
   // ---------- case page: roulette ----------
   const ROUL_N = 56, ROUL_WIN = 46;   // strip length and the index the winner lands on
