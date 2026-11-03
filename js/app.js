@@ -358,6 +358,148 @@
     </div>`;
     renderRefPanel(); renderRoad(); refSync();
   }
+  // ---------- earnings: paid TikTok / Shorts videos (server: /api/clip + /api/clips, admins pay USDT by hand) ----------
+  // [id, title, min views for a request, USD for 1 000 / 100 000 / 1 000 000 views]; must match CLIP_CATS in bot/worker.js
+  const CLIP_CATS = [
+    ['gameplay', 'Геймплей в RUST UP', 3000, [3, 270, 2000]],
+    ['gifts', 'Подарки Telegram', 3000, [1.5, 100, 700]],
+    ['games', 'Игры (Rust, CS2)', 6000, [1, 100, 700]],
+    ['creative', 'Креатив (мемы, нарезки, тренды)', 6000, [0.15, 15, 150]]];
+  const CLIPS_CHANNEL = 'rustuptiktok';   // channel with banners and rules; empty = button hidden
+  const CLIP_MAX = 2000;      // top payout in the headline, USD
+  const usd = n => numFmt(n, n < 10 && n % 1 ? (n * 10 % 1 ? 2 : 1) : 0) + ' $';
+  // payout estimate: per-1k rate up to 100k views, then straight lines between the table points; Shorts pay half
+  function clipEstimate(cat, views, platform) {
+    const [a, b, c] = CLIP_CATS.find(x => x[0] === cat)[3];
+    let v = views <= 1e5 ? Math.min(a * views / 1000, b)
+      : views <= 1e6 ? b + (c - b) * (views - 1e5) / 9e5 : c * views / 1e6;
+    if (platform === 'shorts') v /= 2;
+    return Math.round(v * 100) / 100;
+  }
+  const TIKTOK_ICO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#000"/><path d="M27.5 10h5.3c.4 3.6 2.6 6 6.2 6.3v5.4c-2.3.1-4.4-.6-6.2-1.8v10.6c0 6.3-4.6 10.2-10 10.2-5.7 0-9.8-4.2-9.8-9.7 0-6 4.9-10.3 11.3-9.6v5.6c-3-.7-5.6 1.2-5.6 4 0 2.4 1.9 4.2 4.2 4.2 2.6 0 4.6-1.8 4.6-5.1z" fill="#25f4ee" transform="translate(-1.2 -1)"/><path d="M27.5 10h5.3c.4 3.6 2.6 6 6.2 6.3v5.4c-2.3.1-4.4-.6-6.2-1.8v10.6c0 6.3-4.6 10.2-10 10.2-5.7 0-9.8-4.2-9.8-9.7 0-6 4.9-10.3 11.3-9.6v5.6c-3-.7-5.6 1.2-5.6 4 0 2.4 1.9 4.2 4.2 4.2 2.6 0 4.6-1.8 4.6-5.1z" fill="#fe2c55" transform="translate(1.2 1)"/><path d="M27.5 10h5.3c.4 3.6 2.6 6 6.2 6.3v5.4c-2.3.1-4.4-.6-6.2-1.8v10.6c0 6.3-4.6 10.2-10 10.2-5.7 0-9.8-4.2-9.8-9.7 0-6 4.9-10.3 11.3-9.6v5.6c-3-.7-5.6 1.2-5.6 4 0 2.4 1.9 4.2 4.2 4.2 2.6 0 4.6-1.8 4.6-5.1z" fill="#fff"/></svg>';
+  const FRIEND_ICO = '<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="12" fill="#e5383b22"/><circle cx="20" cy="18" r="6" fill="#ff5a4e"/><path d="M9 36c1-6.5 5.2-10 11-10s10 3.5 11 10z" fill="#ff5a4e"/><path d="M35 17v10M30 22h10" stroke="#ffd166" stroke-width="3" stroke-linecap="round"/></svg>';
+
+  function earnPage() {
+    $('#page').innerHTML = `<div class="page earn">
+      <h2 class="section-title">Заработок</h2>
+      <a class="earn-offer earn-tiktok" href="#/earn/tiktok">
+        <span class="earn-ico">${TIKTOK_ICO}</span><b>Ролики в TikTok</b>
+        <span class="earn-amount">до <b>${usd(CLIP_MAX)}</b></span>
+      </a>
+      <h3 class="earn-sub">Как получить ещё</h3>
+      <a class="earn-offer earn-friend" href="#/friends">
+        <span class="earn-ico">${FRIEND_ICO}</span><b>Пригласить друга</b>
+        <span class="earn-amount">+<b>${coinInt(5000)}</b></span>
+      </a>
+    </div>`;
+  }
+
+  let CLIPS = null, clipsBusy = false;
+  function clipsSync() {
+    if (!refAvailable() || clipsBusy) return;
+    clipsBusy = true;
+    fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/clips', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData })
+    }).then(r => r.json()).then(d => { if (d.ok) { CLIPS = d.clips; renderClips(); } })
+      .catch(() => { /* offline */ }).finally(() => { clipsBusy = false; });
+  }
+  function renderClips() {
+    const box = $('#clipList');
+    if (!box) return;
+    if (!refAvailable()) { box.innerHTML = ''; return; }
+    if (!CLIPS || !CLIPS.length) { box.innerHTML = '<p class="muted" style="margin:0">Заявок пока нет.</p>'; return; }
+    const ST = { wait: ['На проверке', ''], paid: ['Выплачено', 'ok'], rejected: ['Отклонено', 'bad'] };
+    box.innerHTML = CLIPS.map(c => {
+      const [label, cls] = ST[c.status] || ST.wait;
+      return `<div class="clip-row">
+        <a class="clip-url" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url.replace(/^https?:\/\/(www\.)?/, ''))}</a>
+        <span class="muted">${fmtInt(c.views)} просмотров · ${new Date(c.created_at).toLocaleDateString('ru-RU')}</span>
+        <span class="clip-st ${cls}">${label}${c.status === 'paid' ? ` · ${usd(c.amount)}` : ''}${c.note ? ` · ${esc(c.note)}` : ''}</span>
+      </div>`;
+    }).join('');
+  }
+
+  function tiktokPage() {
+    const tgu = tgUser() && tgUser().username;
+    const cols = ['1 000', '100 000', '1 млн'];
+    $('#page').innerHTML = `<div class="page earn">
+      <div class="panel earn-hero">
+        <span class="earn-hero-ico">${TIKTOK_ICO}</span>
+        <h2>Ролики в TikTok и Shorts</h2>
+        <p><b>${usd(CLIP_MAX)}</b> за 1 000 000 просмотров</p>
+      </div>
+      ${CLIPS_CHANNEL ? `<a class="earn-offer earn-channel" href="https://t.me/${esc(CLIPS_CHANNEL)}" target="_blank" rel="noopener">
+        <span class="earn-ico">${TIKTOK_ICO}</span>
+        <span class="earn-channel-txt"><b>Баннеры и примеры роликов</b><small>Начните с канала: там баннеры и все правила</small></span>
+        <span class="earn-arrow">${ICON.right}</span></a>` : ''}
+      <div class="panel earn-rates">
+        <h3>Сколько платим</h3>
+        <div class="rate-cols"><span></span>${cols.map(c => `<span>${c}</span>`).join('')}</div>
+        ${CLIP_CATS.map(([, title, min, r]) => `<div class="rate-row">
+          <div class="rate-name"><b>${title}</b> · заявка от ${fmtInt(min)}</div>
+          <div class="rate-cols"><span></span>${r.map(v => `<b>${usd(v)}</b>`).join('')}</div>
+        </div>`).join('')}
+        <p class="muted">YouTube Shorts — половина ставки. Выплата в USDT на ваш аккаунт в @xRocket. Приглашайте друзей и получайте 5% от их выплат.</p>
+      </div>
+      <div class="panel earn-how">
+        <h3>Как получить выплату</h3>
+        <ol>
+          <li>Снимите ролик про RUST UP и укажите в описании <b>@${esc(window.RUSTUP_BOT || 'rustuper_bot')}</b>.</li>
+          <li>Наберите просмотры — от ${fmtInt(CLIP_CATS[0][2])} для геймплея и подарков, от ${fmtInt(CLIP_CATS[2][2])} для остального.</li>
+          <li>Отправьте ссылку на ролик ниже. Мы проверим просмотры и пришлём USDT в @xRocket, обычно в течение 1–3 дней.</li>
+        </ol>
+        <p class="muted">Накрутка просмотров, чужие ролики и повторные заявки на один ролик не оплачиваются.</p>
+      </div>
+      <div class="panel earn-form">
+        <h3>Отправить ролик</h3>
+        ${refAvailable() ? `
+        <input class="text-input" id="clipUrl" placeholder="Ссылка на ролик TikTok или Shorts" inputmode="url" maxlength="300">
+        <div class="clip-grid">
+          <select class="text-input" id="clipCat">${CLIP_CATS.map(([id, t]) => `<option value="${id}">${t}</option>`).join('')}</select>
+          <input class="text-input" id="clipViews" placeholder="Просмотров сейчас" inputmode="numeric" maxlength="11">
+        </div>
+        <input class="text-input" id="clipWallet" placeholder="@username для выплаты в @xRocket" maxlength="33" value="${tgu ? '@' + esc(tgu) : ''}">
+        <p class="clip-est muted" id="clipEst"></p>
+        <button class="btn btn-accent" id="clipSend">Отправить на проверку</button>
+        <h3 style="margin-top:8px">Мои заявки</h3>
+        <div id="clipList"><p class="muted" style="margin:0">Загрузка…</p></div>`
+        : `<p class="muted">Заявки принимаются в Telegram-боте — откройте игру через него.</p>
+        ${window.RUSTUP_BOT ? `<a class="btn btn-tg" href="https://t.me/${esc(window.RUSTUP_BOT)}" target="_blank" rel="noopener">${ICON.tg}<span>Открыть @${esc(window.RUSTUP_BOT)}</span></a>` : ''}`}
+      </div>
+    </div>`;
+    const ch = $('.earn-channel');
+    if (ch && TG && tgVer('6.1')) ch.onclick = e => { e.preventDefault(); TG.openTelegramLink(ch.href); };
+    if (!refAvailable()) return;
+    const platformOf =u => /youtu\.?be/i.test(u) ? 'shorts' : 'tiktok';
+    const views = () => Math.floor(Number(($('#clipViews').value || '').replace(/[^\d]/g, '')) || 0);
+    const est = () => {
+      const v = views(), cat = $('#clipCat').value, min = CLIP_CATS.find(x => x[0] === cat)[2];
+      $('#clipEst').textContent = !v ? '' : v < min ? `Для этой категории нужно от ${fmtInt(min)} просмотров.`
+        : `Примерная выплата: ${usd(clipEstimate(cat, v, platformOf($('#clipUrl').value)))} — точную сумму назовём после проверки.`;
+    };
+    ['#clipViews', '#clipCat', '#clipUrl'].forEach(s => $(s).addEventListener('input', est));
+    $('#clipSend').onclick = () => {
+      const url = $('#clipUrl').value.trim(), cat = $('#clipCat').value, v = views(), wallet = $('#clipWallet').value.trim();
+      if (!/^https?:\/\/([a-z0-9-]+\.)*(tiktok\.com|youtube\.com|youtu\.be)\//i.test(url)) return toast('Нужна ссылка на ролик в TikTok или YouTube Shorts', 'error');
+      if (v < CLIP_CATS.find(x => x[0] === cat)[2]) return toast('Пока мало просмотров для заявки', 'error');
+      if (!/^@?[a-z0-9_]{4,32}$/i.test(wallet)) return toast('Укажите @username для выплаты', 'error');
+      const btn = $('#clipSend');
+      btn.disabled = true; btn.textContent = 'Отправляем…';
+      fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/clip', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: TG.initData, url, category: cat, views: v, wallet })
+      }).then(r => r.json()).then(d => {
+        if (!d.ok) return toast({ dup: 'Этот ролик уже отправлен', url: 'Нужна ссылка на ролик в TikTok или YouTube Shorts', wallet: 'Укажите @username для выплаты',limit: 'У вас уже 3 заявки на проверке — дождитесь ответа', min: 'Пока мало просмотров для заявки' }[d.error] || 'Не удалось отправить заявку', 'error');
+        sfxWin(); haptic('success');
+        toast('Заявка отправлена! Бот напишет, когда проверим', 'success');
+        $('#clipUrl').value = ''; $('#clipViews').value = ''; est();
+        CLIPS = d.clips; renderClips();
+      }).catch(() => toast('Нет связи с сервером, попробуйте ещё раз', 'error'))
+        .finally(() => { btn.disabled = false; btn.textContent = 'Отправить на проверку'; });
+    };
+    renderClips(); clipsSync();
+  }
+
   function startStatsPing() {
     if (!TG || !window.RUSTUP_API) return;
     statsPing();
@@ -1460,6 +1602,7 @@
         ${avatarHtml(S.user.name, S.user.color)}
         <div><h2>${esc(S.user.name)}</h2><span class="muted">ID ${S.user.id}</span></div>
         <div class="row" style="margin-left:auto;flex-wrap:wrap">
+          <a class="btn btn-ghost" href="#/inventory">Инвентарь</a>
           <button class="btn btn-ghost" id="rename">Сменить ник</button>
           <button class="btn btn-ghost" id="reset">Сбросить демо</button>
           <button class="btn btn-accent" id="logout">Выйти</button>
@@ -2203,7 +2346,7 @@
     const game = new URLSearchParams(query || '').get('game');
     if (game && GAMES.some(g => g.id === game)) setGame(game);
     if (path === '/' && game) path = '/upgrade';
-    const navKey = path === '/upgrade' ? '/' : path.startsWith('/case/') ? '/cases' : path;
+    const navKey = path === '/upgrade' ? '/' : path.startsWith('/case/') ? '/cases' : path.startsWith('/earn') ? '/earn' : path;
     document.querySelectorAll('.nav-item[data-route]').forEach(a => a.classList.toggle('active', a.dataset.route === navKey));
     if (path !== '/upgrade') U.result = null;
     if (path !== '/') clearInterval(heroTimer);
@@ -2213,6 +2356,8 @@
       case '/upgrade': upgradePage(); break;
       case '/cases': casesPage(); break;
       case '/friends': friendsPage(); break;
+      case '/earn': earnPage(); break;
+      case '/earn/tiktok': tiktokPage(); break;
       case '/rewards': rewardsPage(); break;
       case '/inventory': inventoryPage(); break;
       case '/profile': profilePage(); break;
