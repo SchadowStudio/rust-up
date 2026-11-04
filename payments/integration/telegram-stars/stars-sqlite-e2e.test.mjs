@@ -101,7 +101,10 @@ test('Telegram-only integration: pay, unlock, replay, owner-bound purchases, ref
   assert.equal(invoice.json.creditToGame,false);
   assert.equal(telegram.calls.filter(x=>x.method==='createInvoiceLink').length,1);
   const dup=await request('checkout',{sku:'fixed_badge'});
-  assert.equal(dup.status,503);
+  assert.equal(dup.status,200);
+  assert.equal(dup.json.replayed,true);
+  assert.equal(dup.json.orderId,invoice.json.orderId);
+  assert.equal(dup.json.invoiceUrl,invoice.json.invoiceUrl);
   assert.equal(telegram.calls.filter(x=>x.method==='createInvoiceLink').length,1);
   const id=invoice.json.orderId;
   assert.match(id,/^[a-f0-9-]{36}$/);
@@ -159,6 +162,41 @@ test('precheckout denies manipulated Stars amount and missing fixed-content snap
   const missing={pre_checkout_query:{...bad.pre_checkout_query,id:'q-no-fulfillment',total_amount:30}};
   await receiveExistingBotStarsUpdate(missing,env,telegram.api);
   assert.equal(telegram.calls.at(-1).body.ok,false);
+ }finally{sql.close();}
+});
+
+
+test('Stars checkout never approves an invoice without a persisted invoice URL',async()=>{
+ const {sql,env,telegram,request}=fixture();
+ try {
+  const response=(await request('checkout',{sku:'fixed_badge'})).json;
+  const existing=sql.prepare('SELECT invoice_url FROM rustup_stars_invoice_links WHERE order_id=?').get(response.orderId);
+  assert.match(existing.invoice_url,/^https:\/\//);
+  sql.prepare('DELETE FROM rustup_stars_invoice_links WHERE order_id=?').run(response.orderId);
+  await receiveExistingBotStarsUpdate({pre_checkout_query:{
+   id:'q-missing-link',from:{id:userId},currency:'XTR',
+   total_amount:30,invoice_payload:response.orderId
+  }},env,telegram.api);
+  assert.equal(telegram.calls.at(-1).method,'answerPreCheckoutQuery');
+  assert.equal(telegram.calls.at(-1).body.ok,false);
+ }finally{sql.close();}
+});
+
+test('Stars second invoice is blocked after Telegram approved an earlier checkout',async()=>{
+ const {sql,env,telegram,request}=fixture();
+ try{
+  const invoice=(await request('checkout',{sku:'fixed_badge'})).json;
+  await receiveExistingBotStarsUpdate({pre_checkout_query:{
+   id:'q-approved',from:{id:userId},currency:'XTR',
+   total_amount:30,invoice_payload:invoice.orderId
+  }},env,telegram.api);
+  assert.equal(telegram.calls.at(-1).body.ok,true);
+  // Even if an operator has to reconcile a delayed receipt and a lock has
+  // expired, there must not be a second payable invoice for that good.
+  sql.prepare('UPDATE rustup_stars_purchase_locks SET expires_at_ms=0 WHERE order_id=?').run(invoice.orderId);
+  const second=await request('checkout',{sku:'fixed_badge'});
+  assert.equal(second.status,503);
+  assert.equal(telegram.calls.filter(x=>x.method==='createInvoiceLink').length,1);
  }finally{sql.close();}
 });
 
