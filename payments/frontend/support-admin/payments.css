@@ -1,0 +1,47 @@
+/* Additional Payments tab. Matches the original Rubik/red glass Admin Mini App. */
+.tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.tabs button{font-size:clamp(10px,2.75vw,12px);padding:0 2px;min-width:0}
+.pay-panel{padding:16px;overflow:hidden}
+.pay-head{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;margin-bottom:16px}
+.pay-head h2{font-size:21px;margin:4px 0 4px;font-weight:900;letter-spacing:-.4px}
+.pay-head p{color:var(--t2);margin:0;font-size:12px;line-height:1.4}
+.pay-eyebrow{font-size:10px;letter-spacing:1.4px;font-weight:900;color:#fc8f82}
+.pay-refresh{display:grid;place-items:center;min-width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;font-size:22px}
+.pay-prod{background:rgba(67,151,92,.13);border:1px solid rgba(96,204,129,.3);padding:12px;border-radius:15px;margin-bottom:12px}
+.pay-prod strong{color:#a1e6b2;font-size:14px;font-weight:900}
+.pay-prod p{font-size:12px;color:var(--t2);margin:5px 0 0;line-height:1.45}
+.pay-prod-warn{background:rgba(229,56,59,.16);border-color:rgba(229,56,59,.5)}
+.pay-prod-warn strong{color:#ffa79d}
+.pay-grid{display:grid;grid-template-columns:1fr;gap:9px}
+.pay-switch{padding:13px 14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.12);border-radius:16px}
+.pay-title{display:flex;align-items:center;gap:10px}
+.pay-icon{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:rgba(229,56,59,.16);color:#ffc7a0;font-size:20px}
+.pay-copy{display:flex;flex-direction:column;min-width:0;gap:3px}
+.pay-copy strong{font-size:14px;font-weight:800}
+.pay-copy small{font-size:11px;color:var(--t2);line-height:1.35}
+.pay-switch-foot{display:flex;align-items:center;justify-content:space-between;margin-top:11px}
+.pay-pill{font-size:11px;font-weight:900;border-radius:999px;padding:6px 9px;letter-spacing:.2px}
+.pay-pill.prepared{color:#a1e6b2;background:rgba(79,194,122,.14)}
+.pay-pill.stopped{color:#a6abb5;background:rgba(255,255,255,.07)}
+.pay-toggle{width:53px;height:30px;padding:3px;border-radius:50px;background:rgba(255,255,255,.17);border:1px solid rgba(255,255,255,.18);transition:background .15s;text-align:left}
+.pay-toggle.enabled{background:#339d5b}
+.pay-toggle:disabled{opacity:.5;cursor:wait}
+.pay-toggle span{display:block;height:22px;width:22px;background:#fff;border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,.3);transform:translateX(0);transition:transform .15s}
+.pay-toggle.enabled span{transform:translateX(22px)}
+.pay-effective{margin:9px 0 0;font-size:12px;color:var(--t2)}
+.pay-effective strong{color:var(--t1)}
+.pay-stop{display:block;width:100%;height:auto;min-height:48px;border-radius:13px;margin-top:16px;font-weight:900;font-size:13px;padding:10px}
+.pay-stop:disabled{opacity:.5;cursor:not-allowed}
+.pay-hint{font-size:11px;color:var(--t3);line-height:1.5;margin:7px 2px 16px}
+.pay-history{border-top:1px solid rgba(255,255,255,.1);padding-top:10px}
+.pay-history h3{margin:5px 0 8px;font-size:14px}
+.pay-history-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px}
+.pay-history-item>span:nth-child(2){flex:1;min-width:0}
+.pay-history-item small{display:block;color:var(--t3);margin-top:2px;font-size:10px}
+.pay-history-item b{font-size:11px}
+.pay-history-dot{height:8px;width:8px;border-radius:50%;background:var(--bad);flex-shrink:0}
+.pay-history-dot.on{background:var(--ok)}
+.pay-unavailable{padding:20px 4px}
+.pay-unavailable strong{font-size:15px}
+.pay-unavailable p{font-size:12px;color:var(--t2);line-height:1.5}
+@media(max-width:360px){.tabs{gap:2px;margin:8px 5px;padding:3px}.tabs button{font-size:10px}}
