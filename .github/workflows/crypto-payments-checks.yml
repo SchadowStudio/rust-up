@@ -26,4 +26,4 @@ jobs:
       - name: Run same 0-euro offline suite as Windows
         run: cd payments && npm run test:local
       - name: Run isolated Telegram Stars and crypto checkout integration tests
-        run: cd payments && node --test integration/telegram-stars/stars.test.mjs
+        run: cd payments && node --test integration/telegram-stars/*.test.mjs
