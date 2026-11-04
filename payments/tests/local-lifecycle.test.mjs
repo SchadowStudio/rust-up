@@ -16,7 +16,7 @@ const INVOICE='7022bf32-aa2e-4a83-b569-4c055db37e24';
 const ORDER='d3ab0959-951e-4650-986d-a4b30cc7d653';
 const TX='0x'+'a'.repeat(64), BLOCK='0x'+'c'.repeat(64);
 const RECEIVER='0x'+'b'.repeat(40);
-const URL='https://shop.example.com/internal/crypto/credit';
+const MERCHANT_URL='https://shop.example.com/internal/crypto/credit';
 const MASTER='T'.repeat(64);
 const NOW=Math.floor(Date.now()/1000)*1000;
 const rpcHosts=[
@@ -54,7 +54,7 @@ function providerDb(){
        if(!current||current.delivered_at_ms!=null||
           current.next_attempt_ms>args[0]||
           (args.length>1&&args[1]!==current.event_id))return {results:[]};
-       return {results:[{...current,webhook_url:URL,status:'active'}]};
+       return {results:[{...current,webhook_url:MERCHANT_URL,status:'active'}]};
       }
       throw Error('unexpected_provider_list');
      },
