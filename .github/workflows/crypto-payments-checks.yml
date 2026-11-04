@@ -30,6 +30,8 @@ jobs:
         run: cd payments && node --test integration/telegram-stars/*.test.mjs
       - name: Test isolated nonredeemable Stars and crypto game demo ledger
         run: cd payments && node --test integration/demo-game-wallet/*.test.mjs
+      - name: Demonstrate sandbox Stars and crypto flow without real payments
+        run: node payments/scripts/demo-game-wallet.mjs
       - name: Verify private bot recovery and patch scripts
         run: |
           node --check payments/scripts/recover-live-bot-source.mjs
