@@ -4,6 +4,7 @@ import {validateReceivingAddress} from '../address.js';
 import {FIATS,positiveAtomic} from './fiat.js';
 import {digestHex,newSecret,projectWebhookKey,safeEqual} from './keys.js';
 import {requireProjectId,isUuid,safeWebhookUrl} from './identity.js';
+import {readinessV2} from './readiness.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
  'content-type':'application/json','cache-control':'no-store'}});
 const fail=(code,status=400)=>json({ok:false,error:code},status);
@@ -169,7 +170,9 @@ export async function multiAdmin(request,env,url){
     db.prepare('SELECT COUNT(*) AS n FROM v2_delivery_outbox WHERE delivered_at_ms IS NULL').first()
    ]);
    return json({ok:true,projects:projects?.n||0,pending:open?.n||0,
-    deliveryBacklog:undelivered?.n||0,checkoutEnabled:env.MULTI_LIVE_ENABLED==='true'});
+    deliveryBacklog:undelivered?.n||0,
+    checkoutEnabled:readinessV2(env).ready,
+    missingPrerequisites:readinessV2(env).missing});
   }
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
