@@ -5,6 +5,7 @@ on:
     branches:
       - feature/self-hosted-crypto-payments
       - feature/rustup-payments-staging
+      - feature/rustup-payment-admin-controls
     paths:
       - 'payments/**'
       - '.github/workflows/crypto-payments-checks.yml'
