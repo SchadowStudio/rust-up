@@ -81,7 +81,7 @@ export async function operatorRoute(request,env,url) {
     WHERE resolved_at_ms IS NULL`).first();
   return respond({ok:true,orders:rows.results||[],
    awaitingGameIntegration:pending?.count||0,manualReview:review?.count||0,
-   livePayments:env.CRYPTO_PAYMENTS_ENABLED==='true'});
+   livePayments:readiness(env).ready,readiness:readiness(env)});
  }
  return fail('operator_not_found',404);
 }
