@@ -204,3 +204,11 @@ test('variable crypto fiat input goes to server-scoped project, not browser key'
   assert.deepEqual(await recordExternalVariableReceipt(
     new Request('https://test.invalid'),env),{accepted:false,disabled:true});
 });
+
+
+test('variable crypto refuses Telegram bot digital payment context',async()=>{
+ await assert.rejects(
+  ()=>createExternalVariableCryptoCheckout({}, {sourceChannel:'telegram-bot'}),
+  /telegram_digital_goods_require_stars/
+ );
+});
