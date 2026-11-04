@@ -227,3 +227,171 @@ async function loadReviews(){
  }
 }
 $('loadReviews').addEventListener('click',()=>loadReviews().catch(e=>output(e.message,true)));
+
+let activePaymentProfile=null;
+let paymentPage=null;
+function selectedProject(){
+ const id=$('projectSelect').value;
+ if(!/^[0-9a-f-]{36}$/i.test(id))throw Error('Bitte erst ein Projekt erstellen oder auswählen.');
+ return id;
+}
+const profileRoute=()=>'/v2/admin/projects/'+encodeURIComponent(selectedProject());
+function setMethodSelectors(){
+ if(!activePaymentProfile)return;
+ const fiat=activePaymentProfile.fiatMethods.find(x=>x.currency===$('profileFiat').value);
+ if(fiat){
+  $('profileFiatEnabled').value=String(fiat.enabled);
+  $('profileFiatMin').value=String(fiat.minMinor);
+  $('profileFiatMax').value=String(fiat.maxMinor);
+ }
+ const crypto=activePaymentProfile.cryptoMethods.find(x=>x.asset===$('profileCrypto').value);
+ if(crypto)$('profileCryptoEnabled').value=String(crypto.enabled);
+}
+function renderProjectPaymentProfile(config){
+ activePaymentProfile=config;
+ $('profileName').value=config.displayName;
+ $('profileInvoices').value=String(config.invoicesEnabled);
+ $('profileDeposits').value=String(config.depositsEnabled);
+ $('profileProducts').value=String(config.productsEnabled);
+ $('profileLifetime').value=String(config.invoiceLifetimeMinutes);
+ $('projectWebhook').value=config.webhookUrl;
+ setMethodSelectors();
+ const box=$('profileSummary');box.replaceChildren();
+ for(const f of config.fiatMethods){
+  row(box,f.currency+' – '+(f.enabled?'freigegeben':'gesperrt'),
+   'Minimum: '+f.minMinor+' · Maximum: '+f.maxMinor+' (jeweils Cent/Kopeken)');
+ }
+ for(const a of config.cryptoMethods)
+  row(box,a.asset+' / '+a.chain,a.enabled?'Für dieses Projekt erlaubt':'Für dieses Projekt gesperrt');
+}
+async function loadProfile(){
+ const p=await call(profileRoute()+'/payment-config');
+ renderProjectPaymentProfile(p.config);
+ output('Projekt-Zahlungsregeln geladen. Andere Projekte bleiben unverändert.');
+}
+$('loadProfile').addEventListener('click',()=>loadProfile().catch(e=>output(e.message,true)));
+$('profileFiat').addEventListener('change',setMethodSelectors);
+$('profileCrypto').addEventListener('change',setMethodSelectors);
+$('projectSelect').addEventListener('change',()=>{
+ activePaymentProfile=null;paymentPage=null;
+ $('profileSummary').replaceChildren();
+ $('projectSummary').replaceChildren();
+ $('projectKeys').replaceChildren();
+ $('projectPayments').replaceChildren();
+ $('projectWebhook').value='';
+ $('olderProjectPayments').disabled=true;
+});
+$('saveProfile').addEventListener('click',async()=>{
+ try{
+  const displayName=$('profileName').value.trim(),
+   invoiceLifetimeMinutes=Number($('profileLifetime').value);
+  if(!requireConfirm('Zahlungsintegration für dieses Projekt ändern?'))return;
+  const result=await call(profileRoute()+'/payment-config','POST',{
+   displayName,
+   invoicesEnabled:$('profileInvoices').value==='true',
+   depositsEnabled:$('profileDeposits').value==='true',
+   productsEnabled:$('profileProducts').value==='true',
+   invoiceLifetimeMinutes,confirmation:'CONFIRM_PROJECT_PAYMENT_SETTINGS'
+  });
+  renderProjectPaymentProfile(result.config);
+  output('Zahlungsintegration gespeichert. Die Auswahl gilt nur für dieses Projekt.');
+ }catch(e){output(e.message,true)}
+});
+$('saveProfileFiat').addEventListener('click',async()=>{
+ try{
+  if(!requireConfirm('Fiat-Währung für dieses Projekt ändern?'))return;
+  const result=await call(profileRoute()+'/fiat-method','POST',{
+   currency:$('profileFiat').value,
+   enabled:$('profileFiatEnabled').value==='true',
+   minMinor:Number($('profileFiatMin').value),
+   maxMinor:Number($('profileFiatMax').value),
+   confirmation:'CONFIRM_PROJECT_PAYMENT_SETTINGS'
+  });
+  renderProjectPaymentProfile(result.config);
+  output('Fiat-Zahlungsregeln für dieses Projekt gespeichert.');
+ }catch(e){output(e.message,true)}
+});
+$('saveProfileCrypto').addEventListener('click',async()=>{
+ try{
+  if(!requireConfirm('Kryptowährung für dieses Projekt ändern?'))return;
+  const result=await call(profileRoute()+'/crypto-method','POST',{
+   asset:$('profileCrypto').value,
+   enabled:$('profileCryptoEnabled').value==='true',
+   confirmation:'CONFIRM_PROJECT_PAYMENT_SETTINGS'
+  });
+  renderProjectPaymentProfile(result.config);
+  output('Kryptowährung für dieses Projekt gespeichert.');
+ }catch(e){output(e.message,true)}
+});
+$('loadProjectSummary').addEventListener('click',async()=>{
+ try{
+  const data=await call(profileRoute()+'/summary');
+  const target=$('projectSummary');target.replaceChildren();
+  row(target,'Projektübersicht','Ausstehende Webhook-Benachrichtigungen: '+data.undeliveredEvents);
+  for(const item of data.invoiceCounts)
+   row(target,item.fiat+' / '+item.status,'Rechnungen: '+item.invoice_count);
+  output('Zahlungsstatistik für gewähltes Projekt geladen.');
+ }catch(e){output(e.message,true)}
+});
+$('loadProjectKeys').addEventListener('click',async()=>{
+ try{
+  const data=await call(profileRoute()+'/keys');
+  const target=$('projectKeys');target.replaceChildren();
+  for(const key of data.keys){
+   const buttons=[];
+   if(key.status==='active')buttons.push(action('Zugangsschlüssel sperren',async()=>{
+    if(!requireConfirm('API-Schlüssel '+key.id+' dauerhaft sperren? Andere Projekte bleiben unverändert.'))return;
+    await call('/v2/admin/keys/revoke','POST',{
+     projectId:selectedProject(),keyId:key.id,
+     confirmation:'CONFIRM_KEY_REVOCATION'});
+    $('loadProjectKeys').click();
+   }));
+   row(target,'API-Key '+key.id,
+    key.status+' · erstellt '+new Date(key.created_at_ms).toLocaleString(),
+    buttons);
+  }
+  if(!data.keys.length)row(target,'Keine Zugangsschlüssel','Projekt noch nicht eingerichtet.');
+  output('Projekt-Zugangsschlüssel geladen; geheime Werte werden nicht angezeigt.');
+ }catch(e){output(e.message,true)}
+});
+$('saveProjectWebhook').addEventListener('click',async()=>{
+ try{
+  const webhookUrl=$('projectWebhook').value.trim();
+  if(!requireConfirm('Webhook-Adresse für dieses Projekt ändern?'))return;
+  await call('/v2/admin/projects/webhook','POST',{
+   projectId:selectedProject(),webhookUrl,
+   confirmation:'CONFIRM_WEBHOOK_UPDATE'});
+  output('Projekt-Webhook aktualisiert.');
+ }catch(e){output(e.message,true)}
+});
+async function loadProjectPayments(older=false){
+ const pid=selectedProject(),filter=$('paymentFilter').value;
+ if(!older||!paymentPage||paymentPage.pid!==pid||paymentPage.filter!==filter)
+  paymentPage={pid,filter,before:null,beforeId:null};
+ const url=new URLSearchParams({status:filter,limit:'50'});
+ if(older&&paymentPage.before!=null){
+  url.set('before',String(paymentPage.before));
+  url.set('beforeId',paymentPage.beforeId);
+ }
+ const result=await call(profileRoute()+'/payments?'+url.toString());
+ const holder=$('projectPayments');
+ if(!older)holder.replaceChildren();
+ for(const payment of result.payments){
+  const amount=(Math.floor(payment.amountMinor/100)).toLocaleString('de-DE')+
+   ','+String(payment.amountMinor%100).padStart(2,'0');
+  row(holder,payment.invoiceId+' · '+payment.status,
+   amount+' '+payment.fiat+' · '+payment.asset+' ('+payment.chain+')'+
+   ' · Transaktion: '+(payment.transactionHash||'noch nicht bestätigt')+
+   ' · Projekt-Webhook: '+(payment.webhookDelivered?'zugestellt':'ausstehend'));
+ }
+ paymentPage.before=result.nextBefore;
+ paymentPage.beforeId=result.nextBeforeId;
+ $('olderProjectPayments').disabled=result.payments.length<50||!result.nextBeforeId;
+ if(!result.payments.length&&!older)
+  row(holder,'Keine Rechnungen','Für diese Auswahl sind keine Zahlungen vorhanden.');
+ output('Zahlungsübersicht nur für dieses Projekt geladen.');
+}
+$('loadProjectPayments').addEventListener('click',
+ ()=>loadProjectPayments(false).catch(e=>output(e.message,true)));
+$('olderProjectPayments').addEventListener('click',
+ ()=>loadProjectPayments(true).catch(e=>output(e.message,true)));
