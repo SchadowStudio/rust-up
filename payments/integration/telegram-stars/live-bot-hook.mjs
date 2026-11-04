@@ -7,7 +7,7 @@ export async function handleExistingBotPaymentCommands(update, env, {
   isAdmin, telegramApi
 } = {}) {
   if (typeof update?.message?.text !== 'string') return false;
-  if (!/^\/payments?(?:@[A-Za-z0-9_]{5,32})?(?:\s|$)/i.test(update.message.text.trim()))
+  if (!/^\/(?:pay|payments)(?:@[A-Za-z0-9_]{5,32})?(?:\s|$)/i.test(update.message.text.trim()))
     return false;
   if (typeof isAdmin !== 'function' || typeof telegramApi !== 'function')
     throw Error('existing_bot_dependencies_missing');
