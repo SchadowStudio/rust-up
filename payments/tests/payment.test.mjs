@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {webcrypto} from 'node:crypto';
 import {ASSETS,decimalToAtomic,formatAtomic,txId,evm,tronHex,ERC20_TRANSFER_TOPIC} from '../src/assets.js';
 import {verifiedTelegramId} from '../src/auth.js';
 import {verifyChainPayment} from '../src/chains.js';
-globalThis.crypto=webcrypto;
 test('five distinct crypto networks and assets',()=>{
  assert.equal(Object.keys(ASSETS).length,5);
  assert.equal(ASSETS.USDT_ERC20.chain,'ethereum');
