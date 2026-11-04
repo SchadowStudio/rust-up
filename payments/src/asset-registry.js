@@ -6,7 +6,8 @@ const entries=[
  ['ETH','ethereum',18,12,'native','ETH','evm-native'],
  ['TRX','tron',6,1,'native','TRX','tron-native'],
  ['USDT_ERC20','ethereum',6,12,'erc20','USDT','evm-erc20'],
- ['USDT_TRC20','tron',6,1,'trc20','USDT','tron-trc20']
+ ['USDT_TRC20','tron',6,1,'trc20','USDT','tron-trc20'],
+ ['TON','ton',9,1,'native','TON','ton-native']
 ];
 export const ASSET_CATALOG=Object.freeze(Object.fromEntries(entries.map(
  ([asset,chain,decimals,confirmations,standard,marketSymbol,adapter])=>
@@ -18,7 +19,8 @@ export const ASSETS=Object.freeze(Object.fromEntries(Object.entries(ASSET_CATALO
 export const RECEIVER_NETWORKS=Object.freeze({
  bitcoin:Object.freeze({name:'Bitcoin Mainnet',assets:Object.freeze(['BTC']),connection:'public-address',derivation:'watch-only-addresses'}),
  ethereum:Object.freeze({name:'Ethereum Mainnet',assets:Object.freeze(['ETH','USDT_ERC20']),connection:'eip6963',derivation:'public-addresses'}),
- tron:Object.freeze({name:'TRON Mainnet',assets:Object.freeze(['TRX','USDT_TRC20']),connection:'public-address',derivation:'public-addresses'})
+ tron:Object.freeze({name:'TRON Mainnet',assets:Object.freeze(['TRX','USDT_TRC20']),connection:'public-address',derivation:'public-addresses'}),
+ ton:Object.freeze({name:'The Open Network Mainnet',assets:Object.freeze(['TON']),connection:'public-address',derivation:'watch-only-addresses'})
 });
 export function walletSetupPlan(){
  return Object.entries(RECEIVER_NETWORKS).map(([chain,item])=>({
@@ -31,7 +33,7 @@ export function walletSetupPlan(){
 // New symbols cannot piggyback on USDT Transfer-event logic.
 const CERTIFIED_ADAPTERS=Object.freeze({
  BTC:'bitcoin-core',ETH:'evm-native',TRX:'tron-native',
- USDT_ERC20:'evm-erc20',USDT_TRC20:'tron-trc20'
+ USDT_ERC20:'evm-erc20',USDT_TRC20:'tron-trc20',TON:'ton-native'
 });
 export const PINNED_MAINNET_CONTRACTS=Object.freeze({
  USDT_ERC20:Object.freeze({

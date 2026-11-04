@@ -142,6 +142,8 @@ export async function paymentProfileAdmin(request,env,url){
   const enabled=toFlag(b.enabled);
   if(!SUPPORTED_ASSETS.includes(b.asset)||enabled===null)
    return fail('invalid_project_asset');
+  if(b.asset==='TON'&&enabled===1&&env.MULTI_TON_ENABLED!=='true')
+   return fail('ton_not_configured',403);
   const updated=await db.prepare(`UPDATE v2_project_crypto_methods
     SET enabled=? WHERE project_id=? AND asset=?`)
     .bind(enabled,projectId,b.asset).run();

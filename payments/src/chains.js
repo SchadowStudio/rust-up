@@ -1,5 +1,6 @@
 import {ASSETS, ERC20_TRANSFER_TOPIC, evm, hexBig, tronHex, txId} from './assets.js';
 import {requireCertifiedPaymentAsset} from './asset-registry.js';
+import {verifyTonPayment} from './ton-chain.js';
 
 function rpcUrl(u) {
  if(typeof u!=='string'||(!/^https:\/\//i.test(u)&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(u)))
@@ -175,6 +176,8 @@ export async function verifyChainPayment(order,submittedHash,env) {
   ?await ethVerify(order,hash,env)
   :conf.chain==='bitcoin'
    ?await btcVerify(order,hash,env)
-   :await tronVerify(order,hash,env);
+   :conf.chain==='ton'
+    ?await verifyTonPayment(order,hash,env)
+    :await tronVerify(order,hash,env);
  return {...result,txHash:hash};
 }

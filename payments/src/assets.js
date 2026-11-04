@@ -1,5 +1,6 @@
 // All supported assets and their networks are centrally reviewed in one manifest.
 import {ASSETS} from './asset-registry.js';
+import {tonHashHex} from './ton.js';
 export {ASSETS};
 export const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 export function decimalToAtomic(amount, decimals) {
@@ -18,7 +19,7 @@ export function formatAtomic(atomic,decimals) {
 }
 export function txId(asset,hash) {
  if(!ASSETS[asset]) throw new Error('unsupported_asset');
- const h=String(hash||'').trim().toLowerCase();
+ const h=ASSETS[asset].chain==='ton'?tonHashHex(hash):String(hash||'').trim().toLowerCase();
  const re=ASSETS[asset].chain==='ethereum'?/^0x[a-f0-9]{64}$/:/^[a-f0-9]{64}$/;
  if(!re.test(h)) throw new Error('invalid_transaction_id');
  return h;
@@ -27,6 +28,7 @@ export function validAddress(chain,addr) {
  if(typeof addr!=='string') return false;
  if(chain==='ethereum') return /^0x[a-f0-9]{40}$/i.test(addr);
  if(chain==='tron') return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
+ if(chain==='ton')return /^[EU][Qf][a-zA-Z0-9_-]{46}$/.test(addr);
  if(chain==='bitcoin') return /^(bc1[ac-hj-np-z02-9]{11,71}|[13][1-9A-HJ-NP-Za-km-z]{25,34})$/i.test(addr);
  return false;
 }

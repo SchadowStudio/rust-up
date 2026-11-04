@@ -8,7 +8,8 @@ import {ASSETS} from '../assets.js';
 const GROUPS={
  bitcoin:{url:'BITCOIN_RPC_URL',auth:'BITCOIN_RPC_BASIC_B64'},
  ethereum:{url:'ETHEREUM_RPC_URL'},
- tron:{url:'TRON_RPC_URL',auth:'TRON_RPC_API_KEY'}
+ tron:{url:'TRON_RPC_URL',auth:'TRON_RPC_API_KEY'},
+ ton:{url:'TON_INDEXER_URL',auth:'TON_INDEXER_API_KEY'}
 };
 export function validateIndependentRpcs(env,chain){
  const spec=GROUPS[chain];

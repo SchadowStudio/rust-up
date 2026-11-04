@@ -13,6 +13,8 @@ export function readinessV2(env){
   ethereumQuorum:hasRpcQuorum(env,'ethereum'),
   bitcoinQuorum:hasRpcQuorum(env,'bitcoin'),
   tronQuorum:hasRpcQuorum(env,'tron'),
+  tonQuorum:env.MULTI_TON_ENABLED!=='true'||hasRpcQuorum(env,'ton'),
+  tonIndexer:env.MULTI_TON_ENABLED!=='true'||/^https:\/\//i.test(String(env.TON_INDEXER_URL||'')),
   operatorKey:typeof env.MULTI_ADMIN_KEY==='string'&&env.MULTI_ADMIN_KEY.length>=48,
   operatorApproval:env.MULTI_OPERATOR_APPROVED==='true',
   acceptingDeposits:env.MULTI_LIVE_ENABLED==='true',

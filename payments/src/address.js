@@ -1,6 +1,7 @@
 // Strict Bitcoin mainnet and TRON receiving-address validation.
 // All checks happen without private keys.
 import {evm,tronHex} from './assets.js';
+import {tonCanonicalAddress} from './ton.js';
 const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const BECH32='qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 async function checkBase58(address,version,expectedLength){
@@ -56,6 +57,7 @@ export async function validateReceivingAddress(chain,address){
  if(typeof address!=='string'||address.length>128)return false;
  if(chain==='ethereum'){try{evm(address);return true}catch{return false}}
  if(chain==='tron'){try{await tronHex(address);return true}catch{return false}}
+ if(chain==='ton'){try{tonCanonicalAddress(address);return true}catch{return false}}
  if(chain==='bitcoin'){
   if(/^bc1/i.test(address))return bech32Validate(address);
   if(/^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(address))

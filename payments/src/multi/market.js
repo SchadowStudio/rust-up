@@ -2,7 +2,7 @@
 // NO real money charged if a provider is stale, unavailable or inconsistent.
 import {ASSETS} from '../assets.js';
 import {FIATS} from './fiat.js';
-const COINS=[['BTC','bitcoin'],['ETH','ethereum'],['TRX','tron'],['USDT','tether']];
+const COINS=[['BTC','bitcoin'],['ETH','ethereum'],['TRX','tron'],['TON','the-open-network'],['USDT','tether']];
 const scale=100000000n;
 export function priceE8(raw){
  const s=String(raw);
@@ -43,9 +43,9 @@ export async function loadConsensus(env,now=Date.now()){
  if(!env.COINGECKO_DEMO_KEY||!env.CRYPTOCOMPARE_API_KEY)
   throw Error('two_market_feeds_not_configured');
  const [gecko,compare]=await Promise.all([
-  fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tron,tether&vs_currencies=rub,eur,usd&include_last_updated_at=true',
+  fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tron,the-open-network,tether&vs_currencies=rub,eur,usd&include_last_updated_at=true',
    {'x-cg-demo-api-key':env.COINGECKO_DEMO_KEY}),
-  fetchJson('https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH,TRX,USDT&tsyms=RUB,EUR,USD',
+  fetchJson('https://min-api.cryptocompare.com/data/pricemulti?fsyms=BTC,ETH,TRX,TON,USDT&tsyms=RUB,EUR,USD',
    {'authorization':'Apikey '+env.CRYPTOCOMPARE_API_KEY})
  ]);
  const rows=[],errors=[];

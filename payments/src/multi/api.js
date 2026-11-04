@@ -52,6 +52,7 @@ async function createInvoice(db,project,b,req,env,{deposit=false}={},now=Date.no
  const orderRef=requireOrderRef(b.projectOrderRef),key=requireIdempotency(req.headers.get('idempotency-key'));
  if(!ASSETS[b.asset]||(!deposit&&!cleanSku(b.sku)))
   return fail('invalid_product_or_asset');
+ if(b.asset==='TON'&&env.MULTI_TON_ENABLED!=='true')return fail('ton_not_configured',503);
  // Only the project backend (authenticated by its API key) may set a deposit's
  // fiat amount; the checkout browser never has access to project API credentials.
  const minMinor=Number(env.MULTI_DEPOSIT_MIN_MINOR||100);
@@ -219,7 +220,8 @@ async function projectRoute(req,env,url){
    fiatCurrencies:profile.fiatMethods.filter(x=>x.enabled).map(x=>({
     currency:x.currency,minMinor:x.minMinor,maxMinor:x.maxMinor
    })),
-   supportedAssets:profile.cryptoMethods.filter(x=>x.enabled).map(x=>({
+   supportedAssets:profile.cryptoMethods.filter(x=>x.enabled&&
+    (x.asset!=='TON'||env.MULTI_TON_ENABLED==='true')).map(x=>({
     asset:x.asset,chain:x.chain,
     decimals:ASSETS[x.asset].decimals,
     minConfirmations:ASSETS[x.asset].confirmations

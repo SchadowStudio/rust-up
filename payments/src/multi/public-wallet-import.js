@@ -2,13 +2,14 @@
 // signing API, wallet hot-key generation, or automatic spend permission.
 import {validateReceivingAddress} from '../address.js';
 import {RECEIVER_NETWORKS} from '../asset-registry.js';
+import {tonCanonicalAddress} from '../ton.js';
 const chainSet=new Set(Object.keys(RECEIVER_NETWORKS));
 const own=(obj,k)=>Object.prototype.hasOwnProperty.call(obj,k);
 const allowedTop=new Set(['walletLabel','addresses']);
 const allowedItem=new Set(['chain','address']);
 export function canonicalPublicAddress(chain,address){
  if(!chainSet.has(chain)||typeof address!=='string')throw Error('invalid_public_receiver');
- return chain==='ethereum'?address.toLowerCase():address;
+ return chain==='ethereum'?address.toLowerCase():chain==='ton'?tonCanonicalAddress(address):address;
 }
 export async function validatePublicWalletImport(input){
  if(!input||typeof input!=='object'||Array.isArray(input)||
