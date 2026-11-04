@@ -189,7 +189,9 @@ async function listEvents(db,projectId,url){
   nextAfterEventId:last?.eventId??afterEventId});
 }
 async function projectRoute(req,env,url){
- if(!checkoutReady(env))return fail('checkout_disabled',503);
+ // Emergency stop disables NEW invoices, never access to existing receipts,
+ // retryable callbacks or incident-recovery history.
+ if(!env.DB)return fail('database_unavailable',503);
  let project;
  try{project=await authenticateProject(env.DB,req)}
  catch{return fail('unauthorized_project',401);}
@@ -199,6 +201,7 @@ async function projectRoute(req,env,url){
   const profile=await getProjectPaymentConfig(env.DB,project.id);
   if(!profile||!profile.invoicesEnabled)return fail('project_payment_integration_disabled',403);
   return json({ok:true,projectId:project.id,displayName:profile.displayName,
+   acceptingNewInvoices:checkoutReady(env),
    depositsEnabled:profile.depositsEnabled,
    productsEnabled:profile.productsEnabled,
    fiatCurrencies:profile.fiatMethods.filter(x=>x.enabled).map(x=>({
@@ -211,10 +214,14 @@ async function projectRoute(req,env,url){
    })),
    note:'Fiat is invoice value; funds are received in cryptocurrency. No game credit here.'});
  }
- if(url.pathname==='/v2/invoices'&&req.method==='POST')
+ if(url.pathname==='/v2/invoices'&&req.method==='POST'){
+  if(!checkoutReady(env))return fail('checkout_disabled',503);
   return createInvoice(env.DB,project,await body(req),req,env);
- if(url.pathname==='/v2/deposits'&&req.method==='POST')
+ }
+ if(url.pathname==='/v2/deposits'&&req.method==='POST'){
+  if(!checkoutReady(env))return fail('checkout_disabled',503);
   return createInvoice(env.DB,project,await body(req),req,env,{deposit:true});
+ }
  if(url.pathname==='/v2/events'&&req.method==='GET')
   return listEvents(env.DB,project.id,url);
  const found=/^\/v2\/invoices\/([a-zA-Z0-9-]+)(\/verify)?$/.exec(url.pathname);
