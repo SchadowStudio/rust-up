@@ -1,0 +1,64 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>RUST UP · Trust Wallet Verwaltung</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+*{box-sizing:border-box}body{background:#101113;color:#f6f5f1;margin:0}
+main{max-width:890px;margin:35px auto;padding:22px}
+h1{margin:0 0 8px;font-size:clamp(24px,5vw,38px)}
+a{color:#ffba42}p,small{color:#b5b6b9;line-height:1.5}
+.warning{border-left:4px solid #f5aa25;padding:14px;background:#282219}
+.panel{background:#1b1d20;border:1px solid #313338;border-radius:14px;padding:20px;margin:18px 0}
+label{display:block;margin:12px 0 6px;font-weight:600}
+input,select{width:100%;background:#111315;border:1px solid #45494d;border-radius:9px;color:#fff;padding:11px;font:inherit}
+button{cursor:pointer;border:0;border-radius:9px;background:#ffb42c;color:#1f1710;padding:11px 17px;font-weight:800;margin:12px 7px 0 0}
+button.secondary{background:#3b3e42;color:#fff}
+button:disabled{opacity:.6;cursor:not-allowed}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+#message{white-space:pre-wrap;word-break:break-word;font-size:14px}
+.address{border:1px solid #34363a;border-radius:9px;padding:12px;margin:10px 0;overflow-wrap:anywhere}
+.good{color:#a0e4aa}.muted{color:#aaa}.bad{color:#ffa692}
+@media(max-width:650px){.row{grid-template-columns:1fr}main{padding:15px;margin:10px auto}}
+</style></head><body><main>
+<h1>RUST <span style="color:#ffb42c">UP</span> · Trust Wallet</h1>
+<p>Eigene Empfangsadressen verwalten. Keine Seed-Phrase, keine Private Keys und keine Auszahlungserlaubnis erforderlich.</p>
+<p class="warning"><b>Entwicklungsmodus.</b> Diese Verwaltung gehört zu einem separaten Krypto-Service.
+Nicht in der Telegram Mini App verwenden. Die Annahme echter Zahlungen bleibt zunächst deaktiviert.</p>
+<section class="panel">
+<h2>1. Betreiber-Zugang</h2>
+<label for="endpoint">Eigene Cloudflare-Worker-URL</label>
+<input id="endpoint" type="url" placeholder="https://mein-worker.example.workers.dev" autocomplete="off">
+<label for="token">Operator-Schlüssel (Cloudflare Secret)</label>
+<input id="token" type="password" placeholder="Nicht speichern oder weitergeben" autocomplete="off">
+<button id="list" class="secondary" type="button">Verbindung prüfen / Adressen laden</button>
+</section>
+<section class="panel">
+<h2>2. Empfangs-Wallet</h2>
+<p>Trust Wallet wird nur zum Abrufen deiner öffentlichen Empfangsadresse verbunden.</p>
+<button id="connect" type="button">Trust Wallet verbinden (ETH / ERC-20)</button>
+<p><small>Für BTC und TRON bitte die jeweilige Empfangsadresse aus deinem Trust Wallet kopieren. 
+Eine automatische Verbindung für diese beiden Netzwerke ist hier noch nicht vorhanden.</small></p>
+<div class="row">
+<div><label for="chain">Netzwerk</label><select id="chain">
+<option value="ethereum">Ethereum – ETH / USDT ERC-20</option>
+<option value="tron">TRON – TRX / USDT TRC-20</option>
+<option value="bitcoin">Bitcoin – BTC</option></select></div>
+<div><label for="label">Bezeichnung (optional)</label>
+<input id="label" maxlength="40" placeholder="Trust Wallet Konto 1" autocomplete="off"></div></div>
+<label for="address">Öffentliche Empfangsadresse</label>
+<input id="address" spellcheck="false" autocomplete="off" placeholder="Hier öffentliche Adresse einfügen">
+<button id="add" type="button">Adresse deaktiviert hinzufügen</button>
+<p><small>Jede Adresse wird nur einer Bestellung zugewiesen. Für mehrere gleichzeitige Zahlungen
+benötigst du mehrere tatsächlich kontrollierte Empfangsadressen.</small></p>
+</section>
+<section class="panel">
+<h2>3. Adressen und Freigabe</h2>
+<p>Aktiviere nur unbenutzte, kontrollierte Adressen. Importiere BTC-Adressen zuvor watch-only in Bitcoin Core.</p>
+<div id="receivers"><p>Noch keine Serverabfrage.</p></div>
+</section>
+<section class="panel">
+<h2>Systemstatus</h2><div id="message" role="status" aria-live="polite">Noch nicht verbunden.</div>
+</section>
+<footer><small>Private Schlüssel und Recovery Phrases niemals in dieses Formular eintragen.</small></footer>
+</main><script type="module" src="./app.js"></script></body></html>
