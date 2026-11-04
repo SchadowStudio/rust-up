@@ -1,0 +1,22 @@
+/* Embedded in existing RUST UP Telegram Mini App only. */
+.rustup-stars-page{max-width:900px;margin:0 auto}
+.rustup-stars-note{font-size:12px;line-height:1.5;color:var(--text-subtitle);margin:8px 0 14px}
+.rustup-stars-status{padding:13px 15px;border:1px solid #ffffff24;background:#22242b;border-radius:14px;font-size:13px}
+.rustup-stars-tabs{display:flex;gap:8px;margin:18px 0}
+.rustup-stars-tab{padding:12px;border-radius:12px;flex:1;background:var(--bg-secondary);color:var(--text-subtitle);font-weight:800;font-size:12px}
+.rustup-stars-tab.on{background:var(--accent);color:white}
+.rustup-stars-content{display:grid;gap:12px}
+.rustup-stars-product{padding:16px;border-radius:19px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;border:1px solid #ffffff24;background:linear-gradient(155deg,#ffffff18,#ffffff09)}
+.rustup-stars-product strong{font-size:14px}
+.rustup-stars-action{display:flex;flex-direction:column;gap:7px;text-align:center}
+.rustup-stars-action b{color:#ffcf9b}
+.rustup-stars-buy{font-weight:800;border-radius:11px;padding:11px 14px;background:var(--accent);color:white}
+.rustup-stars-buy:disabled{opacity:.4}
+.rustup-stars-empty{font-size:13px;color:var(--text-subtitle);padding:20px;border-radius:15px;border:1px dashed #ffffff26}
+.rustup-stars-owned{display:flex;flex-direction:column;align-items:stretch}
+.rustup-stars-owned small{color:var(--text-subtitle)}
+.rustup-stars-delivery{font:inherit;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0;padding:12px;border-radius:12px;border:1px solid #ffffff20;background:#0003}
+.rustup-stars-help{margin:20px 0;color:var(--text-subtitle);font-size:12px}
+.rustup-stars-help a{color:#ffaaa5;text-decoration:underline}
+@media(max-width:440px){.rustup-stars-product{grid-template-columns:1fr}.rustup-stars-action{flex-direction:row;align-items:center;justify-content:space-between}}
+@media(max-width:390px){.nav-mobile:has([data-route="/stars"]) .nav-item{font-size:11px}}
