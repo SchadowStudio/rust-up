@@ -24,5 +24,7 @@ jobs:
           node-version: '22'
       - name: Validate payment JavaScript
         run: cd payments && npm run validate
+      - name: Build isolated Trust Wallet operator console
+        run: cd payments && npm run build:operator
       - name: Test D1 SQLite uniqueness constraints
         run: python3 -m unittest discover -s payments/tests -p 'schema_test.py' -v
