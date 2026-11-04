@@ -1,0 +1,14 @@
+/* Read-only Stars panel reuses the existing RUST UP red-glass wallet design. */
+.rustup-stars-readonly{gap:12px}
+.rustup-stars-tabs{display:flex;gap:8px}
+.rustup-stars-tab{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);color:#dfd4d4;font-weight:750;cursor:pointer}
+.rustup-stars-tab.on{background:linear-gradient(180deg,#f24749,#c32935);color:#fff;border-color:#ff7a7d}
+.rustup-stars-status{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px;margin:0;background:rgba(10,8,14,.25)}
+.rustup-stars-results{display:grid;gap:10px}
+.rustup-stars-item{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(10,8,14,.22);overflow-wrap:anywhere}
+.rustup-stars-item strong{font-size:14px}
+.rustup-stars-item p{margin:8px 0 0}
+.rustup-stars-delivery{padding:10px;border-radius:10px;background:rgba(0,0,0,.3);white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+.rustup-stars-retry{padding:10px 16px;background:#c32935;color:white;border:0;border-radius:10px;font-weight:750;cursor:pointer}
+.rustup-stars-retry[hidden]{display:none}
+.rustup-stars-help{color:#ffb4b4;text-decoration:underline;font-size:12px}
