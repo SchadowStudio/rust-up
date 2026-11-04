@@ -30,7 +30,10 @@ export async function settleV2(db,invoice,proof,now=Date.now()){
   invoiceId:invoice.id,projectOrderRef:invoice.project_order_ref,
   amountMinor:invoice.amount_minor,currency:invoice.fiat,
   asset:invoice.asset,chain:invoice.chain,amountAtomic:proof.actualAtomic,
-  transactionHash:proof.txHash,confirmedAt:now
+  transactionHash:proof.txHash,confirmedAt:now,
+  ...(Array.isArray(proof.paymentParts)?{
+   transactionHashes:proof.paymentParts,paymentMode:'combined_chain_transfers'
+  }:{})
  });
  try {
   const [updated]=await db.batch([
