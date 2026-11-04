@@ -13,7 +13,7 @@ import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
 import {readinessV2} from './readiness.js';
 import {consumeManualVerifyQuota,auditVerifiedInvoices} from './reconciliation.js';
-import {processPaymentPart,storedParts} from './multi-transfer.js';
+import {processPaymentPart,storedParts,reconcileDuePaymentParts} from './multi-transfer.js';
 import {getProjectMethodPolicy,getProjectPaymentConfig} from './project-config.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
@@ -294,11 +294,12 @@ export default {
    Promise.resolve().then(()=>expireV2(env.DB)),
    Promise.resolve().then(()=>deliverV2(env)),
    Promise.resolve().then(()=>scanMultiPayments(env)),
-   Promise.resolve().then(()=>auditVerifiedInvoices(env))
+   Promise.resolve().then(()=>auditVerifiedInvoices(env)),
+   Promise.resolve().then(()=>reconcileDuePaymentParts(env))
   ];
   ctx.waitUntil(Promise.allSettled(work).then(results=>{
    for(let i=0;i<results.length;i++){
-    const x=results[i],task=['expiry','webhook_delivery','chain_scan','post_settlement_audit'][i];
+    const x=results[i],task=['expiry','webhook_delivery','chain_scan','post_settlement_audit','partial_reconciliation'][i];
     if(x.status==='rejected'){
      console.error('payment cron task failed',task,
       String(x.reason?.message||'unknown').slice(0,120));
@@ -312,6 +313,8 @@ export default {
      console.error('payment webhook delivery failures: '+report.failed);
     if(task==='post_settlement_audit'&&report?.manualReview>0)
      console.error('reconciliation payment incidents requiring manual review: '+report.manualReview);
+    if(task==='partial_reconciliation'&&report?.failed>0)
+     console.error('multi-transfer reconciliation retries needed: '+report.failed);
    }
   }));
  },
