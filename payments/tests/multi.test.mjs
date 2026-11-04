@@ -25,7 +25,7 @@ test('all three fiat currencies use exactly 100 minor units',()=>{
 test('fractions always round up using BigInt',()=>{
  assert.equal(calculateQuote(101,'1','10'),'11');
  assert.equal(calculateQuote(100000000000,'100000000000000','3'),
-  '3333333333333333333333333334');
+  '3333333333333333333333334');
  assert.throws(()=>calculateQuote(123,'0','1'));
  assert.throws(()=>calculateQuote(123,'1','0'));
  assert.throws(()=>calculateQuote(0,'1','1'));
