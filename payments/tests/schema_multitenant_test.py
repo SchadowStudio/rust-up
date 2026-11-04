@@ -145,6 +145,39 @@ class MultiTenantSchema(unittest.TestCase):
   self.assertEqual(self.db.execute(query,('EUR','BTC',P2)).fetchone(),(0,0,0,0))
   self.assertEqual(self.db.execute(query,('RUB','BTC',P1)).fetchone(),(1,1,0,1))
   self.assertEqual(self.db.execute(query,('EUR','ETH',P1)).fetchone(),(1,1,1,0))
+ def test_multitransfer_ledger_rejects_cross_project_transaction_replay(self):
+  invoice(self.db,'part-inv-a',P1,'part-a','part-a')
+  invoice(self.db,'part-inv-b',P2,'part-b','part-b','0xbbb')
+  sql="""INSERT INTO v2_payment_parts
+    (chain,tx_hash,invoice_id,project_id,asset,actual_atomic,
+     payment_time_ms,block_hash,confirmed_at_ms)
+    VALUES ('ethereum',?,?,?,?,?,?,?,?)"""
+  data=('0x'+'a'*64,'part-inv-a',P1,'ETH','30',200,'0x'+'b'*64,250)
+  self.db.execute(sql,data)
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute(sql,('0x'+'a'*64,'part-inv-b',P2,'ETH','70',200,
+    '0x'+'b'*64,250))
+  self.assertEqual(self.db.execute(
+   'SELECT COUNT(*) FROM v2_payment_parts WHERE invoice_id=?',
+   ('part-inv-a',)).fetchone()[0],1)
+ def test_split_payment_queue_can_resume_without_client_retry(self):
+  invoice(self.db,'part-inv-a',P1,'part-a','part-a')
+  self.db.execute("""INSERT INTO v2_partial_reconcile_queue
+   (invoice_id,next_check_ms,attempts,updated_at_ms) VALUES('part-inv-a',200,0,100)""")
+  self.db.execute("""INSERT INTO v2_partial_reconcile_queue
+   (invoice_id,next_check_ms,attempts,updated_at_ms) VALUES('part-inv-a',200,0,100)
+   ON CONFLICT(invoice_id) DO UPDATE SET next_check_ms=excluded.next_check_ms""")
+  self.assertEqual(self.db.execute(
+   "SELECT COUNT(*) FROM v2_partial_reconcile_queue WHERE invoice_id='part-inv-a'"
+   ).fetchone()[0],1)
+ def test_verify_quota_limits_each_project_independently(self):
+  sql="""INSERT INTO v2_verify_quota(project_id,bucket_minute_ms,attempts)
+   VALUES(?,60000,1) ON CONFLICT(project_id,bucket_minute_ms)
+   DO UPDATE SET attempts=attempts+1 WHERE attempts<?"""
+  self.assertEqual(self.db.execute(sql,(P1,2)).rowcount,1)
+  self.assertEqual(self.db.execute(sql,(P1,2)).rowcount,1)
+  self.assertEqual(self.db.execute(sql,(P1,2)).rowcount,0)
+  self.assertEqual(self.db.execute(sql,(P2,2)).rowcount,1)
  def test_tables_store_no_direct_customer_identifiers(self):
   for table in ('v2_projects','v2_api_keys','v2_products','v2_invoices',
     'v2_chain_claims','v2_delivery_outbox'):
