@@ -75,3 +75,39 @@ Dafür wird **noch nichts** auf Cloudflare deployed.
 **Niemals den separaten Zahlungs-Testworker einfach anstelle von
 `rustup-bot` deployen!** Dies würde die eigentliche App außer Betrieb
 setzen.
+
+
+## 5. Vor jedem Deployment: aktuelle Cloudflare-Version vergleichen
+
+Das zusätzliche Skript `payments/scripts/prepare-live-bot-deployment.mjs`
+prüft **erneut** den Cloudflare-Worker und blockiert die Freigabe, wenn eine
+der neun Quelldateien seit dem Recovery verändert wurde. Es prüft außerdem,
+ob `DB` weiterhin auf `rustup-stats` zeigt, die vier ursprünglichen
+Bot-Secrets vorhanden sind und der Cron jede Minute läuft.
+
+Es erzeugt nur eine lokale Wrangler-Konfiguration unter
+`wrangler.rustup-bot.toml`. Die Konfiguration setzt
+`PAYMENT_PRODUCTION_ENABLED=false`, ergänzt ein separates
+`PAYMENTS_DB`, bewahrt mit `keep_vars=true` die bisherigen Klartextvariablen
+und verlangt die alten Secrets. Das Skript deployt NICHT.
+
+```powershell
+cd "$HOME\RUST-UP-Local"
+git pull --ff-only origin feature/rustup-payment-admin-controls
+$folder = "$HOME\RUST-UP-Local\.private\rustup-bot-recovered\2026-11-04T17-29-30-097Z-174d458d73"
+$secure = Read-Host "Cloudflare API Token (Workers Scripts Read)" -AsSecureString
+$env:CLOUDFLARE_API_TOKEN = [System.Net.NetworkCredential]::new("", $secure).Password
+node .\payments\scripts\prepare-live-bot-deployment.mjs "$folder"
+Remove-Item Env:CLOUDFLARE_API_TOKEN
+```
+
+Wenn dies `PASS` meldet, ein **Dry-run** statt eines echten Deployments:
+
+```powershell
+npx --yes wrangler deploy --dry-run --config "$folder\wrangler.rustup-bot.toml"
+```
+
+Weder der Preflight noch der Wrangler-Dry-run aktivieren Live-Zahlungen.
+Bei einer Versionsabweichung keine Änderungen erzwingen, sondern
+den aktuellen Live-Worker erneut sichern und die Anpassungen darauf
+portieren.
