@@ -1,7 +1,7 @@
 // Canonical proof reader shared by webhooks and post-settlement audits.
 // Multi-transfer credit MUST re-verify every piece, not just the last hash.
 import {verifyChainPaymentQuorum} from './quorum.js';
-import {MAX_PARTS_PER_INVOICE} from './multi-transfer.js';
+import {MAX_PARTS_PER_INVOICE} from './transfer-policy.js';
 
 const minPositive=s=>/^[1-9][0-9]{0,59}$/.test(String(s||''));
 function uniqueHashes(input){
