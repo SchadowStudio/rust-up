@@ -12,3 +12,8 @@ dist-admin/
 
 dist-checkout/
 coin-candidates/
+
+# Private operational attestations (no receipts, wallet keys or secrets in git)
+release-evidence.json
+release-evidence.*.json
+!release-evidence.example.json
