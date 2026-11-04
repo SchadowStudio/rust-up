@@ -75,6 +75,32 @@ class MultiTenantSchema(unittest.TestCase):
    self.db.execute("""INSERT INTO v2_chain_claims
     (chain,tx_hash,invoice_id,project_id,claimed_at_ms)
     VALUES ('ethereum','0xhash','i2',?,100)""",(P2,))
+ def test_project_quota_atomically_blocks_oversubscription(self):
+  def slot(project,invoice,limit=1):
+   sql="""INSERT INTO v2_invoice_quota
+    (project_id,bucket_minute_ms,invoice_count,last_invoice_id)
+    VALUES (?,60000,1,?) ON CONFLICT(project_id,bucket_minute_ms)
+    DO UPDATE SET invoice_count=invoice_count+1,last_invoice_id=excluded.last_invoice_id
+    WHERE invoice_count<?"""
+   return self.db.execute(sql,(project,invoice,limit)).rowcount
+  self.assertEqual(slot(P1,'invoice1'),1)
+  self.assertEqual(slot(P1,'invoice2'),0)
+  self.assertEqual(slot(P2,'invoice3'),1)
+  self.assertEqual(self.db.execute(
+   'SELECT invoice_count FROM v2_invoice_quota WHERE project_id=?',(P1,)).fetchone()[0],1)
+  self.assertEqual(self.db.execute(
+   'SELECT last_invoice_id FROM v2_invoice_quota WHERE project_id=?',(P1,)).fetchone()[0],'invoice1')
+ def test_quota_failure_cannot_reserve_a_receiver(self):
+  self.db.execute("""INSERT INTO v2_invoice_quota
+   (project_id,bucket_minute_ms,invoice_count,last_invoice_id) VALUES(?,60000,1,'first')""",(P1,))
+  changed=self.db.execute("""UPDATE deposit_addresses SET assigned_intent='second'
+   WHERE chain='ethereum' AND address='0xbbb' AND enabled=1
+   AND assigned_intent IS NULL AND EXISTS(
+    SELECT 1 FROM v2_invoice_quota
+    WHERE project_id=? AND bucket_minute_ms=60000 AND last_invoice_id='second')""",(P1,)).rowcount
+  self.assertEqual(changed,0)
+  self.assertIsNone(self.db.execute(
+   "SELECT assigned_intent FROM deposit_addresses WHERE address='0xbbb'").fetchone()[0])
  def test_tables_store_no_direct_customer_identifiers(self):
   for table in ('v2_projects','v2_api_keys','v2_products','v2_invoices',
     'v2_chain_claims','v2_delivery_outbox'):
