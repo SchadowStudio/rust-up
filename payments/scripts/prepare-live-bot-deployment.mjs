@@ -112,7 +112,15 @@ async function main(){
     throw Error('cloudflare_metadata_query_failed');
   const config=buildSafeWranglerConfig(s.result,c.result);
   const file=path.join(directory,'wrangler.rustup-bot.toml');
-  await fs.writeFile(file,config,{flag:'wx',mode:0o600});
+  // Repeated safety checks must not overwrite a hand-edited deploy config.
+  // An existing identical config is safe; a different one is a hard stop.
+  try {
+    await fs.writeFile(file,config,{flag:'wx',mode:0o600});
+  } catch (e) {
+    if (e?.code!=='EEXIST') throw e;
+    const existing=await fs.readFile(file,'utf8');
+    if (existing!==config) throw Error('local_deploy_config_drift');
+  }
   console.log('PASS: all 9 Cloudflare modules match the local recovery snapshot.');
   console.log('PASS: 4 bot secrets, existing game D1 and minute cron verified.');
   console.log('PASS: separate PAYMENTS_DB configured; PAYMENT_PRODUCTION_ENABLED=false.');
