@@ -82,3 +82,46 @@ test('Bitcoin Core output must pay correct address',async()=>{
   assert.equal((await verifyChainPayment(order,hash,{BITCOIN_RPC_URL:'https://btc.example'})).actualAtomic,'10000');
  });
 });
+
+test('TRX checks walletsolidity transfer recipient and block confirmation',async()=>{
+ const hash='b'.repeat(64);
+ const destination='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+ const trxHex=await tronHex(destination);
+ const order={asset:'TRX',chain:'tron',receive_address:destination,amount_atomic:'1000000'};
+ const original=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  const out=String(url).endsWith('gettransactionbyid')?
+   {txID:hash,raw_data:{contract:[{type:'TransferContract',parameter:{value:{to_address:trxHex,amount:1000000}}}]}}:
+   String(url).endsWith('gettransactioninfobyid')?
+    {blockNumber:100,receipt:{result:'SUCCESS'}}:
+    {block_header:{raw_data:{number:101}}};
+  return {ok:true,json:async()=>out};
+ };
+ try {
+  const verified=await verifyChainPayment(order,hash,{TRON_RPC_URL:'https://tron.example'});
+  assert.equal(verified.actualAtomic,'1000000');
+  await assert.rejects(()=>verifyChainPayment({...order,amount_atomic:'1000001'},hash,{TRON_RPC_URL:'https://tron.example'}));
+ }finally{globalThis.fetch=original;}
+});
+test('USDT TRC20 verifies official token contract, event recipient and six decimals',async()=>{
+ const hash='c'.repeat(64);
+ const destination='TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+ const trxHex=await tronHex(destination);
+ const log={address:trxHex.slice(2),topics:[ERC20_TRANSFER_TOPIC.slice(2),
+  '0'.repeat(64),'0'.repeat(24)+trxHex.slice(2)],data:(5000000).toString(16)};
+ const order={asset:'USDT_TRC20',chain:'tron',receive_address:destination,amount_atomic:'5000000'};
+ const original=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  const out=String(url).endsWith('gettransactionbyid')?
+    {txID:hash,raw_data:{contract:[]}}:
+    String(url).endsWith('gettransactioninfobyid')?
+      {blockNumber:100,receipt:{result:'SUCCESS'},log:[log]}:
+      {block_header:{raw_data:{number:101}}};
+  return {ok:true,json:async()=>out};
+ };
+ try {
+  const env={TRON_RPC_URL:'https://tron.example',USDT_TRC20_CONTRACT:destination};
+  assert.equal((await verifyChainPayment(order,hash,env)).actualAtomic,'5000000');
+  await assert.rejects(()=>verifyChainPayment({...order,amount_atomic:'5000001'},hash,env));
+ }finally{globalThis.fetch=original;}
+});
