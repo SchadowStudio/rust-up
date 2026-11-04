@@ -73,3 +73,41 @@ test('TON scanner is disabled without explicit network enable flag',async()=>{
  await scanTonPayments({},[invoice],{...env,MULTI_TON_ENABLED:'false'},
   {scannedTonTransactions:0},{});
 });
+
+
+test('TON discovery falls back to secondary independent indexer after HTTP failure',async()=>{
+ const secondary='https://other-ton-provider.example.net/api/v3';
+ const calls=[];
+ const old=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  const host=new URL(url).hostname;calls.push(host);
+  if(host==='independent-ton-node.example.com')return {ok:false,status:503};
+  return {ok:true,json:async()=>({transactions:[record()]})};
+ };
+ let count=0;
+ try{
+  await scanTonPayments({},[invoice],{
+   ...env,TON_INDEXER_URL_SECONDARY:secondary
+  },{scannedTonTransactions:0},{
+   scanCursor:async()=>null,advance:async()=>{},
+   trySettle:async()=>{count++}
+  });
+  assert.equal(count,1);
+  assert.deepEqual(calls,['independent-ton-node.example.com','other-ton-provider.example.net']);
+ }finally{globalThis.fetch=old}
+});
+test('TON does not advance cursor if all independently configured indexers fail',async()=>{
+ const old=globalThis.fetch;
+ let advanced=false;
+ globalThis.fetch=async()=>({ok:false,status:503});
+ try{
+  await assert.rejects(()=>scanTonPayments({},[invoice],{
+   ...env,TON_INDEXER_URL_SECONDARY:'https://ton-backup.example.net/api/v3',
+   TON_INDEXER_URL_TERTIARY:'https://ton-third.example.org/api/v3'
+  },{scannedTonTransactions:0},{
+   scanCursor:async()=>null,advance:async()=>{advanced=true},
+   trySettle:async()=>{throw Error('must_not_settle')}
+  }),/ton_discovery_indexers_unavailable/);
+  assert.equal(advanced,false);
+ }finally{globalThis.fetch=old}
+});
