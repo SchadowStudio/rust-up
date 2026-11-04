@@ -21,7 +21,7 @@ def make():
   db.execute("INSERT INTO v2_project_payment_profiles(project_id,display_name,updated_at_ms) VALUES(?,?,100)",(id,'Project'))
   for fiat in ('RUB','EUR','USD'):
    db.execute("INSERT INTO v2_project_fiat_methods(project_id,currency) VALUES(?,?)",(id,fiat))
-  for asset in ('BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'):
+  for asset in ('BTC','ETH','TRX','USDT_ERC20','USDT_TRC20','TON'):
    db.execute("INSERT INTO v2_project_crypto_methods(project_id,asset) VALUES(?,?)",(id,asset))
  for n,address in enumerate(('0xaaa','0xbbb','0xccc')):
   db.execute("""INSERT INTO deposit_addresses(chain,address,enabled,assigned_intent)
