@@ -80,6 +80,16 @@ export function verifySnapshot(current,manifest){
   }
   return true;
 }
+export async function writeConfigIfUnchanged(file,config){
+  // Repeated safety checks must never overwrite a hand-edited deploy config.
+  // An existing identical config is safe; a different one is a hard stop.
+  try {
+    await fs.writeFile(file,config,{flag:'wx',mode:0o600});
+  } catch(e) {
+    if(e?.code!=='EEXIST') throw e;
+    if(await fs.readFile(file,'utf8')!==config) throw Error('local_deploy_config_drift');
+  }
+}
 async function main(){
   const arg=process.argv[2];
   if(!arg)throw Error('Usage: node payments/scripts/prepare-live-bot-deployment.mjs "<recovered-directory>"');
@@ -112,15 +122,7 @@ async function main(){
     throw Error('cloudflare_metadata_query_failed');
   const config=buildSafeWranglerConfig(s.result,c.result);
   const file=path.join(directory,'wrangler.rustup-bot.toml');
-  // Repeated safety checks must not overwrite a hand-edited deploy config.
-  // An existing identical config is safe; a different one is a hard stop.
-  try {
-    await fs.writeFile(file,config,{flag:'wx',mode:0o600});
-  } catch (e) {
-    if (e?.code!=='EEXIST') throw e;
-    const existing=await fs.readFile(file,'utf8');
-    if (existing!==config) throw Error('local_deploy_config_drift');
-  }
+  await writeConfigIfUnchanged(file,config);
   console.log('PASS: all 9 Cloudflare modules match the local recovery snapshot.');
   console.log('PASS: 4 bot secrets, existing game D1 and minute cron verified.');
   console.log('PASS: separate PAYMENTS_DB configured; PAYMENT_PRODUCTION_ENABLED=false.');
