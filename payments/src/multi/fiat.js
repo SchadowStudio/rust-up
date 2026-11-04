@@ -29,3 +29,43 @@ export function quoteFromRate(product,rate,asset,now=Date.now()){
   rateNumerator:rate.numerator_atomic,rateDenominator:rate.denominator_minor,
   expiry:Math.min(now+20*60*1000,rate.expires_at_ms)};
 }
+
+/**
+ * Freeze one invoice's two independent currency amounts:
+ * - creditCurrency/creditAmountMinor: canonical project wallet (RUB for RUST UP)
+ * - currency/amountMinor: customer-selected RUB, EUR or USD display amount
+ *
+ * Both prices are derived from the SAME asset, source and update snapshot.
+ * Never convert money through floating-point numbers or browser-provided FX.
+ */
+export function quoteForPaymentFiat(product,walletRate,paymentRate,asset,paymentFiat,now=Date.now()){
+ if(!allowedFiat(paymentFiat)||!allowedFiat(product.currency))
+  throw Error('unsupported_fiat');
+ const wallet=quoteFromRate(product,walletRate,asset,now);
+ if(paymentFiat===product.currency){
+  return {...wallet,creditCurrency:product.currency,
+   creditAmountMinor:product.amount_minor};
+ }
+ if(!paymentRate||paymentRate.fiat!==paymentFiat||
+    paymentRate.asset!==asset||paymentRate.source!==walletRate.source||
+    paymentRate.valid_from_ms!==walletRate.valid_from_ms)
+  throw Error('fx_snapshot_mismatch');
+ // Checking payment quote's validity also prevents a stale cross-rate.
+ quoteFromRate({currency:paymentFiat,amount_minor:100},paymentRate,asset,now);
+ if(!positiveAtomic(walletRate.numerator_atomic)||
+    !positiveAtomic(walletRate.denominator_minor)||
+    !positiveAtomic(paymentRate.numerator_atomic)||
+    !positiveAtomic(paymentRate.denominator_minor))
+  throw Error('invalid_exchange_rate');
+ const numerator=BigInt(product.amount_minor)*
+  BigInt(walletRate.numerator_atomic)*BigInt(paymentRate.denominator_minor);
+ const denominator=BigInt(walletRate.denominator_minor)*
+  BigInt(paymentRate.numerator_atomic);
+ const converted=(numerator+denominator-1n)/denominator;
+ if(converted<=0n||converted>100000000000n)throw Error('quote_out_of_bounds');
+ const charge=quoteFromRate({currency:paymentFiat,
+  amount_minor:Number(converted)},paymentRate,asset,now);
+ return {...charge,creditCurrency:product.currency,
+  creditAmountMinor:product.amount_minor,
+  expiry:Math.min(wallet.expiry,charge.expiry)};
+}
