@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>RUST UP · Multi-Projekt Payments</title>
+<style>
+:root{font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}body{background:#101114;color:#f1f1f1;margin:0}
+main{max-width:1100px;margin:22px auto;padding:16px}
+h1{font-size:clamp(23px,3vw,36px);margin:0}
+h2{font-size:20px;margin:0 0 10px}h3{font-size:15px;margin:15px 0 6px}
+p,small{color:#b5b7bb}strong,em{color:#f7b733}
+a{color:#f7b733}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:15px}
+.panel{border:1px solid #35383d;background:#1b1e22;border-radius:14px;padding:18px;margin:14px 0}
+label{display:block;font-weight:600;font-size:13px;margin:11px 0 4px}
+input,select{background:#101114;color:white;border:1px solid #4b4e56;
+ border-radius:8px;padding:10px;width:100%;font:inherit;min-height:42px}
+button{background:#f5b12a;color:#211a09;font-weight:700;border:0;border-radius:9px;
+ padding:10px 14px;min-height:42px;cursor:pointer;margin:10px 5px 0 0}
+button.subtle{background:#41454b;color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+.notice{border-left:3px solid #f5b12a;background:#26231a;padding:13px}
+.entry{background:#141619;border:1px solid #36393e;border-radius:9px;
+ padding:12px;margin:7px 0;overflow-wrap:anywhere}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
+.ok{color:#98e8ad}.bad{color:#ff9b9b}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.muted{color:#b5b7bb}#secretView{display:none}
+@media(max-width:600px){main{margin:5px;padding:10px}.panel{padding:13px}}
+</style>
+</head><body><main>
+<header><h1>RUST <em>UP</em> · Payments</h1>
+<p>Private Betreiberkonsole für mehrere Projekte, Trust Wallet und Kryptowährungen.</p></header>
+<p class="notice">Entwicklungsbranch – echte Zahlungen sind serverseitig deaktiviert.
+  Wallet-Passwörter, Seed-Phrases und private Schlüssel hier niemals eingeben.
+  Projekte greifen mit eigenen Server-Schlüsseln auf das Zahlungs-Backend zu.</p>
+<section class="panel"><h2>Verbindung</h2>
+<div class="grid">
+<div><label for="server">Eigene Gateway-URL (HTTPS)</label>
+<input id="server" placeholder="https://gateway.example.com" autocomplete="off" type="url"></div>
+<div><label for="master">Betreiber-API-Schlüssel</label>
+<input id="master" type="password" placeholder="Nur für diese Browser-Sitzung" autocomplete="off"></div>
+</div>
+<button id="status">Systemstatus prüfen</button>
+<small>Die Konsole speichert den Schlüssel nicht. Nur den eigenen HTTPS-Server verwenden.</small>
+</section>
+<div class="grid">
+<section class="panel">
+<h2>Projekte</h2>
+<label for="projectName">Projektname</label><input id="projectName" maxlength="60" placeholder="Beispielprojekt">
+<label for="webhook">Projekt-Webhook (HTTPS, freigegebene Domain)</label>
+<input id="webhook" maxlength="256" placeholder="https://projekt.example.com/internal/crypto/credit">
+<button id="createProject">Projekt und Schlüssel erzeugen</button>
+<button class="subtle" id="loadProjects">Projekte anzeigen</button>
+<div id="projects"></div>
+</section>
+<section class="panel">
+<h2>Trust Wallet</h2>
+<p>ETH/USDT-ERC20: Wallet-Verbindung mit öffentlicher Adresse. BTC und TRON: öffentliche Adresse einfügen.</p>
+<button id="walletConnect">Trust Wallet verbinden (Ethereum)</button>
+<label for="receiverChain">Netzwerk</label>
+<select id="receiverChain"><option value="ethereum">Ethereum / USDT ERC-20</option>
+<option value="bitcoin">Bitcoin</option><option value="tron">TRON / USDT TRC-20</option></select>
+<label for="receiver">Öffentliche Empfangsadresse</label>
+<input id="receiver" autocomplete="off" spellcheck="false" placeholder="Empfangsadresse">
+<button id="addReceiver">Deaktiviert hinzufügen</button>
+<button class="subtle" id="loadReceivers">Empfangsadressen prüfen</button>
+<div id="receivers"></div>
+</section>
+<section class="panel">
+<h2>Produkte und Rechnungswährung</h2>
+<label for="projectSelect">Projekt</label><select id="projectSelect"></select>
+<label for="sku">Produkt-Kennung</label><input id="sku" placeholder="rank_small">
+<label for="title">Produktname</label><input id="title" placeholder="Small Rank">
+<div class="grid">
+<div><label for="currency">Währung</label>
+<select id="currency"><option>RUB</option><option>EUR</option><option>USD</option></select></div>
+<div><label for="minor">Preis in kleinsten Einheiten (10000 = 100 ₽ / 100 € / 100 $)</label>
+<input id="minor" type="number" min="1" step="1" value="10000"></div></div>
+<button id="saveProduct">Produkt deaktiviert speichern</button>
+<button class="subtle" id="loadProducts">Produkte aktualisieren</button>
+<div id="products"></div>
+</section>
+<section class="panel">
+<h2>Wechselkurse</h2>
+<p>Automatische Kurse kommen später aus zwei Datenquellen. Diese Verwaltung ermöglicht feste Notfallkurse; sie laufen nach kurzer Zeit ab.</p>
+<div class="grid">
+<div><label for="rateCurrency">Rechnungswährung</label>
+<select id="rateCurrency"><option>RUB</option><option>EUR</option><option>USD</option></select></div>
+<div><label for="rateAsset">Kryptowährung</label>
+<select id="rateAsset"><option>BTC</option><option>ETH</option><option>TRX</option>
+<option>USDT_ERC20</option><option>USDT_TRC20</option></select></div></div>
+<label for="num">Atomare Einheiten (Zähler)</label><input id="num" placeholder="Nur vorab geprüfte Ganzzahl">
+<label for="denom">Fiat-Minus-Einheiten (Nenner)</label><input id="denom" placeholder="Nur vorab geprüfte Ganzzahl">
+<button id="saveRate">Kurs deaktiviert anlegen</button>
+<button class="subtle" id="loadRates">Kurse anzeigen</button>
+<div id="rates"></div>
+</section>
+</div>
+<section class="panel" id="secretView">
+<h2>Einmalige Zugangsdaten</h2>
+<p>Diese Schlüssel werden nur in dieser Ansicht angezeigt. In einem Passwortmanager und im jeweiligen Projektserver speichern, nicht im Browser oder GitHub.</p>
+<pre id="secrets"></pre><button id="clearSecrets" class="subtle">Anzeige löschen</button>
+</section>
+<section class="panel"><h2>Aktueller Status</h2><p id="output" role="status" aria-live="polite">Noch nicht verbunden.</p></section>
+</main><script type="module" src="./app.js"></script></body></html>
