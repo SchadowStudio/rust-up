@@ -1,4 +1,5 @@
 import {ASSETS, ERC20_TRANSFER_TOPIC, evm, hexBig, tronHex, txId} from './assets.js';
+import {requireCertifiedPaymentAsset} from './asset-registry.js';
 
 function rpcUrl(u) {
  if(typeof u!=='string'||(!/^https:\/\//i.test(u)&&!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//i.test(u)))
@@ -165,6 +166,8 @@ async function tronVerify(order,hash,env) {
  return {confirmations,actualAtomic:received.toString(),paymentTimeMs,blockHash};
 }
 export async function verifyChainPayment(order,submittedHash,env) {
+ // Reject unknown coins and any token pointing to a spoofed mainnet contract.
+ requireCertifiedPaymentAsset(order.asset,env);
  const conf=ASSETS[order.asset];
  if(!conf||conf.chain!==order.chain)throw new Error('wrong_chain');
  const hash=txId(order.asset,submittedHash);
