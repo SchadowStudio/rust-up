@@ -132,3 +132,7 @@ CREATE INDEX v2_payment_parts_invoice
 -- TON must additionally pass per-project opt-in, enabled receiving-address
 -- and independent RPC quorum / masterchain finality checks.
 PRAGMA foreign_key_check;
+-- The existing children still point to unchanged primary keys. Clearing the
+-- deferred-violation bookkeeping after explicit FK validation is required by
+-- SQLite when parent tables were rebuilt in place.
+PRAGMA defer_foreign_keys = OFF;
