@@ -29,8 +29,17 @@ async function createProject(db,b,env){
  const label=String(b.label||'').trim();
  if(label.length<3||label.length>60) return fail('invalid_project_label');
  const callback=safeWebhookUrl(b.webhookUrl);
+ // Operator must explicitly allow each project's callback host.
+ const hostname=new URL(callback).hostname;
+ const approved=String(env.MULTI_WEBHOOK_HOST_ALLOWLIST||'').split(',')
+  .map(x=>x.trim().toLowerCase()).filter(Boolean);
+ if(!approved.includes(hostname))return fail('callback_host_not_approved',403);
+ if(typeof env.MULTI_WEBHOOK_MASTER_KEY!=='string'||
+    env.MULTI_WEBHOOK_MASTER_KEY.length<40)
+  return fail('webhook_signing_not_configured',503);
  const projectId=crypto.randomUUID(),keyId=crypto.randomUUID();
  const secret=newSecret(),hash=await digestHex(secret);
+ const webhookSigningSecret=await projectWebhookKey(env.MULTI_WEBHOOK_MASTER_KEY,projectId);
  const now=Date.now();
  await db.batch([
   db.prepare(`INSERT INTO v2_projects(id,label,webhook_url,status,created_at_ms,updated_at_ms)
@@ -40,7 +49,6 @@ async function createProject(db,b,env){
   db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
    VALUES(?,'create_project',?,'{}',?)`).bind(crypto.randomUUID(),projectId,now)
  ]);
- const webhookSigningSecret=await projectWebhookKey(env.MULTI_WEBHOOK_MASTER_KEY,projectId);
  return json({ok:true,projectId,keyId,apiKey:secret,webhookSigningSecret,
    status:'disabled',notice:'Store both secrets in your project server secrets; shown once.'},201);
 }
