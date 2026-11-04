@@ -155,7 +155,7 @@ test('payment provider methods are RUB EUR USD and the five supported crypto net
  const r=await handleMulti(request('/v2/methods'),environment(db));
  assert.equal(r.status,200);
  const data=await r.json();
- assert.deepEqual(data.fiatCurrencies.map(x=>x.currency),['EUR','RUB','USD']);
+ assert.deepEqual(data.fiatCurrencies.map(x=>x.currency),['RUB','EUR','USD']);
  assert.equal(data.supportedAssets.length,5);
  assert.match(data.note,/Fiat denotes invoice value/);
 });
