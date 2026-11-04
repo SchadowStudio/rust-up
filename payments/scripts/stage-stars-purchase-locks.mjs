@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const expectedOld='adce5a938f79f6284dfb72cf9791965d0457079a';
-const expectedNew='396d5341c91ad48e71f217911579e223c19ad511';
+const expectedNew='576cd3e70f5bc0ee42144351b8b174780fe8b347';
 function gitBlob(text){
  const v=Buffer.from(text.replace(/\r\n/g,'\n'));
  return createHash('sha1').update('blob '+v.length+'\0').update(v).digest('hex');
