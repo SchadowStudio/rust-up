@@ -2519,7 +2519,7 @@
       case '/profile': profilePage(); break;
       case '/provably-fair': fairPage(); break;
       case '/tos': textPage('Условия использования', '<p>RUST UP — демонстрационный интерфейс. Баланс, скины и результаты виртуальные и не имеют денежной стоимости, их нельзя вывести или обменять.</p><p>Проект не связан с Valve, Steam и Facepunch Studios. Изображения предметов принадлежат их правообладателям.</p>'); break;
-      case '/privacy': textPage('Политика конфиденциальности', '<p>В Telegram-игре используется серверная авторизация. Баланс, инвентарь и история хранятся на сервере; lokal werden nur Anzeigeeinstellungen gespeichert. Eine vollständige Datenschutzerklärung muss vor dem öffentlichen Betrieb ergänzt werden.</p>'); break;
+      case '/privacy': textPage('Политика конфиденциальности', '<p>В Telegram-игре используется серверная авторизация. Баланс, инвентарь и история хранятся на сервере, а на устройстве — только настройки интерфейса. Перед публичным запуском необходимо опубликовать полную политику конфиденциальности.</p>'); break;
       default: if (path.startsWith('/case/')) casePage(path.slice(6)); else homePage();
     }
     window.scrollTo({ top: 0 });
