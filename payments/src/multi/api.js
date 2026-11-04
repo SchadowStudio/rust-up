@@ -53,6 +53,9 @@ async function createInvoice(db,project,b,req,env,{deposit=false}={},now=Date.no
  // fiat amount; the checkout browser never has access to project API credentials.
  const minMinor=Number(env.MULTI_DEPOSIT_MIN_MINOR||100);
  const maxMinor=Number(env.MULTI_DEPOSIT_MAX_MINOR||100000000);
+ if(!Number.isSafeInteger(minMinor)||!Number.isSafeInteger(maxMinor)||
+    minMinor<1||maxMinor<minMinor||maxMinor>100000000000)
+  return fail('deposit_limits_misconfigured',503);
  if(deposit&&(!allowedFiat(b.currency)||!Number.isSafeInteger(b.amountMinor)||
     b.amountMinor<minMinor||b.amountMinor>maxMinor))
   return fail('invalid_deposit_amount',400);
@@ -179,6 +182,15 @@ async function projectRoute(req,env,url){
  catch{return fail('unauthorized_project',401);}
  if(url.pathname==='/v2/me'&&req.method==='GET')
   return json({ok:true,projectId:project.id});
+ if(url.pathname==='/v2/methods'&&req.method==='GET')
+  return json({ok:true,fiatCurrencies:['RUB','EUR','USD'],
+   supportedAssets:Object.entries(ASSETS).map(([asset,details])=>({
+    asset,chain:details.chain,decimals:details.decimals,
+    minConfirmations:details.confirmations
+   })),
+   depositMinMinor:Number(env.MULTI_DEPOSIT_MIN_MINOR||100),
+   depositMaxMinor:Number(env.MULTI_DEPOSIT_MAX_MINOR||100000000),
+   note:'Fiat denotes invoice value. Settlement is made in cryptocurrency.'});
  if(url.pathname==='/v2/invoices'&&req.method==='POST')
   return createInvoice(env.DB,project,await body(req),req,env);
  if(url.pathname==='/v2/deposits'&&req.method==='POST')
