@@ -1,6 +1,7 @@
 // V2 project-to-project gateway: no Telegram IDs, emails, IPs or wallet keys.
 // Merchant backend calls this API with project-scoped credentials.
 import {ASSETS} from '../assets.js';
+import {tonHashHex} from '../ton.js';
 import {validateReceivingAddress} from '../address.js';
 import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 import {quoteFromRate,allowedFiat} from './fiat.js';
@@ -150,7 +151,11 @@ async function verifyInvoice(db,project,invoice,b,env){
   return json({ok:true,invoice:responseInvoice(invoice,invoice.delivered!=null)});
  if(!['awaiting_payment','expired'].includes(invoice.status))
   return fail('invoice_not_claimable',409);
- if(!isHash(b.transactionHash))return fail('invalid_transaction_id');
+ if(invoice.asset==='TON'){
+  try{tonHashHex(b.transactionHash)}
+  catch{return fail('invalid_transaction_id')}
+ }else if(!isHash(b.transactionHash))
+  return fail('invalid_transaction_id');
  if(!await consumeManualVerifyQuota(db,project.id,env))return fail('verification_rate_limited',429);
  if(env.MULTI_PARTIAL_AGGREGATION_ENABLED==='true'){
   const result=await processPaymentPart(db,invoice,b.transactionHash,env);

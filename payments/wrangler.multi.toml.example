@@ -16,6 +16,7 @@ MULTI_RECONCILE_BATCH = "10"
 MULTI_VERIFY_PER_MINUTE = "30"
 MULTI_PARTIAL_AGGREGATION_ENABLED = "false"
 MULTI_PARTIAL_RECONCILE_BATCH = "10"
+MULTI_TON_ENABLED = "false" # TON mainnet provider is globally off until staging and wallet proof
 MULTI_STRICT_QUORUM = "false" # must be enabled only after configuring three independent RPCs per blockchain
 MULTI_ADMIN_ORIGIN = "https://your-private-admin.example.com"
 MULTI_WEBHOOK_HOST_ALLOWLIST = ""
@@ -67,3 +68,12 @@ max_batch_size = 25
 max_batch_timeout = 5
 max_retries = 10
 dead_letter_queue = "rustup-multi-dead-letter"
+
+# TON Center v3-compatible independent HTTPS indexed mainnet providers:
+# wrangler secret put TON_INDEXER_URL
+# wrangler secret put TON_INDEXER_URL_SECONDARY
+# wrangler secret put TON_INDEXER_URL_TERTIARY
+# wrangler secret put TON_INDEXER_API_KEY
+# wrangler secret put TON_INDEXER_API_KEY_SECONDARY
+# wrangler secret put TON_INDEXER_API_KEY_TERTIARY
+# Never point all three TON indexers to the same upstream source.

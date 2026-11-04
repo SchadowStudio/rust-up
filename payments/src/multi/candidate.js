@@ -6,12 +6,12 @@ import {settleV2,reviewUnderpayment} from './settlement.js';
 import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 import {processPaymentPart} from './multi-transfer.js';
 export async function reconcileCandidate(db,item,env){
- if(!item||!['ethereum','bitcoin','tron'].includes(item.chain)||
+ if(!item||!['ethereum','bitcoin','tron','ton'].includes(item.chain)||
     !await validateReceivingAddress(item.chain,item.address))
    return {status:'ignored',reason:'invalid_candidate'};
  let hash;
  try{hash=txId(item.chain==='bitcoin'?'BTC':
-  item.chain==='ethereum'?'ETH':'TRX',item.txHash);}
+  item.chain==='ethereum'?'ETH':item.chain==='ton'?'TON':'TRX',item.txHash);}
  catch{return {status:'ignored',reason:'invalid_transaction_hash'}}
  const query=item.chain==='ethereum'
   ?`SELECT * FROM v2_invoices WHERE chain=? AND
