@@ -14,6 +14,10 @@ class FakeD1 {
   this.orders=[];
   this.currency=currency;
   this.assigned=false;
+  this.invoicesEnabled=true;this.depositsEnabled=true;this.productsEnabled=true;
+  this.allowedFiats=['RUB','EUR','USD'];
+  this.allowedAssets=['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'];
+  this.minMinor=100;this.maxMinor=100000000;this.lifetimeMinutes=20;
  }
  prepare(sql){
   const db=this;
@@ -25,23 +29,31 @@ class FakeD1 {
       return {results:[{id:PROJECT,status:'active',webhook_url:'https://shop.example.com/payments',secret_sha256:db.keyHash}]};
      if(sql.includes('FROM v2_project_fiat_methods WHERE project_id=?'))
       return {results:['RUB','EUR','USD'].map(currency=>({
-       currency,enabled:1,min_minor:100,max_minor:100000000
+       currency,enabled:db.allowedFiats.includes(currency)?1:0,
+       min_minor:db.minMinor,max_minor:db.maxMinor
       }))};
      if(sql.includes('FROM v2_project_crypto_methods'))
-      return {results:['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'].map(asset=>({asset,enabled:1}))};
+      return {results:['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20']
+       .map(asset=>({asset,enabled:db.allowedAssets.includes(asset)?1:0}))};
      throw Error('unexpected list query: '+sql);
     },
     async first(){
      if(sql.includes('FROM v2_project_payment_profiles p')&&
         sql.includes('JOIN v2_project_fiat_methods'))
-      return {invoices_enabled:1,deposits_enabled:1,products_enabled:1,
-       invoice_lifetime_minutes:20,fiat_enabled:1,crypto_enabled:1,
-       min_minor:100,max_minor:100000000};
+      return {invoices_enabled:db.invoicesEnabled?1:0,
+       deposits_enabled:db.depositsEnabled?1:0,
+       products_enabled:db.productsEnabled?1:0,
+       invoice_lifetime_minutes:db.lifetimeMinutes,
+       fiat_enabled:db.allowedFiats.includes(args[0])?1:0,
+       crypto_enabled:db.allowedAssets.includes(args[1])?1:0,
+       min_minor:db.minMinor,max_minor:db.maxMinor};
      if(sql.includes('FROM v2_project_payment_profiles p')&&
         sql.includes('JOIN v2_projects pr'))
       return {project_id:PROJECT,display_name:'Test project',
-       invoices_enabled:1,deposits_enabled:1,products_enabled:1,
-       invoice_lifetime_minutes:20,updated_at_ms:NOW,
+       invoices_enabled:db.invoicesEnabled?1:0,
+       deposits_enabled:db.depositsEnabled?1:0,
+       products_enabled:db.productsEnabled?1:0,
+       invoice_lifetime_minutes:db.lifetimeMinutes,updated_at_ms:NOW,
        project_status:'active',webhook_url:'https://shop.example.com/payments'};
      if(sql.includes('FROM v2_invoices')&&sql.includes('idempotency_key'))
       return db.orders.find(x=>x.project_id===args[0]&&x.idempotency_key===args[1])||null;
@@ -166,4 +178,46 @@ test('provider stays disabled without real merchant approval and infrastructure'
  }),{DB:db});
  assert.equal(r.status,503);
  assert.equal(db.orders.length,0);
+});
+
+test('a project cannot use currencies or cryptocurrencies disabled in its own profile',async()=>{
+ const hash=await digestHex(API_KEY);
+ for(const changes of [
+  {allowedFiats:['EUR','USD']},
+  {allowedAssets:['BTC','ETH']},
+  {depositsEnabled:false},
+  {invoicesEnabled:false},
+  {minMinor:2000},
+  {maxMinor:500}
+ ]){
+  const db=new FakeD1(hash,'RUB');
+  Object.assign(db,changes);
+  const body={currency:'RUB',amountMinor:1000,asset:'USDT_TRC20',
+   projectOrderRef:randomUUID()};
+  const r=await handleMulti(request('/v2/deposits',{body}),environment(db));
+  assert.ok([400,403].includes(r.status),JSON.stringify(changes));
+  assert.equal(db.orders.length,0,'disabled method never reserves an address');
+ }
+});
+test('project methods only expose methods enabled for that project',async()=>{
+ const db=new FakeD1(await digestHex(API_KEY),'RUB');
+ db.allowedFiats=['EUR'];
+ db.allowedAssets=['ETH'];
+ const r=await handleMulti(request('/v2/methods'),environment(db));
+ const methods=await r.json();
+ assert.equal(r.status,200);
+ assert.deepEqual(methods.fiatCurrencies.map(x=>x.currency),['EUR']);
+ assert.deepEqual(methods.supportedAssets.map(x=>x.asset),['ETH']);
+});
+test('project can configure shorter invoice lifetime independently',async()=>{
+ const db=new FakeD1(await digestHex(API_KEY),'RUB');
+ db.lifetimeMinutes=5;
+ const start=Date.now();
+ const r=await handleMulti(request('/v2/deposits',{body:{
+  currency:'RUB',amountMinor:1000,asset:'USDT_TRC20',
+  projectOrderRef:randomUUID()
+ }}),environment(db));
+ assert.equal(r.status,201);
+ const invoice=(await r.json()).invoice;
+ assert.ok(invoice.expiresAt<=start+5*60000+2000);
 });
