@@ -11,15 +11,17 @@ export async function signV2Webhook(master,projectId,eventId,time,body){
  const secret=await projectWebhookKey(master,projectId);
  return 'v2='+await sign(secret,[String(time),projectId,eventId,body].join('.'));
 }
-export async function deliverV2(env,now=Date.now()){
+export async function deliverV2(env,now=Date.now(),onlyEventId=null){
  if(!env.DB||env.MULTI_DELIVERY_ENABLED!=='true')return {skipped:'disabled'};
  if(!env.MULTI_WEBHOOK_MASTER_KEY)throw Error('missing_master_key');
  const db=env.DB;
- const rows=await db.prepare(`SELECT o.event_id,o.project_id,o.invoice_id,
+ const base=`SELECT o.event_id,o.project_id,o.invoice_id,
     o.event_body,o.attempts,o.next_attempt_ms,p.webhook_url,p.status
    FROM v2_delivery_outbox o JOIN v2_projects p ON p.id=o.project_id
-   WHERE o.delivered_at_ms IS NULL AND o.next_attempt_ms<=?
-   ORDER BY o.created_at_ms LIMIT 25`).bind(now).all();
+   WHERE o.delivered_at_ms IS NULL AND o.next_attempt_ms<=?`;
+ const rows=onlyEventId?
+  await db.prepare(base+' AND o.event_id=? LIMIT 1').bind(now,onlyEventId).all():
+  await db.prepare(base+' ORDER BY o.created_at_ms LIMIT 25').bind(now).all();
  const result={attempted:0,delivered:0,deferred:0,failed:0};
  for(const event of rows.results||[]){
   if(event.status!=='active'){result.deferred++;continue;}
@@ -63,4 +65,14 @@ export async function deliverV2(env,now=Date.now()){
   }
  }
  return result;
+}
+
+export async function notifyDeliveryQueue(env,result){
+ if(result?.status!=='verified'||result.idempotent||!result.eventId||
+    !env.MULTI_EVENT_QUEUE)return;
+ try{await env.MULTI_EVENT_QUEUE.send({kind:'delivery',eventId:result.eventId});}
+ catch{
+  // The outbox is durable. Cron reconciliation will retry on queue outage.
+  console.warn('Event enqueue failed; persisted outbox will retry');
+ }
 }
