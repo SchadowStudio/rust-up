@@ -47,13 +47,15 @@ export default {
     const isVariable=url.pathname==='/api/stars/topup';
     const isFixed=url.pathname==='/api/stars/checkout';
     if(!isVariable&&!isFixed)return json({ok:false,error:'not_found'},404);
-    if(!(await isPaymentEnabled(env,'stars'))||
+    if(env.STARS_PAYMENT_ENABLED!=='true'||
       (isVariable&&env.STARS_VARIABLE_TOPUP_ENABLED!=='true')||
       (isFixed&&env.STARS_FIXED_PRODUCTS_ENABLED!=='true'))
       return json({ok:false,error:'stars_checkout_disabled'},503);
     const origin=request.headers.get('origin');
     if(!allowedOrigin(origin,env))
       return json({ok:false,error:'origin_rejected'},403);
+    if(!(await isPaymentEnabled(env,'stars')))
+      return json({ok:false,error:'stars_checkout_disabled'},503);
     if(request.method==='OPTIONS')
       return new Response(null,{status:204,headers:{
         'access-control-allow-origin':origin,'access-control-allow-methods':'POST',
