@@ -1,6 +1,7 @@
 // Config-level gates only. A green configuration check is NOT a substitute for
 // live receipt verification, wallet ownership proofs, backups and load testing.
 import {validateIndependentRpcs} from './quorum.js';
+import {PINNED_MAINNET_CONTRACTS} from '../asset-registry.js';
 function hasRpcQuorum(env,chain){
  try{validateIndependentRpcs(env,chain);return true;}
  catch{return false;}
@@ -29,8 +30,10 @@ export function readinessV2(env){
    env.BITCOIN_RPC_BASIC_B64_TERTIARY.length>16,
   bitcoinStart:/^[a-f0-9]{64}$/i.test(String(env.BITCOIN_START_BLOCKHASH||'')),
   ethereumStart:Number.isSafeInteger(Number(env.ETHEREUM_START_BLOCK))&&Number(env.ETHEREUM_START_BLOCK)>0,
-  erc20Contract:/^0x[a-f0-9]{40}$/i.test(String(env.USDT_ERC20_CONTRACT||'')),
-  trc20Contract:/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(String(env.USDT_TRC20_CONTRACT||'')),
+  erc20Contract:String(env.USDT_ERC20_CONTRACT||'').toLowerCase()===
+   PINNED_MAINNET_CONTRACTS.USDT_ERC20.address.toLowerCase(),
+  trc20Contract:String(env.USDT_TRC20_CONTRACT||'')===
+   PINNED_MAINNET_CONTRACTS.USDT_TRC20.address,
   approvedWebhookHosts:typeof env.MULTI_WEBHOOK_HOST_ALLOWLIST==='string'&&
     env.MULTI_WEBHOOK_HOST_ALLOWLIST.split(',').some(x=>x.trim().length>5)
  };
