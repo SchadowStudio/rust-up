@@ -109,24 +109,19 @@ export async function acceptVerifiedPaymentPart(db,invoice,proof,env,now=Date.no
  if(total<target)throw Error('payment_parts_no_longer_sufficient');
  const last=parts.at(-1);
  // Keep old one-invoice-one-event compatibility, but include all TX hashes.
- const settled=await settleV2(db,invoice,{
+ if(total>target){
+  // Fail closed. Record the excess BEFORE confirming the invoice: an
+  // unavailable review database must not silently lose refundable money.
+  await db.prepare(`INSERT OR IGNORE INTO v2_payment_reviews
+   (id,invoice_id,tx_hash,reason,created_at_ms,actual_amount_atomic)
+   VALUES(?,?,?,'manual',?,?)`)
+   .bind(crypto.randomUUID(),invoice.id,last.tx_hash,now,total.toString()).run();
+ }
+ return settleV2(db,invoice,{
   txHash:last.tx_hash,actualAtomic:total.toString(),
   paymentTimeMs:latestPaymentTime,confirmations:minConfirmations,
   paymentParts:parts.map(p=>p.tx_hash)
  },now);
- if(total>target&&settled.status==='verified'){
-  // Invoice can be marked paid, but the excess must remain visible for
-  // operator-led resolution. Provider has no private key to auto-refund.
-  try{
-   await db.prepare(`INSERT OR IGNORE INTO v2_payment_reviews
-    (id,invoice_id,tx_hash,reason,created_at_ms,actual_amount_atomic)
-    VALUES(?,?,?,'manual',?,?)`)
-    .bind(crypto.randomUUID(),invoice.id,last.tx_hash,now,total.toString()).run();
-  }catch{
-   console.error('overpayment review insertion failed; manual reconciliation required');
-  }
- }
- return settled;
 }
 export async function processPaymentPart(db,invoice,hash,env,now=Date.now()){
  const proof=await verifyChainPaymentQuorum({...invoice,amount_atomic:'1'},hash,env);
