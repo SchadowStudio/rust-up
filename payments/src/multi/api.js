@@ -212,5 +212,8 @@ export default {
   ]).then(results=>{
    for(const r of results)if(r.status==='rejected')console.error('multi-payments background job failed');
   }));
+ },
+ async queue(batch,env){
+  await consumePaymentEvents(batch,env);
  }
 };
