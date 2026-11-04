@@ -129,11 +129,27 @@ async function connectWallet(){
  const chain=await p.request({method:'eth_chainId'});
  if(chain!=='0x1')throw Error('Bitte auf Ethereum Mainnet wechseln.');
  const accounts=await p.request({method:'eth_requestAccounts'});
- const address=accounts?.[0];
- if(!await validateReceivingAddress('ethereum',address))
-  throw Error('Ungültige Ethereum-Adresse aus Wallet.');
- $('receiverChain').value='ethereum';$('receiver').value=address;
- output('Trust Wallet verbunden: ausschließlich öffentliche ETH-Adresse übertragen. Noch nicht für Zahlungen freigegeben.');
+ if(!Array.isArray(accounts)||accounts.length<1||accounts.length>25)
+  throw Error('Wallet hat keine oder zu viele freigegebene Adressen.');
+ const addresses=[];
+ for(const candidate of accounts){
+  if(!await validateReceivingAddress('ethereum',candidate))
+   throw Error('Ungültige öffentliche Ethereum-Adresse aus Wallet.');
+  const address=candidate.toLowerCase();
+  if(!addresses.some(x=>x.address===address))
+   addresses.push({chain:'ethereum',address});
+ }
+ $('receiverChain').value='ethereum';$('receiver').value=addresses[0].address;
+ output('Trust Wallet hat '+addresses.length+' öffentliche Ethereum-Adresse(n) freigegeben. Noch keine aktiviert.');
+ // The wallet never sends seed phrases, private keys or spending permissions.
+ // Explicit operator consent before importing watch-only addresses.
+ if(window.confirm('Sollen '+addresses.length+' öffentliche Ethereum-Adresse(n) aus der Wallet beim Provider gesperrt hinterlegt werden? Keine Private Keys werden benötigt.')){
+  const added=await call('/v2/admin/wallet-import','POST',{
+   walletLabel:'Trust Wallet',addresses,
+   confirmation:'CONFIRM_PUBLIC_ADDRESS_IMPORT'});
+  output(added.count+' öffentliche Ethereum-Adresse(n) importiert. Zunächst deaktiviert; erst nach Empfangstest freigeben.');
+  await loadReceivers();
+ }
  if(p.on)p.on('accountsChanged',()=>{
   $('receiver').value='';
   output('Wallet-Konto geändert. Bitte erneut verbinden.',true);
