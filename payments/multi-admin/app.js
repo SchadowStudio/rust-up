@@ -50,6 +50,7 @@ async function toggle(resource,params,enabled){
 async function loadProjects(){
  const data=await call('/v2/admin/projects');
  const holder=$('projects'),select=$('projectSelect');
+ const selected=select.value;
  holder.replaceChildren();select.replaceChildren();
  for(const x of data.projects){
   const option=document.createElement('option');
@@ -67,6 +68,7 @@ async function loadProjects(){
    })
   ]);
  }
+ if(data.projects.some(p=>p.id===selected))select.value=selected;
  if(data.projects.length===0)output('Keine Projekte. Erstelle zuerst eines.');
 }
 function showSecret(data){
