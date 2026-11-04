@@ -65,9 +65,17 @@ async function ethVerify(order,hash,env) {
  mustMatch(received,order);
  const block=await jsonRpc(url,'eth_getBlockByNumber',[receipt.blockNumber,false]);
  if(!block||block.number?.toLowerCase()!==receipt.blockNumber.toLowerCase())throw new Error('invalid_block_timestamp');
+ if(env.MULTI_STRICT_QUORUM==='true'){
+  const h=String(receipt.blockHash||'').toLowerCase();
+  if(!/^0x[0-9a-f]{64}$/.test(h)||
+     String(tx.blockHash||'').toLowerCase()!==h||
+     String(block.hash||'').toLowerCase()!==h)
+   throw new Error('noncanonical_ethereum_block');
+ }
  const paymentTimeMs=Number(BigInt(block.timestamp)*1000n);
  if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
- return {confirmations:Number(confirmations),actualAtomic:received.toString(),paymentTimeMs};
+ return {confirmations:Number(confirmations),actualAtomic:received.toString(),paymentTimeMs,
+  blockHash:String(receipt.blockHash||'').toLowerCase()};
 }
 async function btcVerify(order,hash,env) {
  // Own Bitcoin Core with txindex=1, or an explicitly trusted RPC node.
@@ -89,7 +97,21 @@ async function btcVerify(order,hash,env) {
  mustMatch(satoshis,order);
  const paymentTimeMs=tx.blocktime*1000;
  if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
- return {confirmations:tx.confirmations,actualAtomic:satoshis.toString(),paymentTimeMs};
+ let blockHash=String(tx.blockhash||'').toLowerCase();
+ if(env.MULTI_STRICT_QUORUM==='true'){
+  if(!/^[0-9a-f]{64}$/.test(blockHash))throw Error('bitcoin_blockhash_missing');
+  const header=await jsonRpc(env.BITCOIN_RPC_URL,'getblockheader',
+   [blockHash,true],env.BITCOIN_RPC_BASIC_B64);
+  if(!Number.isSafeInteger(header.height)||header.height<0||
+     String(header.hash).toLowerCase()!==blockHash)
+   throw Error('invalid_bitcoin_block_header');
+  const canonical=await jsonRpc(env.BITCOIN_RPC_URL,'getblockhash',
+   [header.height],env.BITCOIN_RPC_BASIC_B64);
+  if(String(canonical).toLowerCase()!==blockHash)
+   throw Error('noncanonical_bitcoin_block');
+ }
+ return {confirmations:tx.confirmations,actualAtomic:satoshis.toString(),paymentTimeMs,
+  blockHash};
 }
 async function tronVerify(order,hash,env) {
  const url=env.TRON_RPC_URL,key=env.TRON_RPC_API_KEY;
@@ -131,7 +153,16 @@ async function tronVerify(order,hash,env) {
  mustMatch(received,order);
  const paymentTimeMs=info.blockTimeStamp;
  if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
- return {confirmations,actualAtomic:received.toString(),paymentTimeMs};
+ let blockHash='';
+ if(env.MULTI_STRICT_QUORUM==='true'){
+  const canonical=await tronRpc(url,'/walletsolidity/getblockbynum',{num:info.blockNumber},key);
+  blockHash=String(canonical.blockID||'').toLowerCase();
+  if(!/^[0-9a-f]{64}$/.test(blockHash)||
+     canonical.block_header?.raw_data?.number!==info.blockNumber||
+     canonical.block_header?.raw_data?.timestamp!==paymentTimeMs)
+   throw Error('noncanonical_tron_block');
+ }
+ return {confirmations,actualAtomic:received.toString(),paymentTimeMs,blockHash};
 }
 export async function verifyChainPayment(order,submittedHash,env) {
  const conf=ASSETS[order.asset];
