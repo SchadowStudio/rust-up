@@ -150,6 +150,17 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
   '(id,telegram_user_id,sku,price_stars,status,created_at_ms,expires_at_ms) '+
   "VALUES (?,?,?,?,'pending',?,?)"
  ).bind(id,userId,sku,product.price_stars,now,now+TTL).run();
+ // Atomic upsert prevents concurrent button presses from issuing multiple invoices.
+ // The losing request never reaches Telegram's createInvoiceLink.
+ const lock=await db.prepare(
+  'INSERT INTO rustup_stars_purchase_locks '+
+  '(telegram_user_id,sku,order_id,expires_at_ms) VALUES(?,?,?,?) '+
+  'ON CONFLICT(telegram_user_id,sku) DO UPDATE SET '+
+  'order_id=excluded.order_id,expires_at_ms=excluded.expires_at_ms '+
+  'WHERE rustup_stars_purchase_locks.expires_at_ms<=?'
+ ).bind(userId,sku,id,now+TTL,now).run();
+ if(lock?.meta?.changes!==1)throw Error('stars_invoice_already_active');
+ // Save and verify the exact content before issuing a payable Telegram invoice.
  await db.prepare(
   'INSERT INTO rustup_stars_order_content(order_id,delivery_text) VALUES (?,?)'
  ).bind(id,product.delivery_text).run();
