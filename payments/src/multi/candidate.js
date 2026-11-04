@@ -1,5 +1,5 @@
 // Cloudflare Queue messages are UNTRUSTED HINTS. Chain verification is mandatory.
-import {verifyChainPayment} from '../chains.js';
+import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 import {txId} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
 import {settleV2,reviewUnderpayment} from './settlement.js';
