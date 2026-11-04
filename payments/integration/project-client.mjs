@@ -34,6 +34,17 @@ export class ProjectPaymentsClient {
  createInvoice({sku,asset,projectOrderRef=randomUUID(),idempotencyKey=randomUUID()}){
   return this.request('/v2/invoices','POST',{sku,asset,projectOrderRef},idempotencyKey);
  }
+ // Payment-provider-only deposit invoice. RUB/EUR/USD indicate the amount
+ // requested by the merchant; the customer transfers the chosen cryptocurrency.
+ // How the project accounts for this payment is up to the project, later.
+ createDeposit({currency,amountMinor,asset,
+  projectOrderRef=randomUUID(),idempotencyKey=randomUUID()}){
+  if(!['RUB','EUR','USD'].includes(currency)||
+     !Number.isSafeInteger(amountMinor)||amountMinor<100)
+   throw Error('invalid_deposit_request');
+  return this.request('/v2/deposits','POST',
+   {currency,amountMinor,asset,projectOrderRef},idempotencyKey);
+ }
  status(invoiceId){
   return this.request('/v2/invoices/'+encodeURIComponent(invoiceId));
  }
