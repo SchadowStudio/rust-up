@@ -1,7 +1,7 @@
 // Read-only production readiness assessment. Never changes remote settings,
 // displays secrets, or marks a real-money deployment as "certified".
 import {executeOperator} from './headless-operator.mjs';
-import {fileURLToPath} from 'node:url';
+import {pathToFileURL} from 'node:url';
 
 export function assessOperationalStatus(status,{minFreePerChain=1,maxPendingPartials=100}={}){
  const blockers=[],warnings=[];
@@ -60,5 +60,4 @@ async function main(){
   process.exitCode=1;
  }
 }
-if(process.argv[1]&&fileURLToPath(import.meta.url)===
- new URL('file://'+process.argv[1]).href)await main();
+if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)await main();
