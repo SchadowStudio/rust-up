@@ -109,6 +109,16 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
   "WHERE id=? AND status='paid' AND telegram_user_id=?)"
  ).bind(Date.now(),String(receipt.invoice_payload),String(receipt.invoice_payload),msg.from.id).run();
  if(updated?.meta?.changes!==1){
+  // A repeated callback might find an already-unlocked good. Confirm
+  // both the paid receipt and entitlement before acknowledging it.
+  const existing=await db.prepare(
+    'SELECT c.unlocked_at_ms,o.telegram_charge_id FROM rustup_stars_order_content c '+
+    'JOIN rustup_stars_orders o ON o.id=c.order_id '+
+    "WHERE c.order_id=? AND o.telegram_user_id=? AND o.status='paid'"
+  ).bind(String(receipt.invoice_payload),msg.from.id).first();
+  if(existing?.unlocked_at_ms&&
+     existing.telegram_charge_id===receipt.telegram_payment_charge_id)
+    return true;
   await recordUnexpectedReceipt(db,msg,'paid_but_content_not_unlocked');
   throw Error('payment_content_unlock_failed_retry');
  }
