@@ -17,10 +17,10 @@ const proof=(txHash,actualAtomic)=>({
  paymentTimeMs:TIME,confirmations:20
 });
 function inMemory(){
- const parts=new Map(),events=[],claims=[];
+ const parts=new Map(),events=[],claims=[],queue=new Map();
  let paid=false;
  const db={
-  parts,events,claims,
+  parts,events,claims,queue,
   prepare(sql){return {bind(...args){return {
    sql,args,
    async first(){
@@ -46,6 +46,10 @@ function inMemory(){
      if(parts.has(key))throw Error('UNIQUE');
      parts.set(key,{chain,tx_hash,invoice_id,project_id,asset,
       actual_atomic,payment_time_ms,block_hash,confirmed_at_ms});
+     return {meta:{changes:1}};
+    }
+    if(sql.includes('INSERT INTO v2_partial_reconcile_queue')){
+     queue.set(args[0],{next_check_ms:args[1],attempts:0});
      return {meta:{changes:1}};
     }
     throw Error('unexpected_run_query:'+sql);
