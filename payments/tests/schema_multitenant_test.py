@@ -101,6 +101,44 @@ class MultiTenantSchema(unittest.TestCase):
   self.assertEqual(changed,0)
   self.assertIsNone(self.db.execute(
    "SELECT assigned_intent FROM deposit_addresses WHERE address='0xbbb'").fetchone()[0])
+ def test_project_payment_methods_start_disabled_and_isolated(self):
+  for project in (P1,P2):
+   profile=self.db.execute(
+    "SELECT invoices_enabled,deposits_enabled,products_enabled FROM v2_project_payment_profiles WHERE project_id=?",(project,)).fetchone()
+   self.assertEqual(profile,(0,0,0))
+   self.assertEqual(self.db.execute(
+    "SELECT COUNT(*) FROM v2_project_fiat_methods WHERE project_id=? AND enabled=0",(project,)).fetchone()[0],3)
+   self.assertEqual(self.db.execute(
+    "SELECT COUNT(*) FROM v2_project_crypto_methods WHERE project_id=? AND enabled=0",(project,)).fetchone()[0],5)
+  self.db.execute("UPDATE v2_project_payment_profiles SET invoices_enabled=1,deposits_enabled=1 WHERE project_id=?",(P1,))
+  self.db.execute("UPDATE v2_project_fiat_methods SET enabled=1 WHERE project_id=? AND currency='RUB'",(P1,))
+  self.db.execute("UPDATE v2_project_crypto_methods SET enabled=1 WHERE project_id=? AND asset='USDT_TRC20'",(P1,))
+  self.assertEqual(self.db.execute(
+   "SELECT invoices_enabled FROM v2_project_payment_profiles WHERE project_id=?",(P2,)).fetchone()[0],0)
+  self.assertEqual(self.db.execute(
+   "SELECT COUNT(*) FROM v2_project_fiat_methods WHERE project_id=? AND enabled=1",(P2,)).fetchone()[0],0)
+  self.assertEqual(self.db.execute(
+   "SELECT COUNT(*) FROM v2_project_crypto_methods WHERE project_id=? AND enabled=1",(P2,)).fetchone()[0],0)
+ def test_cannot_enable_unsupported_currency_or_invalid_limits(self):
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("INSERT INTO v2_project_fiat_methods(project_id,currency) VALUES (?,'GBP')",(P1,))
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("UPDATE v2_project_fiat_methods SET min_minor=10000,max_minor=1000 WHERE project_id=? AND currency='RUB'",(P1,))
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("UPDATE v2_project_payment_profiles SET invoice_lifetime_minutes=500 WHERE project_id=?",(P1,))
+ def test_project_wallet_keys_and_payment_method_are_independent(self):
+  self.db.execute("UPDATE v2_project_payment_profiles SET invoices_enabled=1,deposits_enabled=1 WHERE project_id=?",(P1,))
+  self.db.execute("UPDATE v2_project_fiat_methods SET enabled=1 WHERE project_id=? AND currency='EUR'",(P1,))
+  self.db.execute("UPDATE v2_project_crypto_methods SET enabled=1 WHERE project_id=? AND asset='BTC'",(P1,))
+  query="""SELECT p.invoices_enabled,p.deposits_enabled,
+    f.enabled,c.enabled FROM v2_project_payment_profiles p
+    JOIN v2_project_fiat_methods f ON f.project_id=p.project_id AND f.currency=?
+    JOIN v2_project_crypto_methods c ON c.project_id=p.project_id AND c.asset=?
+    WHERE p.project_id=?"""
+  self.assertEqual(self.db.execute(query,('EUR','BTC',P1)).fetchone(),(1,1,1,1))
+  self.assertEqual(self.db.execute(query,('EUR','BTC',P2)).fetchone(),(0,0,0,0))
+  self.assertEqual(self.db.execute(query,('RUB','BTC',P1)).fetchone(),(1,1,0,1))
+  self.assertEqual(self.db.execute(query,('EUR','ETH',P1)).fetchone(),(1,1,1,0))
  def test_tables_store_no_direct_customer_identifiers(self):
   for table in ('v2_projects','v2_api_keys','v2_products','v2_invoices',
     'v2_chain_claims','v2_delivery_outbox'):
