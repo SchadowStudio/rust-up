@@ -46,4 +46,14 @@ test('read-only preflight can query operator status without any POST',async()=>{
  assert.equal(request.options.method,'GET');
  assert.equal(request.url,'https://gateway.example/v2/admin/status');
 });
-\ntest('TON-specific readiness requires a free TON receiver only after operator activation',()=>{\n const off=assessOperationalStatus({...good(),tonNetworkEnabled:false});\n assert.equal(off.readyForFurtherManualReview,true);\n const on=assessOperationalStatus({...good(),tonNetworkEnabled:true});\n assert.equal(on.readyForFurtherManualReview,false);\n assert.ok(on.blockers.includes('insufficient_unique_wallet_addresses:ton'));\n const ready=assessOperationalStatus({...good(),tonNetworkEnabled:true,\n  availableReceivers:{...good().availableReceivers,ton:5}});\n assert.equal(ready.readyForFurtherManualReview,true);\n});\n
+
+test('TON-specific readiness requires a free TON receiver only after operator activation',()=>{
+ const off=assessOperationalStatus({...good(),tonNetworkEnabled:false});
+ assert.equal(off.readyForFurtherManualReview,true);
+ const on=assessOperationalStatus({...good(),tonNetworkEnabled:true});
+ assert.equal(on.readyForFurtherManualReview,false);
+ assert.ok(on.blockers.includes('insufficient_unique_wallet_addresses:ton'));
+ const ready=assessOperationalStatus({...good(),tonNetworkEnabled:true,
+  availableReceivers:{...good().availableReceivers,ton:5}});
+ assert.equal(ready.readyForFurtherManualReview,true);
+});
