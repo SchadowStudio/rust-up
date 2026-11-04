@@ -174,3 +174,19 @@ test('invalid or forged Mini App initData cannot create an invoice',async()=>{
   assert.equal(telegram.calls.length,0);
  }finally{sql.close();}
 });
+
+
+test('production checkout is blocked until authorized refund handling is enabled',async()=>{
+ const {sql,env,request,telegram}=fixture();
+ try{
+  env.STARS_REFUNDS_ENABLED='false';
+  assert.equal((await request('catalog')).json.checkoutEnabled,false);
+  assert.equal((await request('checkout',{sku:'fixed_badge'})).status,503);
+  assert.equal(telegram.calls.length,0);
+  env.STARS_REFUNDS_ENABLED='true';
+  delete env.PAYMENT_ADMIN_IDS;
+  assert.equal((await request('catalog')).json.checkoutEnabled,false);
+  assert.equal((await request('checkout',{sku:'fixed_badge'})).status,503);
+  assert.equal(telegram.calls.length,0);
+ }finally{sql.close();}
+});
