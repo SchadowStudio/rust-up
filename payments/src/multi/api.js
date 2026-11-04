@@ -7,7 +7,7 @@ import {quoteFromRate} from './fiat.js';
 import {digestHex,authenticateProject} from './keys.js';
 import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity.js';
 import {settleV2,expireV2} from './settlement.js';
-import {deliverV2} from './delivery.js';
+import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 import {scanMultiPayments} from './monitor.js';
 import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
@@ -128,6 +128,7 @@ async function verifyInvoice(db,project,invoice,b,env){
  if(!isHash(b.transactionHash))return fail('invalid_transaction_id');
  const proof=await verifyChainPayment(invoice,b.transactionHash,env);
  const result=await settleV2(db,invoice,proof);
+ await notifyDeliveryQueue(env,result);
  if(result.status==='manual_review')return fail('payment_requires_manual_review',409);
  const latest=await getInvoice(db,project.id,invoice.id);
  return json({ok:true,invoice:responseInvoice(latest,latest.delivered!=null)});
