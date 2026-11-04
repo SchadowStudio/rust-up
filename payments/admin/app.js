@@ -12,7 +12,12 @@ window.addEventListener('eip6963:announceProvider',event=>{
 });
 window.dispatchEvent(new Event('eip6963:requestProvider'));
 function provider(){
- return [...walletProviders.values()][0]||null;
+ const announced=[...walletProviders.values()][0];
+ if(announced)return announced;
+ const mobile=window.trustwallet?.ethereum || window.trustwallet;
+ if(mobile?.request)return mobile;
+ if(window.ethereum?.isTrust && window.ethereum?.request)return window.ethereum;
+ return null;
 }
 async function walletConnect(){
  const p=provider();
