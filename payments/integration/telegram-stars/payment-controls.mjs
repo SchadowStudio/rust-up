@@ -42,7 +42,7 @@ export async function isPaymentEnabled(env,channel){
   // Fail closed on missing migration, DB failure or unset hard gates.
   if(!hardPaymentGate(env,channel))return false;
   try{
-    const s=await readPaymentSwitches(env.DB);
+    const s=await readPaymentSwitches(env.PAYMENTS_DB||env.DB);
     return s.master&&s[channel];
   }catch{return false;}
 }
@@ -85,19 +85,21 @@ function statusMessage(s,env){
  * Uses an injected send function so the existing bot's Telegram API client
  * is reused: sendMessage(chatId, plainText) => Promise<void>.
  */
-export async function handlePaymentAdminCommand(update,env,{sendMessage}={}){
+export async function handlePaymentAdminCommand(update,env,{sendMessage,authorize}={}){
   const msg=update?.message;
   const command=parseCommand(msg?.text,env);
   if(!command)return {handled:false};
   const userId=msg?.from?.id;
   // Admin commands are accepted in a private chat, not a forwarded message,
   // a group, or a user-controlled API request.
-  if(!isPaymentAdmin(userId,env)||msg?.chat?.type!=='private'||
+  if((typeof authorize==='function' ? !(await authorize(msg.from)) : !isPaymentAdmin(userId,env))||
+     msg?.chat?.type!=='private'||
      msg.chat.id!==userId||msg.forward_origin||msg.sender_chat)
     return {handled:true,authorized:false};
   if(typeof sendMessage!=='function')throw Error('payment_admin_sender_missing');
+  const db=env.PAYMENTS_DB||env.DB;
   let switches;
-  try{switches=await readPaymentSwitches(env.DB);}
+  try{switches=await readPaymentSwitches(db);}
   catch{
     await sendMessage(userId,'Payments unavailable: settings database missing. No changes made.');
     return {handled:true,authorized:true,ok:false};
@@ -112,13 +114,13 @@ export async function handlePaymentAdminCommand(update,env,{sendMessage}={}){
   }
   const next=command.enabled?1:0;
   if(switches[command.channel]!==command.enabled){
-    const result=await env.DB.prepare(
+    const result=await db.prepare(
       'UPDATE rustup_payment_settings SET enabled=?,updated_at_ms=?,updated_by=? WHERE channel=? AND enabled<>?'
     ).bind(next,Date.now(),userId,command.channel,next).run();
     if(result?.meta?.changes!==1)
       throw Error('payment_control_concurrent_change');
   }
-  switches=await readPaymentSwitches(env.DB);
+  switches=await readPaymentSwitches(db);
   await sendMessage(userId,statusMessage(switches,env));
   return {handled:true,authorized:true,ok:true,updated:command.channel,
     enabled:switches[command.channel]};
