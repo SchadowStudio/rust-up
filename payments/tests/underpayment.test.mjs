@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {reviewUnderpayment} from '../src/multi/settlement.js';
 
 const HASH='0x'+'a'.repeat(64),RECEIVER='0x'+'b'.repeat(40);
-const TIME=1762300000000;
+const TIME=1762300000000, BLOCK='0x'+'d'.repeat(64);
+const RPC_ENV={ETHEREUM_RPC_URL:'https://one-rpc.example.com',
+ ETHEREUM_RPC_URL_SECONDARY:'https://two-rpc.example.net',
+ ETHEREUM_RPC_URL_TERTIARY:'https://three-rpc.example.org'};
 function invoice(){return {
  id:'123e4567-e89b-42d3-a456-426614174000',project_id:'123e4567-e89b-42d3-a456-426614174001',
  asset:'ETH',chain:'ethereum',receive_address:RECEIVER,
@@ -21,10 +24,10 @@ async function withEthPaidTo(address,received,callback){
   const {method}=JSON.parse(options.body);
   const entries={
    eth_chainId:'0x1',
-   eth_getTransactionByHash:{hash:HASH,to:address,value:'0x'+received.toString(16),blockNumber:'0x65'},
-   eth_getTransactionReceipt:{transactionHash:HASH,status:'0x1',blockNumber:'0x65',logs:[]},
+   eth_getTransactionByHash:{hash:HASH,to:address,value:'0x'+received.toString(16),blockNumber:'0x65',blockHash:BLOCK},
+   eth_getTransactionReceipt:{transactionHash:HASH,status:'0x1',blockNumber:'0x65',blockHash:BLOCK,logs:[]},
    eth_blockNumber:'0x70',
-   eth_getBlockByNumber:{number:'0x65',timestamp:'0x'+Math.floor(TIME/1000).toString(16)}
+   eth_getBlockByNumber:{number:'0x65',hash:BLOCK,timestamp:'0x'+Math.floor(TIME/1000).toString(16)}
   };
   return {ok:true,json:async()=>({result:entries[method]})};
  };
@@ -33,7 +36,7 @@ async function withEthPaidTo(address,received,callback){
 test('confirmed underpayment produces a review ticket, not a wallet credit',async()=>{
  const db=dbMock(),order=invoice();
  await withEthPaidTo(RECEIVER,25n,async()=>{
-  const result=await reviewUnderpayment(db,order,HASH,{ETHEREUM_RPC_URL:'https://eth.example'},TIME+180000);
+  const result=await reviewUnderpayment(db,order,HASH,RPC_ENV,TIME+180000);
   assert.deepEqual(result,{status:'manual_review',reason:'underpaid',receivedAtomic:'25'});
  });
  assert.equal(db.writes.length,1);
@@ -45,7 +48,7 @@ test('transaction paying wrong address cannot create partial invoice',async()=>{
  const db=dbMock();
  await withEthPaidTo('0x'+'c'.repeat(40),25n,async()=>{
   await assert.rejects(()=>reviewUnderpayment(db,invoice(),HASH,
-    {ETHEREUM_RPC_URL:'https://eth.example'},TIME+180000));
+    RPC_ENV,TIME+180000));
  });
  assert.equal(db.writes.length,0);
 });
@@ -54,7 +57,7 @@ test('payments after locked quote expiry need support review',async()=>{
  order.expires_at_ms=TIME-1000;
  await withEthPaidTo(RECEIVER,25n,async()=>{
   const result=await reviewUnderpayment(db,order,HASH,
-   {ETHEREUM_RPC_URL:'https://eth.example'},TIME+180000);
+   RPC_ENV,TIME+180000);
   assert.equal(result.reason,'late');
  });
  assert.equal(db.writes.length,1);
@@ -63,7 +66,7 @@ test('full amount never takes the underpayment path',async()=>{
  const db=dbMock();
  await withEthPaidTo(RECEIVER,100n,async()=>{
   const result=await reviewUnderpayment(db,invoice(),HASH,
-   {ETHEREUM_RPC_URL:'https://eth.example'},TIME+180000);
+   RPC_ENV,TIME+180000);
   assert.equal(result.status,'full_amount_needs_retry');
  });
  assert.equal(db.writes.length,0);
