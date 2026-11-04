@@ -165,3 +165,32 @@ von Projekt B.
 
 Die Existenz der Projektkonfiguration und erfolgreiche GitHub-Tests bedeuten
 nicht, dass die echten Zahlungssysteme bereits verbunden oder live sind.
+
+
+## Sicherheitsvorfälle nach bereits bestätigten Zahlungen
+
+Das Projektbackend kann mit seinem **serverseitigen** Projekt-Key den
+read-only Incident-Feed abfragen:
+
+```http
+GET /v2/incidents
+Authorization: Bearer <PROJECT_API_KEY>
+X-Project-Id: <PROJECT_UUID>
+```
+
+Die Antwort enthält nur die zum jeweiligen Projekt gehörigen
+`auditDisputes` (unklare/reorganisierte Blockchain-Nachweise) sowie
+`openPaymentReviews` (noch ungeklärte manuelle Fälle). Jede Gruppe ist
+auf 100 neueste Einträge begrenzt; das ist kein vollständiger Audit-Export.
+Der Feed kann **nach** einem bereits zugestellten Payment-Webhook neue
+Verdachtsfälle enthalten. Projekte müssen ihn regelmäßig serverseitig prüfen
+und bei Befunden ihre eigenen Fulfillment-/Support-Prozesse auslösen.
+Keine automatische Abbuchung und kein automatischer Wallet-Refund erfolgt.
+
+Bei noch nicht zugestellten Webhooks sperrt der Provider nun eine
+Gutschrift, solange der zugehörige Blockchain-Audit auf `uncertain` oder
+`manual_review` steht oder ein Zahlungsprüfungsfall offen ist.
+Die Zustellung verbleibt in der Retry-Outbox.
+
+Der Client in `integration/project-client.mjs` stellt hierfür
+`incidents()` bereit. **Nicht im Browser mit Projekt-API-Key nutzen.**
