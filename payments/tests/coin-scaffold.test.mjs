@@ -32,6 +32,6 @@ test('coin scaffold rejects path injection and invalid chains',()=>{
   ['USDC_ERC20','tron','erc20',6],
   ['USDT_ERC20','ethereum','erc20',6],
   ['BTC','bitcoin','native',8],
-  ['SOL','solana','spl',9]
+  ['SOL','solana','erc20',9]
  ])assert.throws(()=>coinScaffold(asset,chain,standard,decimals));
 });
