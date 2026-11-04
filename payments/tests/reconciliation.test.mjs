@@ -23,6 +23,12 @@ function fakeDb(invoice){
     return {
      async all(){if(sql.includes('FROM v2_invoices i'))return {results:invoice?[{...invoice}]:[]};
       throw Error('unexpected_query')},
+     async first(){
+      if(sql.includes('FROM v2_delivery_outbox'))
+       return {event_body:JSON.stringify({invoiceId:UUID,projectId:UUID,
+        transactionHash:TX,amountAtomic:'123'})};
+      throw Error('unexpected_single_query');
+     },
      async run(){writes.push({sql,args});return {meta:{changes:1}}}
     };
    }};
