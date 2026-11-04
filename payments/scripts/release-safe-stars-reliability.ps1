@@ -35,7 +35,16 @@ if($PreflightOnly){
  exit 0
 }
 $migration=Join-Path $repo 'payments\integration\telegram-stars\invoice-links-migration.sql'
-Step "Migrate isolated payment database only" {npx --yes wrangler d1 execute rustup-stars-staging --remote "--file=$migration" --config $config}
+# Wrangler --file invokes Cloudflare's D1 /import endpoint, which can return
+# OAuth code 10000 even when D1 /query access is valid. This is one small,
+# additive idempotent statement: use the /query-backed --command instead.
+$migrationSql=Get-Content -LiteralPath $migration -Raw
+if($migrationSql -notmatch '(?i)CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+rustup_stars_invoice_links'){
+ throw "Unexpected Stars migration contents. Refusing to run."
+}
+Step "Verify isolated payment D1 query access" {npx --yes wrangler d1 execute rustup-stars-staging --remote --command "SELECT 1 AS auth_ok" --config $config}
+Step "Migrate isolated payment database via D1 query endpoint" {npx --yes wrangler d1 execute rustup-stars-staging --remote --command $migrationSql --config $config}
+Step "Verify invoice link table exists" {npx --yes wrangler d1 execute rustup-stars-staging --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name='rustup_stars_invoice_links'" --config $config}
 Step "Deploy Worker with payments OFF" {npx --yes wrangler deploy --config $config}
 $health=Invoke-RestMethod 'https://rustup-bot.ttzoomrust.workers.dev/api/stars/health'
 if(!$health.ok -or $health.productionEnabled -or $health.gameBalanceCredit){
