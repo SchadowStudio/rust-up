@@ -18,16 +18,27 @@ export function patchAdminSource(source){
   if(source.includes('RUSTUP_PAYMENT_MINI_APP')||source.includes('handleAdminPaymentPanelApi'))
     throw Error('admin_payment_panel_already_patched');
   const offset=source.indexOf(fn);
-  const sw=source.indexOf('  switch (path) {\n',offset);
-  const end=source.indexOf('  return h.json({ ok: false, error: "path" }',offset);
-  const auth=source.indexOf('await h.verifyInitData(',offset);
-  const check=source.indexOf('await h.isAdmin(env, user)',offset);
-  if(sw<0||end<0||sw>end||auth<offset||auth>sw||check<auth||check>sw||
-     !source.includes('env.ADMIN_BOT_TOKEN'))
-    throw Error('admin_endpoint_authentication_not_verified');
-  const patched=source.slice(0,sw)+source.slice(sw).replace(
-    '  switch (path) {\n','  switch (path) {\n'+CASE);
-  return IMPORT+patched;
+  // Source maps can contain CRLF, different whitespace and single-quoted
+  // responses. Do not require a particular default 404 string/indentation:
+  // require the authenticated adminApi function and both guards instead.
+  const local=source.slice(offset,offset+12000);
+  const matches=[...local.matchAll(/^([ \\t]*)switch\\s*\\(\\s*path\\s*\\)\\s*\\{/gm)];
+  const mark=matches.length===1?matches[0]:null;
+  const sw=mark?offset+mark.index:-1;
+  const pre=sw>=0?source.slice(offset,sw):'';
+  const auth=pre.indexOf('await h.verifyInitData(');
+  const token=pre.indexOf('env.ADMIN_BOT_TOKEN');
+  const guard=pre.indexOf('await h.isAdmin(env, user)');
+  const idReject=/if\\s*\\(\\s*!user\\s*\\|\\|\\s*!user\\.id\\s*\\)\\s*return\\s+h\\.json\\s*\\(/.test(pre);
+  const adminReject=/if\\s*\\(\\s*!\\s*(?:\\(\\s*)?await\\s+h\\.isAdmin\\s*\\(\\s*env\\s*,\\s*user\\s*\\)\\s*\\)?\\s*\\)\\s*return\\s+h\\.json\\s*\\(/.test(pre);
+  if(sw<0||sw-offset>6000||auth<0||token<auth||guard<token||!idReject||!adminReject)
+    throw Error('admin_endpoint_authentication_not_verified ('+
+      'switch='+Boolean(mark)+',signed_initData='+(auth>=0&&token>auth)+
+      ',admin_check='+(guard>token)+',reject_invalid_user='+idReject+
+      ',reject_non_admin='+adminReject+')');
+  const begin=mark[0];
+  const insertion=begin+'\n'+CASE;
+  return IMPORT+source.slice(0,sw)+source.slice(sw).replace(begin,insertion);
 }
 async function main(){
   const target=process.argv[2];
