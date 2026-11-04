@@ -63,7 +63,7 @@ test('ETH payments verify recipient, amount, receipt, and confirmations',async()
  });
 });
 test('USDT ERC-20 checks contract and Transfer recipient',async()=>{
- const hash='0x'+'a'.repeat(64),destination='0x'+'b'.repeat(40),token='0x'+'d'.repeat(40);
+ const hash='0x'+'a'.repeat(64),destination='0x'+'b'.repeat(40),token='0xdAC17F958D2ee523a2206206994597C13D831ec7';
  const log={address:token,topics:[ERC20_TRANSFER_TOPIC,'0x'+'0'.repeat(64),'0x'+'0'.repeat(24)+'b'.repeat(40)],data:'0x2625a0'};
  const data={eth_chainId:'0x1',
  eth_getTransactionByHash:{hash,to:token,value:'0x0',blockNumber:'0x65'},
