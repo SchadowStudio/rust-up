@@ -87,7 +87,9 @@ async function btcVerify(order,hash,env) {
   satoshis+=BigInt(sat);
  }
  mustMatch(satoshis,order);
- return {confirmations:tx.confirmations,actualAtomic:satoshis.toString()};
+ const paymentTimeMs=tx.blocktime*1000;
+ if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
+ return {confirmations:tx.confirmations,actualAtomic:satoshis.toString(),paymentTimeMs};
 }
 async function tronVerify(order,hash,env) {
  const url=env.TRON_RPC_URL,key=env.TRON_RPC_API_KEY;
@@ -127,7 +129,9 @@ async function tronVerify(order,hash,env) {
   }
  }
  mustMatch(received,order);
- return {confirmations,actualAtomic:received.toString()};
+ const paymentTimeMs=info.blockTimeStamp;
+ if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
+ return {confirmations,actualAtomic:received.toString(),paymentTimeMs};
 }
 export async function verifyChainPayment(order,submittedHash,env) {
  const conf=ASSETS[order.asset];
