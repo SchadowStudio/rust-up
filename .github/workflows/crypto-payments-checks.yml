@@ -26,5 +26,7 @@ jobs:
         run: cd payments && npm run validate
       - name: Build isolated Trust Wallet operator console
         run: cd payments && npm run build:operator
+      - name: Build public checkout module
+        run: cd payments && npm run build:checkout
       - name: Test D1 SQLite uniqueness constraints
         run: python3 -m unittest discover -s payments/tests -p 'schema*_test.py' -v
