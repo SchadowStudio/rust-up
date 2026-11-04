@@ -87,6 +87,10 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
      'SELECT 1 FROM rustup_stars_order_content WHERE order_id=?'
     ).bind(q.invoice_payload).first();
     if(!snapshot)throw Error('stars_missing_delivery_snapshot');
+    const savedInvoice=await db.prepare(
+     'SELECT 1 FROM rustup_stars_invoice_links WHERE order_id=?'
+    ).bind(q.invoice_payload).first();
+    if(!savedInvoice)throw Error('stars_missing_persisted_invoice');
    }else if(enabled){
     throw Error('stars_invalid_order_payload');
    }
@@ -148,8 +152,30 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
   "AND status='paid' LIMIT 1"
  ).bind(userId,sku).first();
  if(owned)throw Error('product_already_owned');
-
- const id=crypto.randomUUID(),now=Date.now();
+ // Never issue another invoice after Telegram already approved an earlier
+ // checkout; a delayed Telegram receipt must first be reconciled.
+ const awaitingReceipt=await db.prepare(
+  'SELECT 1 FROM rustup_stars_orders WHERE telegram_user_id=? AND sku=? '+
+  "AND status='checkout_approved' LIMIT 1"
+ ).bind(userId,sku).first();
+ if(awaitingReceipt)throw Error('prior_stars_payment_requires_reconciliation');
+ const now=Date.now();
+ const active=await db.prepare(
+  'SELECT o.id,o.price_stars,o.expires_at_ms,o.status,l.invoice_url '+
+  'FROM rustup_stars_purchase_locks k '+
+  'JOIN rustup_stars_orders o ON o.id=k.order_id '+
+  'LEFT JOIN rustup_stars_invoice_links l ON l.order_id=o.id '+
+  'WHERE k.telegram_user_id=? AND k.sku=? AND k.expires_at_ms>?'
+ ).bind(userId,sku,now).first();
+ if(active){
+  if(active.status==='pending'&&typeof active.invoice_url==='string'&&
+     active.expires_at_ms>now&&active.price_stars===product.price_stars)
+    return {orderId:active.id,invoiceUrl:active.invoice_url,
+      stars:active.price_stars,expiresAtMs:active.expires_at_ms,
+      creditToGame:false,replayed:true};
+  throw Error('stars_invoice_already_active');
+ }
+ const id=crypto.randomUUID();
  await db.prepare(
   'INSERT INTO rustup_stars_orders '+
   '(id,telegram_user_id,sku,price_stars,status,created_at_ms,expires_at_ms) '+
@@ -172,10 +198,16 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
  // No charge occurs before Telegram approves the actual precheckout query.
  const invoice=await telegramApi(asPaymentsEnv(env,true),
   'createInvoiceLink',invoiceBody(product,id),fetchImpl);
- if(typeof invoice!=='string'||!invoice.startsWith('https://'))
+ if(typeof invoice!=='string'||!/^https:\/\/[^\\s]+$/.test(invoice)||invoice.length>1024)
   throw Error('invalid_stars_invoice_link');
+ const saved=await db.prepare(
+  'INSERT OR IGNORE INTO rustup_stars_invoice_links(order_id,invoice_url,created_at_ms) '+
+  'VALUES(?,?,?)'
+ ).bind(id,invoice,now).run();
+ if(saved?.meta?.changes!==1)
+  throw Error('stars_invoice_link_not_persisted');
  return {orderId:id,invoiceUrl:invoice,stars:product.price_stars,
-  expiresAtMs:now+TTL,creditToGame:false};
+  expiresAtMs:now+TTL,creditToGame:false,replayed:false};
 }
 export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  const url=new URL(request.url),path=url.pathname;
