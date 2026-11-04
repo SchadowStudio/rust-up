@@ -23,9 +23,26 @@ class FakeD1 {
     async all(){
      if(sql.includes('JOIN v2_api_keys'))
       return {results:[{id:PROJECT,status:'active',webhook_url:'https://shop.example.com/payments',secret_sha256:db.keyHash}]};
+     if(sql.includes('FROM v2_project_fiat_methods WHERE project_id=?'))
+      return {results:['RUB','EUR','USD'].map(currency=>({
+       currency,enabled:1,min_minor:100,max_minor:100000000
+      }))};
+     if(sql.includes('FROM v2_project_crypto_methods'))
+      return {results:['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'].map(asset=>({asset,enabled:1}))};
      throw Error('unexpected list query: '+sql);
     },
     async first(){
+     if(sql.includes('FROM v2_project_payment_profiles p')&&
+        sql.includes('JOIN v2_project_fiat_methods'))
+      return {invoices_enabled:1,deposits_enabled:1,products_enabled:1,
+       invoice_lifetime_minutes:20,fiat_enabled:1,crypto_enabled:1,
+       min_minor:100,max_minor:100000000};
+     if(sql.includes('FROM v2_project_payment_profiles p')&&
+        sql.includes('JOIN v2_projects pr'))
+      return {project_id:PROJECT,display_name:'Test project',
+       invoices_enabled:1,deposits_enabled:1,products_enabled:1,
+       invoice_lifetime_minutes:20,updated_at_ms:NOW,
+       project_status:'active',webhook_url:'https://shop.example.com/payments'};
      if(sql.includes('FROM v2_invoices')&&sql.includes('idempotency_key'))
       return db.orders.find(x=>x.project_id===args[0]&&x.idempotency_key===args[1])||null;
      if(sql.includes('FROM v2_invoices')&&sql.includes('LEFT JOIN v2_delivery_outbox'))
@@ -138,7 +155,7 @@ test('payment provider methods are RUB EUR USD and the five supported crypto net
  const r=await handleMulti(request('/v2/methods'),environment(db));
  assert.equal(r.status,200);
  const data=await r.json();
- assert.deepEqual(data.fiatCurrencies,['RUB','EUR','USD']);
+ assert.deepEqual(data.fiatCurrencies.map(x=>x.currency),['EUR','RUB','USD']);
  assert.equal(data.supportedAssets.length,5);
  assert.match(data.note,/Fiat denotes invoice value/);
 });
