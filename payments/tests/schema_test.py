@@ -25,4 +25,17 @@ class PaymentSchema(unittest.TestCase):
   self.db.execute("INSERT INTO payment_outbox(event_id,intent_id,event_type,payload,created_at_ms) VALUES('evt1','order1','crypto_payment_verified','{}',1)")
   with self.assertRaises(sqlite3.IntegrityError):
    self.db.execute("INSERT INTO payment_outbox(event_id,intent_id,event_type,payload,created_at_ms) VALUES('evt2','order1','crypto_payment_verified','{}',1)")
+ def test_receivers_default_disabled(self):
+  row=self.db.execute("SELECT enabled FROM deposit_addresses WHERE chain='ethereum' AND address='0xaaa'").fetchone()
+  self.assertEqual(row[0],0)
+ def test_immutable_verification_per_tx(self):
+  self.order('order1')
+  self.db.execute("INSERT INTO payment_verifications(chain,tx_hash,intent_id,confirmations,verified_at_ms) VALUES('ethereum','x','order1',12,12)")
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("INSERT INTO payment_verifications(chain,tx_hash,intent_id,confirmations,verified_at_ms) VALUES('ethereum','x','order1',12,12)")
+ def test_one_manual_review_per_transaction(self):
+  self.order('order1')
+  self.db.execute("INSERT INTO payment_review_queue(chain,tx_hash,intent_id,reason,detected_at_ms) VALUES('ethereum','tx','order1','late_payment',1)")
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("INSERT INTO payment_review_queue(chain,tx_hash,intent_id,reason,detected_at_ms) VALUES('ethereum','tx','order1','late_payment',2)")
 if __name__=='__main__':unittest.main()
