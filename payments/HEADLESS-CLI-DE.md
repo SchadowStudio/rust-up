@@ -180,3 +180,4 @@ Webhook-Verarbeitung, Offsite-Backup, Wiederherstellungstest und
 Vor Freigabe **keine echten Kundeneinzahlungen** ermöglichen.
 Für digitale Güter in Telegram Mini Apps gelten zudem die
 Telegram-Stars-Plattformvorgaben.
+\n## TON / Toncoin (The Open Network)\n\nTON ist ein eigenes Netzwerk und **nicht TRON**. Öffentliche TON-Mainnet-\nWallet-Adressen (EQ.../UQ...) lassen sich auch ohne Provider-Website\nimportieren und werden zunächst gesperrt gespeichert.\n\n\`\`\`powershell\nnpm run operator -- address-add ton DEINE_TON_MAINNET_ADRESSE --confirm\nnpm run operator -- address-list\n# Erst NACH dem Test einer tatsächlich kontrollierten Empfangsadresse\nnpm run operator -- address-enable ton DEINE_TON_MAINNET_ADRESSE --confirm\n\`\`\`\n\nDer globale Schalter \`MULTI_TON_ENABLED\` bleibt false, bis unabhängige\nTON-Mainnet-Indexer, eine eigene Wallet und echte Testzahlungen geprüft sind.\nWeitere Details: [TON-Integration](./TON-INTEGRATION-DE.md).\n

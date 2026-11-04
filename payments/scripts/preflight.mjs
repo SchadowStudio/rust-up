@@ -10,7 +10,8 @@ export function assessOperationalStatus(status,{minFreePerChain=1,maxPendingPart
   status.missingPrerequisites:[];
  for(const name of missing)blockers.push('missing_configuration:'+name);
  const receivers=status.availableReceivers||{};
- for(const chain of ['bitcoin','ethereum','tron']){
+ for(const chain of (status.tonNetworkEnabled===true?
+  ['bitcoin','ethereum','tron','ton']:['bitcoin','ethereum','tron'])){
   const available=Number(receivers[chain]||0);
   if(!Number.isSafeInteger(available)||available<minFreePerChain)
    blockers.push('insufficient_unique_wallet_addresses:'+chain);

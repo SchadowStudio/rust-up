@@ -202,7 +202,9 @@ export async function multiAdmin(request,env,url){
     manualReviews:reviews?.n||0,expiredEnabledRates:staleFx?.n||0,
     postSettlementAudits:Object.fromEntries((chainProblems?.results||[]).map(x=>[x.state,x.n])),
     pendingPartialReconciliations:partialQueue?.n||0,
-    availableReceivers:capacity,checkoutEnabled:readiness.ready,
+    availableReceivers:capacity,
+    tonNetworkEnabled:env.MULTI_TON_ENABLED==='true',
+    checkoutEnabled:readiness.ready,
     missingPrerequisites:readiness.missing});
   }
   if(path==='/v2/admin/reviews'&&request.method==='GET'){
