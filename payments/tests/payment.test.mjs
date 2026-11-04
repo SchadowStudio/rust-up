@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {ASSETS,decimalToAtomic,formatAtomic,txId,evm,tronHex,ERC20_TRANSFER_TOPIC} from '../src/assets.js';
 import {verifiedTelegramId} from '../src/auth.js';
 import {verifyChainPayment} from '../src/chains.js';
-test('five distinct crypto networks and assets',()=>{
- assert.equal(Object.keys(ASSETS).length,5);
+test('six assets across four distinct crypto networks',()=>{
+ assert.equal(Object.keys(ASSETS).length,6);
  assert.equal(ASSETS.USDT_ERC20.chain,'ethereum');
  assert.equal(ASSETS.USDT_TRC20.chain,'tron');
+ assert.equal(ASSETS.TON.chain,'ton');
+ assert.equal(ASSETS.TON.decimals,9);
 });
 test('atomic amounts never use floating-point money',()=>{
  assert.equal(decimalToAtomic('0.00000001',8),'1');

@@ -64,7 +64,7 @@ test('already registered receiving address blocks the entire import before any m
 test('headless coin plan requires no wallet secret or admin server',async()=>{
  const a=await executeOperator(['wallet-setup-plan']);
  assert.equal(a.ok,true);
- assert.equal(a.networks.length,3);
+ assert.equal(a.networks.length,4);
  const b=await executeOperator(['coin-plan','USDC_ERC20','ethereum','erc20','6']);
  assert.equal(b.active,false);
  assert.equal(b.kind,'coin-plan');

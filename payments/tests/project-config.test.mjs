@@ -43,7 +43,7 @@ class ProjectStub{
       currency,enabled:p.fiats.includes(currency)?1:0,
       min_minor:100,max_minor:1000000}))};
     if(sql.includes('FROM v2_project_crypto_methods'))
-     return {results:['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'].map(asset=>({
+     return {results:['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20','TON'].map(asset=>({
       asset,enabled:p.cryptos.includes(asset)?1:0}))};
     throw Error('unexpected all '+sql);
    },
@@ -80,10 +80,10 @@ test('every project is separate, including approved fiat and crypto methods',asy
 test('new project initializes its own disabled profile, all fiat and chain options',async()=>{
  const db=new ProjectStub();
  const statements=await initializeProjectPayments(db,P1,'My new project',100);
- assert.equal(statements.length,9);
+ assert.equal(statements.length,10);
  assert.match(statements[0].sql,/INSERT INTO v2_project_payment_profiles/);
  assert.equal(statements.filter(x=>x.sql.includes('v2_project_fiat_methods')).length,3);
- assert.equal(statements.filter(x=>x.sql.includes('v2_project_crypto_methods')).length,5);
+ assert.equal(statements.filter(x=>x.sql.includes('v2_project_crypto_methods')).length,6);
 });
 test('owner can configure only chosen project, and no other projects are toggled',async()=>{
  const db=new ProjectStub();

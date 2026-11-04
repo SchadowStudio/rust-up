@@ -31,10 +31,12 @@ test('coin and fiat feeds are checked per pair, without tenant information',asyn
  const g={bitcoin:{rub:10000000,eur:100000,usd:110000,last_updated_at:updated},
   ethereum:{rub:300000,eur:3000,usd:3300,last_updated_at:updated},
   tron:{rub:35,eur:0.35,usd:0.4,last_updated_at:updated},
+  'the-open-network':{rub:200,eur:2,usd:2.2,last_updated_at:updated},
   tether:{rub:90,eur:0.9,usd:1,last_updated_at:updated}};
  const c={BTC:{RUB:10010000,EUR:100100,USD:110100},
   ETH:{RUB:300100,EUR:3001,USD:3301},
   TRX:{RUB:35.1,EUR:0.351,USD:0.401},
+  TON:{RUB:200.1,EUR:2.001,USD:2.201},
   USDT:{RUB:90.1,EUR:0.901,USD:1.001}};
  const original=globalThis.fetch,urls=[];
  globalThis.fetch=async (url)=>{
@@ -43,7 +45,7 @@ test('coin and fiat feeds are checked per pair, without tenant information',asyn
  };
  try{
   const response=await loadConsensus({COINGECKO_DEMO_KEY:'fake',CRYPTOCOMPARE_API_KEY:'fake'},now);
-  assert.equal(response.rows.length,15);
+  assert.equal(response.rows.length,18);
   assert.equal(response.errors.length,0);
   assert.equal(urls.length,2);
   const btcEuro=response.rows.find(x=>x.fiat==='EUR'&&x.asset==='BTC');

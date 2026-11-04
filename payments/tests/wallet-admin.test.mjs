@@ -32,8 +32,8 @@ test('authorized owner can query supported chains without connecting browser wal
  assert.equal(result.status,200);
  const info=await result.json();
  assert.equal(info.neverRequestSecrets,true);
- assert.equal(info.networks.length,3);
- assert.equal(info.coins.length,5);
+ assert.equal(info.networks.length,4);
+ assert.equal(info.coins.length,6);
 });
 test('unauthenticated callers cannot view or import wallet addresses',async()=>{
  const {env}=backend();

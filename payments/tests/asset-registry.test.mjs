@@ -6,7 +6,7 @@ import {ASSETS,ASSET_CATALOG,RECEIVER_NETWORKS,walletSetupPlan,planCoinExtension
 test('existing live assets stay identical and do not silently gain new tokens',()=>{
  assert.equal(ORIGINAL,ASSETS);
  assert.deepEqual(Object.keys(ASSETS),
-  ['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20']);
+  ['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20','TON']);
  assert.equal(ASSET_CATALOG.USDT_ERC20.adapter,'evm-erc20');
  assert.equal(ASSET_CATALOG.USDT_TRC20.adapter,'tron-trc20');
  assert.equal(ASSET_CATALOG.BTC.confirmations,3);
@@ -15,10 +15,11 @@ test('existing live assets stay identical and do not silently gain new tokens',(
 });
 test('setup plan groups coin networks instead of creating duplicate wallets for tokens',()=>{
  const plan=walletSetupPlan();
- assert.equal(plan.length,3);
+ assert.equal(plan.length,4);
  assert.deepEqual(RECEIVER_NETWORKS.ethereum.assets,['ETH','USDT_ERC20']);
  assert.deepEqual(RECEIVER_NETWORKS.tron.assets,['TRX','USDT_TRC20']);
  assert.deepEqual(RECEIVER_NETWORKS.bitcoin.assets,['BTC']);
+ assert.deepEqual(RECEIVER_NETWORKS.ton.assets,['TON']);
  assert.ok(plan.every(x=>x.requiresUniqueUnusedAddressPerInvoice));
  assert.ok(plan.every(x=>!x.automaticallyDerivesNewAccounts));
 });

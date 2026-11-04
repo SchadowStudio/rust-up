@@ -115,7 +115,7 @@ class MultiTenantSchema(unittest.TestCase):
    self.assertEqual(self.db.execute(
     "SELECT COUNT(*) FROM v2_project_fiat_methods WHERE project_id=? AND enabled=0",(project,)).fetchone()[0],3)
    self.assertEqual(self.db.execute(
-    "SELECT COUNT(*) FROM v2_project_crypto_methods WHERE project_id=? AND enabled=0",(project,)).fetchone()[0],5)
+    "SELECT COUNT(*) FROM v2_project_crypto_methods WHERE project_id=? AND enabled=0",(project,)).fetchone()[0],6)
   self.db.execute("UPDATE v2_project_payment_profiles SET invoices_enabled=1,deposits_enabled=1 WHERE project_id=?",(P1,))
   self.db.execute("UPDATE v2_project_fiat_methods SET enabled=1 WHERE project_id=? AND currency='RUB'",(P1,))
   self.db.execute("UPDATE v2_project_crypto_methods SET enabled=1 WHERE project_id=? AND asset='USDT_TRC20'",(P1,))
