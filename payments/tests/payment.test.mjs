@@ -54,7 +54,8 @@ test('ETH payments verify recipient, amount, receipt, and confirmations',async()
  const data={eth_chainId:'0x1',
  eth_getTransactionByHash:{hash,to:destination,value:'0x'+sent.toString(16),blockNumber:'0x65'},
  eth_getTransactionReceipt:{transactionHash:hash,status:'0x1',blockNumber:'0x65',logs:[]},
- eth_blockNumber:'0x70'};
+ eth_blockNumber:'0x70',
+ eth_getBlockByNumber:{number:'0x65',timestamp:'0x690aa640'}};
  const order={asset:'ETH',chain:'ethereum',receive_address:destination,amount_atomic:sent.toString()};
  await fakeRpc(data,async()=>{
   assert.equal((await verifyChainPayment(order,hash,{ETHEREUM_RPC_URL:'https://eth.example'})).confirmations,12);
@@ -67,7 +68,8 @@ test('USDT ERC-20 checks contract and Transfer recipient',async()=>{
  const data={eth_chainId:'0x1',
  eth_getTransactionByHash:{hash,to:token,value:'0x0',blockNumber:'0x65'},
  eth_getTransactionReceipt:{transactionHash:hash,status:'0x1',blockNumber:'0x65',logs:[log]},
- eth_blockNumber:'0x70'};
+ eth_blockNumber:'0x70',
+ eth_getBlockByNumber:{number:'0x65',timestamp:'0x690aa640'}};
  const order={asset:'USDT_ERC20',chain:'ethereum',receive_address:destination,amount_atomic:'2500000'};
  await fakeRpc(data,async()=>{
   assert.equal((await verifyChainPayment(order,hash,{ETHEREUM_RPC_URL:'https://eth.example',USDT_ERC20_CONTRACT:token})).actualAtomic,'2500000');
