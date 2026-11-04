@@ -6,7 +6,8 @@ import {verifyChainPaymentQuorum} from './quorum.js';
 import {settleV2} from './settlement.js';
 import {notifyDeliveryQueue} from './delivery.js';
 
-export const MAX_PARTS_PER_INVOICE=8;
+import {MAX_PARTS_PER_INVOICE} from './transfer-policy.js';
+export {MAX_PARTS_PER_INVOICE};
 const positive=s=>/^[1-9][0-9]{0,59}$/.test(String(s||''));
 const canonicalHash=(order,hash)=>txId(order.asset,hash);
 export async function storedParts(db,invoiceId){
