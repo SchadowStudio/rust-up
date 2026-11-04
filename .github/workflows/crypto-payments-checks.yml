@@ -33,3 +33,5 @@ jobs:
           node --check payments/scripts/recover-live-bot-source.mjs
           node --check payments/scripts/patch-recovered-live-bot.mjs
           node --test payments/scripts/recover-live-bot-source.test.mjs
+          node --check payments/scripts/prepare-live-bot-deployment.mjs
+          node --test payments/scripts/prepare-live-bot-deployment.test.mjs
