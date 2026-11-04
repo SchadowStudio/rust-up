@@ -54,8 +54,6 @@ export default {
     const origin=request.headers.get('origin');
     if(!allowedOrigin(origin,env))
       return json({ok:false,error:'origin_rejected'},403);
-    if(!(await isPaymentEnabled(env,'stars')))
-      return json({ok:false,error:'stars_checkout_disabled'},503);
     if(request.method==='OPTIONS')
       return new Response(null,{status:204,headers:{
         'access-control-allow-origin':origin,'access-control-allow-methods':'POST',
@@ -80,6 +78,8 @@ export default {
     } catch {
       return json({ok:false,error:'telegram_auth_invalid'},401,origin);
     }
+    if(!(await isPaymentEnabled(env,'stars')))
+      return json({ok:false,error:'stars_checkout_disabled'},503,origin);
     if(isFixed&&
       (typeof body.sku!=='string'||!(/^[a-z][a-z0-9_-]{2,39}$/).test(body.sku)))
       return json({ok:false,error:'invalid_product'},400,origin);
