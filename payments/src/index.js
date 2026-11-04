@@ -1,6 +1,10 @@
 import {ASSETS, formatAtomic, validAddress} from './assets.js';
 import {verifiedTelegramId} from './auth.js';
 import {verifyChainPayment} from './chains.js';
+import {validateReceivingAddress} from './address.js';
+import {settleVerified} from './settlement.js';
+import {operatorRoute} from './operator.js';
+import {scanPendingPayments} from './monitor.js';
 
 // Isolated API: it never writes to the original game Worker or its balance.
 const json=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
