@@ -26,6 +26,13 @@
 
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const safeVideoUrl = input => {
+    try {
+      const u = new URL(String(input));
+      if (u.protocol !== 'https:' || !['tiktok.com','www.tiktok.com','youtube.com','www.youtube.com','youtu.be','m.youtube.com'].includes(u.hostname)) return '#';
+      return u.href;
+    } catch (e) { return '#'; }
+  };
   const int = n => Math.round(n || 0).toLocaleString('ru-RU');
   const usd = n => {
     const v = Math.round((n || 0) * 100) / 100;
@@ -160,7 +167,7 @@
       const [label, cls] = ST[c.status] || ST.wait;
       const cat = CLIP_CATS.find(x => x[0] === c.category);
       return `<div class="clip">
-        <div class="clip-top"><span class="pf ${c.platform}">${c.platform === 'shorts' ? 'Shorts' : 'TikTok'}</span><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url.replace(/^https?:\/\/(www\.)?/, ''))}</a></div>
+        <div class="clip-top"><span class="pf ${c.platform}">${c.platform === 'shorts' ? 'Shorts' : 'TikTok'}</span><a href="${esc(safeVideoUrl(c.url))}" target="_blank" rel="noopener">${esc(c.url.replace(/^https?:\/\/(www\.)?/, ''))}</a></div>
         <div class="clip-meta"><span>#${c.id} · ${esc(cat ? cat[1] : '')} · ${date(c.created_at)}</span><span>${int(c.views)} просм.</span></div>
         <div class="clip-foot"><span class="st ${cls}">${c.amount && c.status === 'wait' ? 'Перепроверка' : label}${c.amount ? ` · ${usd(c.amount)}` : ''}${c.note ? ` · ${esc(c.note)}` : ''}</span>
           ${c.status !== 'rejected' ? `<button class="btn btn-ghost sm" data-views="${c.id}">Обновить просмотры</button>` : ''}</div>
