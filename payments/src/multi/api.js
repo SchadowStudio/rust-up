@@ -12,6 +12,7 @@ import {scanMultiPayments} from './monitor.js';
 import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
 import {readinessV2} from './readiness.js';
+import {consumeManualVerifyQuota,auditVerifiedInvoices} from './reconciliation.js';
 import {getProjectMethodPolicy,getProjectPaymentConfig} from './project-config.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
@@ -148,6 +149,7 @@ async function verifyInvoice(db,project,invoice,b,env){
  if(!['awaiting_payment','expired'].includes(invoice.status))
   return fail('invoice_not_claimable',409);
  if(!isHash(b.transactionHash))return fail('invalid_transaction_id');
+ if(!await consumeManualVerifyQuota(db,project.id,env))return fail('verification_rate_limited',429);
  let proof;
  try{proof=await verifyChainPayment(invoice,b.transactionHash,env);}
  catch(error){
@@ -262,11 +264,12 @@ export default {
   const work=[
    Promise.resolve().then(()=>expireV2(env.DB)),
    Promise.resolve().then(()=>deliverV2(env)),
-   Promise.resolve().then(()=>scanMultiPayments(env))
+   Promise.resolve().then(()=>scanMultiPayments(env)),
+   Promise.resolve().then(()=>auditVerifiedInvoices(env))
   ];
   ctx.waitUntil(Promise.allSettled(work).then(results=>{
    for(let i=0;i<results.length;i++){
-    const x=results[i],task=['expiry','webhook_delivery','chain_scan'][i];
+    const x=results[i],task=['expiry','webhook_delivery','chain_scan','post_settlement_audit'][i];
     if(x.status==='rejected'){
      console.error('payment cron task failed',task,
       String(x.reason?.message||'unknown').slice(0,120));
@@ -278,6 +281,8 @@ export default {
       report.errors.slice(0,10));
     if(task==='webhook_delivery'&&report?.failed>0)
      console.error('payment webhook delivery failures: '+report.failed);
+    if(task==='post_settlement_audit'&&report?.manualReview>0)
+     console.error('reconciliation payment incidents requiring manual review: '+report.manualReview);
    }
   }));
  },
