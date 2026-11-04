@@ -13,6 +13,7 @@ import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
 import {readinessV2} from './readiness.js';
 import {consumeManualVerifyQuota,auditVerifiedInvoices} from './reconciliation.js';
+import {processPaymentPart,storedParts} from './multi-transfer.js';
 import {getProjectMethodPolicy,getProjectPaymentConfig} from './project-config.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
@@ -150,6 +151,17 @@ async function verifyInvoice(db,project,invoice,b,env){
   return fail('invoice_not_claimable',409);
  if(!isHash(b.transactionHash))return fail('invalid_transaction_id');
  if(!await consumeManualVerifyQuota(db,project.id,env))return fail('verification_rate_limited',429);
+ if(env.MULTI_PARTIAL_AGGREGATION_ENABLED==='true'){
+  const result=await processPaymentPart(db,invoice,b.transactionHash,env);
+  await notifyDeliveryQueue(env,result);
+  const latest=await getInvoice(db,project.id,invoice.id);
+  if(result.status==='partial')
+   return json({ok:true,invoice:responseInvoice(latest,latest.delivered!=null),
+    partial:{receivedAtomic:result.receivedAtomic,
+     remainingAtomic:result.remainingAtomic,confirmedTransfers:result.parts}});
+  if(result.status==='manual_review')return fail('payment_requires_manual_review',409);
+  return json({ok:true,invoice:responseInvoice(latest,latest.delivered!=null)});
+ }
  let proof;
  try{proof=await verifyChainPayment(invoice,b.transactionHash,env);}
  catch(error){
@@ -228,8 +240,18 @@ async function projectRoute(req,env,url){
  if(!found)return fail('not_found',404);
  const invoice=await getInvoice(env.DB,project.id,found[1]);
  if(!invoice)return fail('invoice_not_found',404);
- if(req.method==='GET'&&!found[2])
-  return json({ok:true,invoice:responseInvoice(invoice,invoice.delivered!=null)});
+ if(req.method==='GET'&&!found[2]){
+  const result={ok:true,invoice:responseInvoice(invoice,invoice.delivered!=null)};
+  if(env.MULTI_PARTIAL_AGGREGATION_ENABLED==='true'){
+   const parts=await storedParts(env.DB,invoice.id);
+   const received=parts.reduce((sum,p)=>sum+BigInt(p.actual_atomic),0n);
+   const remaining=BigInt(invoice.amount_atomic)>received?
+    BigInt(invoice.amount_atomic)-received:0n;
+   result.partial={receivedAtomic:received.toString(),
+    remainingAtomic:remaining.toString(),confirmedTransfers:parts.length};
+  }
+  return json(result);
+ }
  if(req.method==='POST'&&found[2])
   return verifyInvoice(env.DB,project,invoice,await body(req),env);
  return fail('method_not_allowed',405);
