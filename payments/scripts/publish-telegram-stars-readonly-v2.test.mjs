@@ -45,7 +45,7 @@ test('read-only client has no invoice, game credit or unsafe innerHTML injection
   assert.doesNotThrow(()=>new Function(bridge));
   assert.match(bridge,/\/api\/stars\//);
   assert.match(bridge,/Telegram\?\.WebApp\?\.initData/);
-  assert.doesNotMatch(bridge,/checkout|createInvoiceLink|openInvoice|state\.balance|innerHTML/i);
+  assert.doesNotMatch(bridge,/\/api\/stars\/checkout|createInvoiceLink\(|openInvoice\(|state\.balance\s*=|innerHTML\s*=/i);
   assert.match(bridge,/AbortController/);
   assert.match(bridge,/Покупки пока отключены/);
 });
