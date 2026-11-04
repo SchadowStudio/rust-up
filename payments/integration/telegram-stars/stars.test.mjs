@@ -35,9 +35,9 @@ test('pre-checkout binds exact price, user, currency and order',()=>{
 });
 
 test('delayed Stars receipt remains verifiable, mismatched and forged receipts fail',()=>{
-  assert.equal(validSuccessfulPayment(order,message,now+180000),true);
-  assert.equal(validSuccessfulPayment(order,{...message,from:{id:99}},now),false);
-  assert.equal(validSuccessfulPayment(order,{...message,successful_payment:{...message.successful_payment,total_amount:500}},now),false);
+  assert.equal(validSuccessfulPayment({...order,status:'checkout_approved'},message,now+180000),true);
+  assert.equal(validSuccessfulPayment({...order,status:'checkout_approved'},{...message,from:{id:99}},now),false);
+  assert.equal(validSuccessfulPayment({...order,status:'checkout_approved'},{...message,successful_payment:{...message.successful_payment,total_amount:500}},now),false);
 });
 
 test('webhook secret is required',()=>{
@@ -57,7 +57,7 @@ test('Stars disabled by default without Telegram calls',async()=>{
 });
 
 function starsDb(){
-  const row={...order,telegram_charge_id:null};
+  const row={...order,status:'checkout_approved',telegram_charge_id:null};
   return {row,prepare(sql){
     return {bind(...args){
       return {
@@ -67,7 +67,7 @@ function starsDb(){
         },
         async run(){
           if(!sql.includes("UPDATE rustup_stars_orders"))throw Error('unexpected_sql');
-          if(row.status!=='pending')return {meta:{changes:0}};
+          if(row.status!=='checkout_approved')return {meta:{changes:0}};
           row.status='paid';row.telegram_charge_id=args[0];return {meta:{changes:1}};
         }
       };
@@ -168,4 +168,26 @@ test('external crypto gateway uses fixed product prices and stable idempotency',
     ...params,verifiedExternalCustomerRef:randomUUID()
   }),/idempotency_conflict/);
   assert.equal(db.row.provider_invoice_id,id);
+});
+
+test('only one Stars pre-checkout reservation, same query retries allowed',async()=>{
+  const r={...order,expires_at_ms:Date.now()+60000,status:'pending',checkout_query_id:null};
+  let n=0;
+  const db={prepare(sql){return {bind(...args){return {
+    async first(){if(sql.includes('SELECT id,telegram_user_id'))return {...r};return null;},
+    async run(){
+      n++;
+      if(r.status!=='pending')return {meta:{changes:0}};
+      r.status='checkout_approved';r.checkout_query_id=args[0];
+      return {meta:{changes:1}};
+    }
+  }}}}};
+  const replies=[];
+  const telegram=async (_url,opt)=>{replies.push(JSON.parse(opt.body));return {ok:true,async json(){return {ok:true,result:true}}}};
+  const env={STARS_PAYMENT_ENABLED:'true',DB:db,TG_STARS_BOT_TOKEN:'123:'+'a'.repeat(30)};
+  assert.equal((await handleStarsUpdate({pre_checkout_query:q},env,telegram)).ok,true);
+  assert.equal((await handleStarsUpdate({pre_checkout_query:q},env,telegram)).ok,true);
+  assert.equal((await handleStarsUpdate({pre_checkout_query:{...q,id:'another'}},env,telegram)).ok,false);
+  assert.equal(n,1);
+  assert.deepEqual(replies.map(x=>x.ok),[true,true,false]);
 });
