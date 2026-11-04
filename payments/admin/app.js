@@ -86,6 +86,13 @@ async function listReceivers(){
  }
 }
 $('connect').addEventListener('click',()=>walletConnect().catch(e=>note(e.message,true)));
+$('mobileConnect').addEventListener('click',()=>{
+ if(location.protocol!=='https:')return note('Mobile Trust Wallet benötigt eine sichere HTTPS-Seite.',true);
+ const url=new URL('https://link.trustwallet.com/open_url');
+ url.searchParams.set('coin_id','60');
+ url.searchParams.set('url',location.href);
+ window.open(url.toString(),'_blank','noopener,noreferrer');
+});
 $('list').addEventListener('click',()=>listReceivers().then(()=>note('Operator-Verbindung erfolgreich.')).catch(e=>note(e.message,true)));
 $('add').addEventListener('click',async()=>{
  const chain=$('chain').value,address=$('address').value.trim(),label=$('label').value.trim();
