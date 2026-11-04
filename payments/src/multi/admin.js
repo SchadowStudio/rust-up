@@ -5,6 +5,7 @@ import {FIATS,positiveAtomic} from './fiat.js';
 import {digestHex,newSecret,projectWebhookKey,safeEqual} from './keys.js';
 import {requireProjectId,isUuid,safeWebhookUrl} from './identity.js';
 import {readinessV2} from './readiness.js';
+import {paymentProfileAdmin,initializeProjectPayments,getProjectPaymentConfig} from './project-config.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
  'content-type':'application/json','cache-control':'no-store'}});
 const fail=(code,status=400)=>json({ok:false,error:code},status);
@@ -48,7 +49,8 @@ async function createProject(db,b,env){
   db.prepare(`INSERT INTO v2_api_keys(id,project_id,secret_sha256,created_at_ms)
    VALUES(?,?,?,?)`).bind(keyId,projectId,hash,now),
   db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
-   VALUES(?,'create_project',?,'{}',?)`).bind(crypto.randomUUID(),projectId,now)
+   VALUES(?,'create_project',?,'{}',?)`).bind(crypto.randomUUID(),projectId,now),
+  ...await initializeProjectPayments(db,projectId,label,now)
  ]);
  return json({ok:true,projectId,keyId,apiKey:secret,webhookSigningSecret,
    status:'disabled',notice:'Store both secrets in your project server secrets; shown once.'},201);
@@ -219,6 +221,8 @@ export async function multiAdmin(request,env,url){
    return json({ok:true,reviewId:id,resolutionCode:b.resolutionCode,
     note:'This action never credits a wallet or submits a refund transaction.'});
   }
+  if(/^\/v2\/admin\/projects\/[0-9a-f-]{36}\/(?:payment-config|fiat-method|crypto-method)$/i.test(path))
+   return paymentProfileAdmin(request,env,url);
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
   if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
