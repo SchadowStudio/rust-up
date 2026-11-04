@@ -175,17 +175,33 @@ async function projectRoute(req,env,url){
 }
 export async function handleMulti(req,env){
  const url=new URL(req.url);
- if(req.headers.get('origin'))return fail('server_to_server_only',403);
- if(req.method==='OPTIONS')return fail('server_to_server_only',403);
- if(url.pathname==='/health')
-  return json({ok:true,service:'multi-project-payments',checkout:checkoutReady(env)});
+ const origin=req.headers.get('origin');
+ const operatorPath=url.pathname.startsWith('/v2/admin/');
+ const allowed=operatorPath&&origin===env.MULTI_ADMIN_ORIGIN &&
+  /^https:\/\//.test(String(origin||''));
+ if(origin&&!allowed)return fail('server_to_server_only',403);
+ const cors=allowed?{
+  'access-control-allow-origin':origin,'vary':'Origin',
+  'access-control-allow-methods':'GET,POST,OPTIONS',
+  'access-control-allow-headers':'authorization,content-type',
+  'access-control-max-age':'600'}:{};
+ if(req.method==='OPTIONS')
+  return allowed?new Response(null,{status:204,headers:cors}):fail('method_not_allowed',405);
+ let answer;
  try{
-  if(url.pathname.startsWith('/v2/admin/'))return multiAdmin(req,env,url);
-  if(!url.pathname.startsWith('/v2/'))return fail('not_found',404);
-  return await projectRoute(req,env,url);
+  if(url.pathname==='/health')
+   answer=json({ok:true,service:'multi-project-payments',checkout:checkoutReady(env)});
+  else if(operatorPath)answer=await multiAdmin(req,env,url);
+  else if(url.pathname.startsWith('/v2/'))answer=await projectRoute(req,env,url);
+  else answer=fail('not_found',404);
  }catch(e){
-  return fail(compactError(e),['invalid_opaque_order_reference','invalid_idempotency_key'].includes(e?.message)?400:503);
+  answer=fail(compactError(e),
+   ['invalid_opaque_order_reference','invalid_idempotency_key'].includes(e?.message)?400:503);
  }
+ if(!allowed)return answer;
+ const headers=new Headers(answer.headers);
+ for(const [k,v] of Object.entries(cors))headers.set(k,v);
+ return new Response(answer.body,{status:answer.status,headers});
 }
 export default {
  fetch:handleMulti,
