@@ -4,13 +4,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 
 const expected='08d498a75221089f054c381de5f2aef494f28077';
 const original="['gifts', 'Telegram и CS2', 10, 7, ['star', 'gift'], 'Звёзды, подарки, скины', ['Звёзды Telegram', 'Подарки и NFT', 'Скины CS2']]";
 const updated="['gifts', 'Telegram Stars', 10, 7, ['star'], 'Звёзды Telegram', ['Оплата через Telegram Stars']]";
 
 function gitBlob(text){
-  const canon=Buffer.from(text.replace(/\r\n/g,'\n'));
+  const canon=Buffer.from(text);
   return createHash('sha1').update('blob '+canon.length+'\0').update(canon).digest('hex');
 }
 export function patchWalletMethod(source){
@@ -25,12 +26,14 @@ async function main(){
   await fs.access(path.join(dir,'.git'));
   const file=path.join(dir,'js','app.js');
   const current=await fs.readFile(file,'utf8');
-  if(gitBlob(current)!==expected)throw Error('website_js_app_modified_refuse_overwrite');
+  const verified=[current,current.replace(/\r\n/g,'\n'),current.replace(/\r?\n/g,'\r\n')]
+    .some(version=>gitBlob(version)===expected);
+  if(!verified)throw Error('website_js_app_modified_refuse_overwrite');
   await fs.writeFile(file,patchWalletMethod(current));
   console.log('PASS: Existing Telegram и CS2 option renamed to Telegram Stars.');
   console.log('PASS: CS2 and gift icons/descriptions removed from this payment option.');
   console.log('PASS: Existing wallet, payment demo behavior, games and other options unchanged.');
   console.log('NOT PUBLISHED: review git diff, then commit/push site checkout separately.');
 }
-if(import.meta.url===new URL('file://'+process.argv[1]?.replace(/\\/g,'/')).href)
+if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)
   main().catch(e=>{console.error('Website patch blocked:',e.message);process.exitCode=1;});
