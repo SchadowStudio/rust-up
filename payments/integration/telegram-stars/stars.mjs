@@ -71,7 +71,7 @@ export function verifiedWebhook(request, env) {
     env.TG_STARS_WEBHOOK_SECRET);
 }
 
-async function telegramApi(env, method, body, fetchImpl) {
+export async function telegramApi(env, method, body, fetchImpl) {
   if (!env.TG_STARS_BOT_TOKEN || !/^[0-9]+:[A-Za-z0-9_-]{20,}$/.test(env.TG_STARS_BOT_TOKEN))
     throw Error('telegram_bot_not_configured');
   const response = await fetchImpl('https://api.telegram.org/bot' +
