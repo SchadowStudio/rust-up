@@ -9,7 +9,7 @@ test('existing Support Mini App gets a fifth payment tab and separate script',()
  assert.match(modified,/data-tab="payments"/);
  assert.match(modified,/payments-tab.js/);
  assert.match(modified,/payments.css/);
- assert.throws(()=>patchAdminFrontendIndex(modified),/website_layout_changed/);
+ assert.throws(()=>patchAdminFrontendIndex(modified),/payment_panel_already_exists/);
 });
 test('admin app loads payment tab through existing signed Telegram initData API',()=>{
  const script=`function render(){
