@@ -32,6 +32,15 @@ jobs:
         run: cd payments && node --test integration/demo-game-wallet/*.test.mjs
       - name: Demonstrate sandbox Stars and crypto flow without real payments
         run: node payments/scripts/demo-game-wallet.mjs
+      - name: Parse safe Stars Windows release helper without running it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'payments/scripts/release-safe-stars-reliability.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
       - name: Verify private bot recovery and patch scripts
         run: |
           node --check payments/scripts/recover-live-bot-source.mjs
