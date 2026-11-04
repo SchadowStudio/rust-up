@@ -127,9 +127,15 @@ export default {
   return new Response(response.body,{status:response.status,headers});
  },
  async scheduled(_event,env,ctx){
-  ctx.waitUntil(scanPendingPayments(env).then(report=>{
-   if(report.errors?.length)console.error('Crypto scan warnings:',report.errors);
-   else console.log('Crypto scan finished:',JSON.stringify(report));
-  }).catch(e=>console.error('Crypto scan failed:',String(e.message))));
+  ctx.waitUntil(Promise.allSettled([
+   scanPendingPayments(env),drainOutbox(env)
+  ]).then(results=>{
+   for(const [i,r] of results.entries()){
+    const name=i?'Ledger outbox':'Blockchain scanner';
+    if(r.status==='rejected')console.error(name+' failed:',String(r.reason));
+    else if(r.value.errors?.length)console.error(name+' warnings:',r.value.errors);
+    else console.log(name+' result:',JSON.stringify(r.value));
+   }
+  }));
  }
 };
