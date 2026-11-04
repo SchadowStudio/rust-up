@@ -22,15 +22,15 @@ export function patchAdminSource(source){
   // responses. Do not require a particular default 404 string/indentation:
   // require the authenticated adminApi function and both guards instead.
   const local=source.slice(offset,offset+12000);
-  const matches=[...local.matchAll(/^([ \\t]*)switch\\s*\\(\\s*path\\s*\\)\\s*\\{/gm)];
+  const matches=[...local.matchAll(/^([ \t]*)switch\s*\(\s*path\s*\)\s*\{/gm)];
   const mark=matches.length===1?matches[0]:null;
   const sw=mark?offset+mark.index:-1;
   const pre=sw>=0?source.slice(offset,sw):'';
   const auth=pre.indexOf('await h.verifyInitData(');
   const token=pre.indexOf('env.ADMIN_BOT_TOKEN');
   const guard=pre.indexOf('await h.isAdmin(env, user)');
-  const idReject=/if\\s*\\(\\s*!user\\s*\\|\\|\\s*!user\\.id\\s*\\)\\s*return\\s+h\\.json\\s*\\(/.test(pre);
-  const adminReject=/if\\s*\\(\\s*!\\s*(?:\\(\\s*)?await\\s+h\\.isAdmin\\s*\\(\\s*env\\s*,\\s*user\\s*\\)\\s*\\)?\\s*\\)\\s*return\\s+h\\.json\\s*\\(/.test(pre);
+  const idReject=/if\s*\(\s*!user\s*\|\|\s*!user\.id\s*\)\s*return\s+h\.json\s*\(/.test(pre);
+  const adminReject=/if\s*\(\s*!\s*(?:\(\s*)?await\s+h\.isAdmin\s*\(\s*env\s*,\s*user\s*\)\s*\)?\s*\)\s*return\s+h\.json\s*\(/.test(pre);
   if(sw<0||sw-offset>6000||auth<0||token<auth||guard<token||!idReject||!adminReject)
     throw Error('admin_endpoint_authentication_not_verified ('+
       'switch='+Boolean(mark)+',signed_initData='+(auth>=0&&token>auth)+
