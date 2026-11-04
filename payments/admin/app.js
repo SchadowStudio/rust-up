@@ -96,3 +96,67 @@ $('add').addEventListener('click',async()=>{
   await listReceivers();
  }catch(e){note(e.message,true)}
 });
+
+async function toggleOffer(resource,id,asset,enabled){
+ const kind=resource==='quotes'?'Krypto-Kurs':'Angebot';
+ if(!window.confirm(kind+' '+id+(asset?' / '+asset:'')+
+ '\n'+(enabled?'deaktivieren':'aktivieren')+'? Bitte Preis und Netzwerk zuvor prüfen.'))return;
+ const path='/v1/operator/'+resource+'/'+encodeURIComponent(id)+
+  (asset?'/'+encodeURIComponent(asset):'')+'/'+(enabled?'disable':'enable');
+ await api(path,'POST',{confirmation:'I_APPROVE_THIS_PRICE'});
+ await listOffers();
+}
+function offerRow(title,description,action){
+ const el=document.createElement('div');el.className='address';
+ const h=document.createElement('strong');h.textContent=title;el.appendChild(h);
+ const p=document.createElement('p');p.className='muted';p.textContent=description;el.appendChild(p);
+ const btn=document.createElement('button');btn.className='secondary';
+ btn.type='button';btn.textContent=action.label;btn.addEventListener('click',action.run);
+ el.appendChild(btn);return el;
+}
+async function listOffers(){
+ const data=await api('/v1/operator/offers');
+ const root=$('offerList');root.replaceChildren();
+ const groups=new Map(data.packages.map(pkg=>[pkg.id,pkg]));
+ for(const pkg of data.packages){
+  const enabled=pkg.enabled===1;
+  const currency=(pkg.credit_kopecks/100).toLocaleString('de-DE',{maximumFractionDigits:2});
+  root.appendChild(offerRow(
+   pkg.title+' ('+pkg.id+')',
+   currency+' ₽ Guthaben · '+(enabled?'ANGEBOT AKTIV':'Angebot deaktiviert'),
+   {label:enabled?'Angebot deaktivieren':'Angebot freigeben',
+    run:()=>toggleOffer('offers',pkg.id,null,enabled).catch(e=>note(e.message,true))}
+  ));
+ }
+ for(const quote of data.quotes){
+  const enabled=quote.enabled;
+  root.appendChild(offerRow(
+   quote.asset+' · '+quote.packageId,
+   quote.amount+' '+quote.asset+' · '+(enabled?'KURS AKTIV':'Kurs deaktiviert'),
+   {label:enabled?'Kurs deaktivieren':'Kurs freigeben',
+    run:()=>toggleOffer('quotes',quote.packageId,quote.asset,enabled)
+     .catch(e=>note(e.message,true))}
+  ));
+ }
+ if(!groups.size){const p=document.createElement('p');p.textContent='Keine Angebote.';root.appendChild(p);}
+}
+$('newPackage').addEventListener('click',async()=>{
+ try{
+  await api('/v1/operator/offers','POST',{
+   id:$('pkgId').value.trim(),title:$('pkgTitle').value.trim(),
+   creditKopecks:Number($('pkgKopecks').value)
+  });
+  note('Neues Angebot deaktiviert gespeichert.');await listOffers();
+ }catch(e){note(e.message,true)}
+});
+$('setQuote').addEventListener('click',async()=>{
+ try{
+  await api('/v1/operator/quotes','POST',{
+   packageId:$('pkgId').value.trim(),asset:$('quoteAsset').value,
+   amount:$('quoteAmount').value.trim()
+  });
+  note('Neue Kursangabe deaktiviert gespeichert.');await listOffers();
+ }catch(e){note(e.message,true)}
+});
+$('listOffers').addEventListener('click',()=>listOffers()
+ .then(()=>note('Zahlungsangebote geladen.')).catch(e=>note(e.message,true)));
