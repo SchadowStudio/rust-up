@@ -3,6 +3,7 @@ import {verifyChainPayment} from '../chains.js';
 import {txId} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
 import {settleV2} from './settlement.js';
+import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 export async function reconcileCandidate(db,item,env){
  if(!item||!['ethereum','bitcoin','tron'].includes(item.chain)||
     !await validateReceivingAddress(item.chain,item.address))
@@ -21,7 +22,9 @@ export async function reconcileCandidate(db,item,env){
  const invoice=await db.prepare(query).bind(item.chain,item.address).first();
  if(!invoice)return {status:'ignored',reason:'invoice_not_found'};
  const proof=await verifyChainPayment(invoice,hash,env);
- return settleV2(db,invoice,proof);
+ const settled=await settleV2(db,invoice,proof);
+ await notifyDeliveryQueue(env,settled);
+ return settled;
 }
 export async function consumePaymentEvents(batch,env){
  if(!env.DB||env.MULTI_AUTO_QUEUE_ENABLED!=='true'){
@@ -30,13 +33,20 @@ export async function consumePaymentEvents(batch,env){
  }
  for(const message of batch.messages){
   try{
-   const result=await reconcileCandidate(env.DB,message.body,env);
+   const item=message.body;
+   if(item?.kind==='delivery'){
+    if(!/^v2:[0-9a-f-]{36}$/i.test(item.eventId||'')){
+     message.ack();continue;
+    }
+    await deliverV2(env,Date.now(),item.eventId);
+    message.ack();continue;
+   }
+   const result=await reconcileCandidate(env.DB,item,env);
    message.ack();
    if(result.status==='manual_review')
     console.warn('Crypto payment was sent for manual review');
   }catch(error){
-   // Temporary network failures and insufficient confirmations are retried.
-   // Queue must be configured with a DLQ so no message is silently discarded.
+   // Retry temporary RPC failure or early confirmations; DLQ catches exhaustion.
    message.retry({delaySeconds:60});
   }
  }
