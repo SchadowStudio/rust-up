@@ -21,7 +21,7 @@ Commands:
   project-config <project-uuid>
   project-profile <project-uuid> <display-name> <invoices:true|false> <deposits:true|false> <products:true|false> <minutes:5-20> --confirm
   project-fiat <project-uuid> <RUB|EUR|USD> <enabled:true|false> <min-minor> <max-minor> --confirm
-  project-crypto <project-uuid> <BTC|ETH|TRX|USDT_ERC20|USDT_TRC20> <enabled:true|false> --confirm
+  project-crypto <project-uuid> <BTC|ETH|TRX|USDT_ERC20|USDT_TRC20|TON> <enabled:true|false> --confirm
   project-summary <project-uuid>
   project-payments <project-uuid> [all|awaiting_payment|verified|expired|manual_review]
   project-keys <project-uuid>
@@ -29,12 +29,12 @@ Commands:
   project-key-revoke <project-uuid> <key-uuid> --confirm
   project-webhook <project-uuid> <https-webhook> --confirm
   wallet-setup-plan
-  coin-plan <ASSET_SYMBOL> <bitcoin|ethereum|tron> <native|erc20|trc20> <decimals>
+  coin-plan <ASSET_SYMBOL> <bitcoin|ethereum|tron|ton> <native|erc20|trc20> <decimals>
   wallet-import-public <public-addresses.json> --confirm
   address-list
-  address-add <bitcoin|ethereum|tron> <public-address> --confirm
-  address-enable <bitcoin|ethereum|tron> <public-address> --confirm
-  address-disable <bitcoin|ethereum|tron> <public-address> --confirm
+  address-add <bitcoin|ethereum|tron|ton> <public-address> --confirm
+  address-enable <bitcoin|ethereum|tron|ton> <public-address> --confirm
+  address-disable <bitcoin|ethereum|tron|ton> <public-address> --confirm
   rates
   reviews [project-uuid]
   review-close <review-uuid> --confirm
@@ -43,7 +43,7 @@ For mutations, --confirm is required. No private key, wallet seed, password,
 Telegram ID or sensitive customer information belongs in CLI arguments.
 `;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ASSETS=['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'];
+const ASSETS=['BTC','ETH','TRX','USDT_ERC20','USDT_TRC20','TON'];
 function fail(msg){throw Error(msg)}
 function id(value,label='ID'){
  if(!uuid.test(value||''))fail('invalid_'+label.toLowerCase().replaceAll(' ','_'));
@@ -173,13 +173,13 @@ function operation(argv){
   case 'address-list':return ['GET','/v2/admin/receivers'];
   case 'address-add':
    mustConfirm(confirmed);
-   if(args.length!==2||!['bitcoin','ethereum','tron'].includes(args[0]))
+   if(args.length!==2||!['bitcoin','ethereum','tron','ton'].includes(args[0]))
     fail('invalid_receive_address_args');
    return ['POST','/v2/admin/receivers',{chain:args[0],address:args[1]}];
   case 'address-enable':
   case 'address-disable':
    mustConfirm(confirmed);
-   if(args.length!==2||!['bitcoin','ethereum','tron'].includes(args[0]))
+   if(args.length!==2||!['bitcoin','ethereum','tron','ton'].includes(args[0]))
     fail('invalid_receive_address_args');
    return ['POST','/v2/admin/receivers/'+(cmd==='address-enable'?'enable':'disable'),{
     chain:args[0],address:args[1],confirmation:'CONFIRM_OPERATOR_CHANGE'}];

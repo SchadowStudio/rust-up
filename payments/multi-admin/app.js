@@ -166,8 +166,8 @@ $('status').addEventListener('click',async()=>{
     ' · Webhooks mit vielen Fehlversuchen: '+(r.deliveryRetryFailures||0)+
     ' · manuelle Zahlungsprüfungen: '+(r.manualReviews||0)+
     ' · abgelaufene aktive Wechselkurse: '+(r.expiredEnabledRates||0)+
-    ' · freie Empfangsadressen BTC/ETH/TRON: '+(capacity.bitcoin||0)+'/'+
-     (capacity.ethereum||0)+'/'+(capacity.tron||0)+
+    ' · freie Empfangsadressen BTC/ETH/TRON/TON: '+(capacity.bitcoin||0)+'/'+
+     (capacity.ethereum||0)+'/'+(capacity.tron||0)+'/'+(capacity.ton||0)+
     ' · Checkout aktiv: '+(r.checkoutEnabled?'ja':'nein')+
     (r.checkoutEnabled?'':' · fehlende Voraussetzungen: '+missing));
  }catch(e){output(e.message,true)}

@@ -59,11 +59,11 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
 </section>
 <section class="panel">
 <h2>Trust Wallet</h2>
-<p>ETH/USDT-ERC20: Wallet-Verbindung mit öffentlicher Adresse. BTC und TRON: öffentliche Adresse einfügen.</p>
+<p>ETH/USDT-ERC20: Wallet-Verbindung mit öffentlicher Adresse. BTC, TRON und TON: öffentliche Adresse einfügen.</p>
 <button id="walletConnect">Trust Wallet verbinden (Ethereum)</button>
 <label for="receiverChain">Netzwerk</label>
 <select id="receiverChain"><option value="ethereum">Ethereum / USDT ERC-20</option>
-<option value="bitcoin">Bitcoin</option><option value="tron">TRON / USDT TRC-20</option></select>
+<option value="bitcoin">Bitcoin</option><option value="tron">TRON / USDT TRC-20</option><option value="ton">TON / Toncoin</option></select>
 <label for="receiver">Öffentliche Empfangsadresse</label>
 <input id="receiver" autocomplete="off" spellcheck="false" placeholder="Empfangsadresse">
 <button id="addReceiver">Deaktiviert hinzufügen</button>
@@ -91,7 +91,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
 <div><label for="rateCurrency">Rechnungswährung</label>
 <select id="rateCurrency"><option>RUB</option><option>EUR</option><option>USD</option></select></div>
 <div><label for="rateAsset">Kryptowährung</label>
-<select id="rateAsset"><option>BTC</option><option>ETH</option><option>TRX</option>
+<select id="rateAsset"><option>BTC</option><option>ETH</option><option>TRX</option><option>TON</option>
 <option>USDT_ERC20</option><option>USDT_TRC20</option></select></div></div>
 <label for="num">Atomare Einheiten (Zähler)</label><input id="num" placeholder="Nur vorab geprüfte Ganzzahl">
 <label for="denom">Fiat-Minus-Einheiten (Nenner)</label><input id="denom" placeholder="Nur vorab geprüfte Ganzzahl">
@@ -129,7 +129,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
 <h3>Eigene Kryptowährungen</h3>
 <div class="grid">
 <div><label for="profileCrypto">Kryptowährung / Netzwerk</label><select id="profileCrypto">
-<option>BTC</option><option>ETH</option><option>TRX</option>
+<option>BTC</option><option>ETH</option><option>TRX</option><option>TON</option>
 <option>USDT_ERC20</option><option>USDT_TRC20</option></select></div>
 <div><label for="profileCryptoEnabled">Für dieses Projekt freigeben?</label><select id="profileCryptoEnabled">
 <option value="false">Nein</option><option value="true">Ja</option></select></div>

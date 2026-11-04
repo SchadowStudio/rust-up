@@ -1,7 +1,7 @@
 // Safe read-only invoice rendering. Merchant server supplies the invoice JSON.
-export const ASSET_DIGITS=Object.freeze({BTC:8,ETH:18,TRX:6,USDT_ERC20:6,USDT_TRC20:6});
+export const ASSET_DIGITS=Object.freeze({BTC:8,ETH:18,TRX:6,USDT_ERC20:6,USDT_TRC20:6,TON:9});
 export const NETWORK_NAMES=Object.freeze({
- bitcoin:'Bitcoin Mainnet',ethereum:'Ethereum Mainnet',tron:'TRON Mainnet'
+ bitcoin:'Bitcoin Mainnet',ethereum:'Ethereum Mainnet',tron:'TRON Mainnet',ton:'The Open Network Mainnet'
 });
 export function formatCryptoAtomic(amount,digits){
  if(!Number.isInteger(digits)||digits<0||digits>18||!/^[0-9]+$/.test(String(amount)))
@@ -20,7 +20,7 @@ export function validatePublicInvoice(p){
     !/^[0-9]+$/.test(String(p.amountAtomic)))
   throw Error('invalid_invoice_response');
  const expected={BTC:'bitcoin',ETH:'ethereum',TRX:'tron',
-  USDT_ERC20:'ethereum',USDT_TRC20:'tron'};
+  USDT_ERC20:'ethereum',USDT_TRC20:'tron',TON:'ton'};
  if(expected[p.asset]!==p.chain)throw Error('wrong_network');
  return {asset:p.asset,chain:p.chain,fiat:p.fiat,
   amountMinor:p.amountMinor,amountAtomic:p.amountAtomic,

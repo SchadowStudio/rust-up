@@ -105,7 +105,7 @@ async function setRate(db,b){
  return json({ok:true,fiat:b.fiat,asset:b.asset,status:'disabled',expiresAt:until});
 }
 async function addReceiver(db,b){
- if(!['bitcoin','ethereum','tron'].includes(b.chain)||
+ if(!['bitcoin','ethereum','tron','ton'].includes(b.chain)||
     !await validateReceivingAddress(b.chain,b.address))return fail('invalid_receiver');
  const address=canonicalPublicAddress(b.chain,b.address);
  const existing=await db.prepare(b.chain==='ethereum'
@@ -147,11 +147,11 @@ async function toggle(db,resource,b,enabled){
    .bind(enabled?1:0,b.fiat,b.asset,now+120000);
   target=b.fiat+':'+b.asset;
  }else if(resource==='receivers'){
-  if(!['bitcoin','ethereum','tron'].includes(b.chain)||
+  if(!['bitcoin','ethereum','tron','ton'].includes(b.chain)||
      !await validateReceivingAddress(b.chain,b.address))return fail('invalid_receiver');
   stmt=db.prepare(`UPDATE deposit_addresses SET enabled=?
    WHERE chain=? AND address=? AND assigned_intent IS NULL`)
-   .bind(enabled?1:0,b.chain,b.address);
+   .bind(enabled?1:0,b.chain,canonicalPublicAddress(b.chain,b.address));
   target=b.chain+':'+b.address;
  }else return fail('invalid_resource');
  const result=await stmt.run();
@@ -193,7 +193,7 @@ export async function multiAdmin(request,env,url){
     db.prepare(`SELECT MIN(created_at_ms) AS oldest FROM v2_delivery_outbox
       WHERE delivered_at_ms IS NULL`).first()
    ]);
-   const capacity={bitcoin:0,ethereum:0,tron:0};
+   const capacity={bitcoin:0,ethereum:0,tron:0,ton:0};
    for(const row of pool.results||[])if(row.chain in capacity)capacity[row.chain]=row.n;
    const readiness=readinessV2(env);
    return json({ok:true,projects:projects?.n||0,pending:open?.n||0,
