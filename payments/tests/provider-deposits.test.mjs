@@ -99,7 +99,7 @@ test('provider accepts RUB EUR USD deposits paid in USDT without game wallet log
   assert.equal(data.invoice.amountMinor,5000);
   assert.equal(data.invoice.asset,'USDT_TRC20');
   assert.equal(data.invoice.chain,'tron');
-  assert.equal(data.invoice.amountAtomic,'5000000');
+  assert.equal(data.invoice.amountAtomic,'500000'); // test-only mock rate, not a live FX rate
   assert.equal(data.invoice.status,'awaiting_payment');
   assert.equal(data.invoice.creditCurrency,undefined);
   assert.equal(data.invoice.walletBalance,undefined);
