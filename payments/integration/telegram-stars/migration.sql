@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS rustup_stars_orders (
   sku TEXT NOT NULL REFERENCES rustup_stars_products(sku),
   price_stars INTEGER NOT NULL CHECK(price_stars>0),
   status TEXT NOT NULL DEFAULT 'pending'
-    CHECK(status IN ('pending','paid','refunded','manual_review')),
+    CHECK(status IN ('pending','checkout_approved','paid','refunded','manual_review')),
+  checkout_query_id TEXT UNIQUE,
   telegram_charge_id TEXT UNIQUE,
   created_at_ms INTEGER NOT NULL,
   expires_at_ms INTEGER NOT NULL,
