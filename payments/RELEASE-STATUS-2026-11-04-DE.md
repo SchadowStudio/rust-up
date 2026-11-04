@@ -137,3 +137,29 @@ Niemals absolute Anonymität, unbegrenzte Skalierung oder 100% Uptime
 behaupten. Blockchain-Einzahlungen sind öffentlich nachvollziehbar;
 Provider/Zahlungsprotokolle sollten nur minimal nötige pseudonyme Daten
 speichern und Aufbewahrungspflichten erfüllen.
+
+
+## Zusatzänderungen im Entwicklungsbranch (4.11.2026)
+
+- Merchant-Webhooks werden bei **offenem** Blockchain-Streitfall oder
+  manuellem Payment-Review zurückgehalten; es gibt keinen stillen Durchgriff
+  auf eine bereits gutgeschriebene Kundenwallet.
+- TON-Scanner kann bei HTTP-/Schema-Ausfall des Primär-Indexers
+  konfigurierten SECONDARY/TERTIARY-Indexer zur **Entdeckung** verwenden.
+  Ein Zahlungsfund wird weiterhin unabhängig per Blockchain-Quorum geprüft.
+- Authentifiziertes `GET /v2/incidents` und `incidents()` im
+  Projekt-Client erlauben projektspezifische Nachkontrolle, auch **nach**
+  einer zugestellten Zahlung. Vorhandene Einträge sind maximal 100 pro
+  Kategorie; operatives Monitoring ist weiterhin Pflicht.
+- `npm run gate:release -- ./release-evidence.json` prüft
+  einen privaten, commitgebundenen, zeitlich begrenzten manuellen
+  Nachweiskatalog **zusammen mit** dem Remote-Preflight.
+  Die Vorlage befindet sich in `release-evidence.example.json`;
+  Anleitung: `RELEASE-EVIDENCE-GATE-DE.md`.
+- Neue Regressionstests für Webhook-Sperren, TON-Indexer-Failover,
+  projektspezifische Incident-Abrufe und Release-Gates.
+
+**Wichtig:** Alle neuen Schutzmechanismen sind Software und automatische
+Tests, **keine** Freigabe für reale Gelder. Produktionsfreigabe weiterhin
+`RELEASE BLOCKED`, bis Wallet, Infrastruktur, unabhängiger Audit und
+Mainnet-Testfälle vom Betreiber nachgewiesen sind.
