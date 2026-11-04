@@ -1,6 +1,8 @@
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {createStarsCheckout,verifiedWebhook,handleStarsUpdate} from './stars.mjs';
 import {createVariableStarsCheckout,handleVariableStarsUpdate} from './variable-stars.mjs';
+import {telegramApi} from './stars.mjs';
+import {handlePaymentAdminCommand,isPaymentEnabled} from './payment-controls.mjs';
 
 const json=(data,status=200,origin=null)=>new Response(JSON.stringify(data),{
   status,headers:{
@@ -27,15 +29,25 @@ export default {
       if(source.length>65536)return json({ok:false,error:'too_large'},413);
       let update;
       try{update=JSON.parse(source);}catch{return json({ok:false,error:'bad_json'},400);}
-      const variable=await handleVariableStarsUpdate(update,env);
+      const control=await handlePaymentAdminCommand(update,env,{
+        sendMessage:async(chat,text)=>telegramApi(env,'sendMessage',{
+          chat_id:chat,text,disable_web_page_preview:true
+        },fetch)
+      });
+      if(control.handled)return json({ok:true});
+      // Accept already-issued payment receipts even after the admin disables
+      // new checkouts. Reject new precheckout requests when switched off.
+      const enabled=await isPaymentEnabled(env,'stars');
+      const guarded={...env,STARS_PAYMENT_ENABLED:enabled?'true':'false'};
+      const variable=await handleVariableStarsUpdate(update,guarded);
       if(variable.handled)return json({ok:true});
-      await handleStarsUpdate(update,env);
+      await handleStarsUpdate(update,guarded);
       return json({ok:true});
     }
     const isVariable=url.pathname==='/api/stars/topup';
     const isFixed=url.pathname==='/api/stars/checkout';
     if(!isVariable&&!isFixed)return json({ok:false,error:'not_found'},404);
-    if(env.STARS_PAYMENT_ENABLED!=='true'||
+    if(!(await isPaymentEnabled(env,'stars'))||
       (isVariable&&env.STARS_VARIABLE_TOPUP_ENABLED!=='true')||
       (isFixed&&env.STARS_FIXED_PRODUCTS_ENABLED!=='true'))
       return json({ok:false,error:'stars_checkout_disabled'},503);
