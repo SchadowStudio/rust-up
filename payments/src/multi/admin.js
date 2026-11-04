@@ -5,7 +5,8 @@ import {FIATS,positiveAtomic} from './fiat.js';
 import {digestHex,newSecret,projectWebhookKey,safeEqual} from './keys.js';
 import {requireProjectId,isUuid,safeWebhookUrl} from './identity.js';
 import {readinessV2} from './readiness.js';
-import {paymentProfileAdmin,initializeProjectPayments,getProjectPaymentConfig} from './project-config.js';
+import {paymentProfileAdmin,initializeProjectPayments} from './project-config.js';
+import {projectReport} from './project-reports.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
  'content-type':'application/json','cache-control':'no-store'}});
 const fail=(code,status=400)=>json({ok:false,error:code},status);
@@ -223,6 +224,8 @@ export async function multiAdmin(request,env,url){
   }
   if(/^\/v2\/admin\/projects\/[0-9a-f-]{36}\/(?:payment-config|fiat-method|crypto-method)$/i.test(path))
    return paymentProfileAdmin(request,env,url);
+  if(/^\/v2\/admin\/projects\/[0-9a-f-]{36}\/(?:payments|summary|keys)$/i.test(path))
+   return projectReport(request,env,url);
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
   if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
