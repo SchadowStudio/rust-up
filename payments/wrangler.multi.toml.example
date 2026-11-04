@@ -1,0 +1,36 @@
+# Standalone multi-project staging Worker. DO NOT deploy as the original game Worker.
+name = "rustup-multi-payments-staging"
+main = "src/multi/api.js"
+compatibility_date = "2026-11-04"
+workers_dev = true
+
+[vars]
+MULTI_ADMIN_ENABLED = "false"
+MULTI_LIVE_ENABLED = "false"
+MULTI_OPERATOR_APPROVED = "false"
+MULTI_AUTO_SCAN_ENABLED = "false"
+MULTI_DELIVERY_ENABLED = "false"
+MULTI_MAX_INVOICES_PER_MINUTE = "1000"
+ETHEREUM_START_BLOCK = "0"
+TRON_INDEXER_URL = "https://api.trongrid.io"
+USDT_ERC20_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rustup-multi-payments-staging"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_UUID"
+
+[triggers]
+crons = ["*/2 * * * *"]
+
+# Required Cloudflare secrets (DO NOT write values into this file):
+# wrangler secret put MULTI_ADMIN_KEY
+# wrangler secret put MULTI_WEBHOOK_MASTER_KEY
+# wrangler secret put ETHEREUM_RPC_URL
+# wrangler secret put TRON_RPC_URL
+# wrangler secret put TRON_RPC_API_KEY
+# wrangler secret put BITCOIN_RPC_URL
+# wrangler secret put BITCOIN_RPC_BASIC_B64
+# wrangler secret put BITCOIN_START_BLOCKHASH
+# No wallet seed/private key is EVER required by this Worker.
