@@ -122,18 +122,24 @@ async function verifyInvoice(db,project,invoice,b,env){
 }
 async function listEvents(db,projectId,url){
  const after=Number(url.searchParams.get('after')||0);
+ const afterEventId=url.searchParams.get('afterEventId')||'';
  const limit=Number(url.searchParams.get('limit')||50);
  if(!Number.isSafeInteger(after)||after<0||
+    (afterEventId!==''&&!/^v2:[0-9a-f-]{36}$/i.test(afterEventId))||
     !Number.isSafeInteger(limit)||limit<1||limit>100)return fail('invalid_cursor');
  const rows=await db.prepare(`SELECT event_id,event_body,created_at_ms,delivered_at_ms
-  FROM v2_delivery_outbox WHERE project_id=? AND created_at_ms>?
+  FROM v2_delivery_outbox
+  WHERE project_id=? AND
+   (created_at_ms>? OR (created_at_ms=? AND event_id>?))
   ORDER BY created_at_ms,event_id LIMIT ?`)
-  .bind(projectId,after,limit).all();
+  .bind(projectId,after,after,afterEventId,limit).all();
  const items=(rows.results||[]).map(x=>({
   eventId:x.event_id,body:JSON.parse(x.event_body),
   delivered:x.delivered_at_ms!=null,createdAt:x.created_at_ms
  }));
- return json({ok:true,events:items,nextAfter:items.length?items.at(-1).createdAt:after});
+ const last=items.at(-1);
+ return json({ok:true,events:items,nextAfter:last?.createdAt??after,
+  nextAfterEventId:last?.eventId??afterEventId});
 }
 async function projectRoute(req,env,url){
  if(!checkoutReady(env))return fail('checkout_disabled',503);
