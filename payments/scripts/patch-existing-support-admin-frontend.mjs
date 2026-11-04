@@ -12,8 +12,12 @@ const EXPECT={
  'app.js':'dbf6b86721616175c4d582ede657d27bd3387f71',
  'style.css':'14b6bea7c51da58b16e3c483dae7444df92ea6e8'
 };
-function gitBlobHash(text){
- const buf=Buffer.from(text);
+export function gitBlobHash(text){
+ // GitHub blob SHA corresponds to LF-formatted repository bytes. On Windows,
+ // Git's core.autocrlf commonly checks out the SAME tracked file with CRLF.
+ // Normalize only for identity verification; retain local line endings when editing.
+ const canonical=text.replace(/\r\n/g,'\n');
+ const buf=Buffer.from(canonical);
  return createHash('sha1').update('blob '+buf.length+'\0').update(buf).digest('hex');
 }
 function replaceOnce(source,needle,replacement){
