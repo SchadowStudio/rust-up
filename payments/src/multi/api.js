@@ -258,10 +258,27 @@ export async function handleMulti(req,env){
 export default {
  fetch:handleMulti,
  async scheduled(_event,env,ctx){
-  ctx.waitUntil(Promise.allSettled([
-   expireV2(env.DB),deliverV2(env),scanMultiPayments(env)
-  ]).then(results=>{
-   for(const r of results)if(r.status==='rejected')console.error('multi-payments background job failed');
+  if(!env.DB){console.error('payment cron: D1 database binding missing');return;}
+  const work=[
+   Promise.resolve().then(()=>expireV2(env.DB)),
+   Promise.resolve().then(()=>deliverV2(env)),
+   Promise.resolve().then(()=>scanMultiPayments(env))
+  ];
+  ctx.waitUntil(Promise.allSettled(work).then(results=>{
+   for(let i=0;i<results.length;i++){
+    const x=results[i],task=['expiry','webhook_delivery','chain_scan'][i];
+    if(x.status==='rejected'){
+     console.error('payment cron task failed',task,
+      String(x.reason?.message||'unknown').slice(0,120));
+     continue;
+    }
+    const report=x.value;
+    if(report?.errors?.length)
+     console.error('payment chain scanner has unresolved failures',
+      report.errors.slice(0,10));
+    if(task==='webhook_delivery'&&report?.failed>0)
+     console.error('payment webhook delivery failures: '+report.failed);
+   }
   }));
  },
  async queue(batch,env){
