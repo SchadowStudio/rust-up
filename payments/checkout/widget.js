@@ -40,12 +40,12 @@ export function mountCryptoPayment(container,initialInvoice,{refresh,onSubmitTra
   const remain=Math.max(0,Math.floor((invoice.expiresAt-Date.now())/1000));
   instructions.textContent='Nur das angegebene Netzwerk verwenden. Auf anderen Netzwerken können Zahlungen verloren gehen.';
   status.textContent=invoice.status==='verified'?
-   invoice.deliveredToProject?'Zahlung bestätigt und dem Projekt gemeldet.':'Blockchain bestätigt – Projektgutschrift steht noch aus.':
+   invoice.deliveredToProject?'Zahlung auf der Blockchain bestätigt; Bestätigung an Projekt zugestellt.':'Blockchain-Zahlung bestätigt – Benachrichtigung an Projekt ausstehend.':
    invoice.status==='manual_review'?'Manuelle Prüfung erforderlich.':
    readyToPay()?'Rechnung offen.':'Rechnung abgelaufen – bitte nicht mehr überweisen.';
   pending.textContent=readyToPay()?
    'Verbleibende Zeit: '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0'):
-   'Bei verspäteter Zahlung bitte den Projektsupport kontaktieren.';
+   'Bei verspäteter Zahlung bitte den Support des empfangenden Projekts kontaktieren.';
   copy.disabled=!readyToPay();
   verifyBtn.disabled=typeof onSubmitTransaction!=='function'||typeof refresh!=='function'||busy;
   hashInput.disabled=typeof onSubmitTransaction!=='function'||typeof refresh!=='function'||busy;
