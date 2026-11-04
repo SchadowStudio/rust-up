@@ -9,3 +9,5 @@ wrangler.toml
 !.env.example
 
 dist-admin/
+
+dist-checkout/
