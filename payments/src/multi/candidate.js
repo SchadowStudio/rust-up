@@ -2,7 +2,7 @@
 import {verifyChainPayment} from '../chains.js';
 import {txId} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
-import {settleV2} from './settlement.js';
+import {settleV2,reviewUnderpayment} from './settlement.js';
 import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 export async function reconcileCandidate(db,item,env){
  if(!item||!['ethereum','bitcoin','tron'].includes(item.chain)||
@@ -21,7 +21,14 @@ export async function reconcileCandidate(db,item,env){
     ORDER BY created_at_ms DESC LIMIT 1`;
  const invoice=await db.prepare(query).bind(item.chain,item.address).first();
  if(!invoice)return {status:'ignored',reason:'invoice_not_found'};
- const proof=await verifyChainPayment(invoice,hash,env);
+ let proof;
+ try{proof=await verifyChainPayment(invoice,hash,env);}
+ catch(error){
+  if(error.message==='recipient_or_amount_mismatch'||
+     error.message==='underpaid_or_wrong_recipient')
+   return reviewUnderpayment(db,invoice,hash,env);
+  throw error;
+ }
  const settled=await settleV2(db,invoice,proof);
  await notifyDeliveryQueue(env,settled);
  return settled;
