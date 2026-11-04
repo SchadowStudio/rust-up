@@ -34,10 +34,10 @@ async function createOrder(db,uid,b){
   WHERE p.id=? AND q.asset=? AND p.enabled=1 AND q.enabled=1`)
   .bind(b.packageId,b.asset).first();
  if(!quote||!/^[1-9][0-9]*$/.test(quote.amount_atomic))return error('quote_unavailable',404);
- const address=await db.prepare('SELECT address FROM deposit_addresses WHERE chain=? AND assigned_intent IS NULL ORDER BY address LIMIT 1')
+ const address=await db.prepare('SELECT address FROM deposit_addresses WHERE chain=? AND enabled=1 AND assigned_intent IS NULL ORDER BY address LIMIT 1')
   .bind(chain).first();
  if(!address)return error('no_unused_address',503);
- if(!validAddress(chain,address.address))return error('bad_receiver_configuration',503);
+ if(!await validateReceivingAddress(chain,address.address))return error('bad_receiver_configuration',503);
  const id=crypto.randomUUID(),expires=now+1800000;
  const [reserved,created]=await db.batch([
   db.prepare('UPDATE deposit_addresses SET assigned_intent=? WHERE chain=? AND address=? AND assigned_intent IS NULL')
