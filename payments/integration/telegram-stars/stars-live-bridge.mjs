@@ -141,11 +141,17 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  if(!['/api/stars/catalog','/api/stars/checkout','/api/stars/purchases','/api/stars/health'].includes(path))
   return null;
  if(path==='/api/stars/health'&&request.method==='GET')
-  return data({ok:true,service:'rustup-fixed-stars',productionEnabled:false,
+  return data({ok:true,service:'rustup-fixed-stars',
+   productionEnabled:env?.PAYMENT_PRODUCTION_ENABLED==='true',
    gameBalanceCredit:false});
- if(request.method!=='POST')return data({ok:false,error:'method'},405);
  const origin=allowedOrigin(request,env);
  if(!origin)return data({ok:false,error:'origin_rejected'},403);
+ if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{
+  'access-control-allow-origin':origin,'access-control-allow-methods':'POST, OPTIONS',
+  'access-control-allow-headers':'content-type','access-control-max-age':'600',
+  'vary':'Origin','cache-control':'no-store'
+ }});
+ if(request.method!=='POST')return data({ok:false,error:'method'},405,origin);
  if(request.headers.get('content-type')?.split(';')[0]!=='application/json')
   return data({ok:false,error:'content_type'},415,origin);
  const raw=await request.text();
