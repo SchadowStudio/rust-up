@@ -4,6 +4,7 @@ import {txId} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
 import {settleV2,reviewUnderpayment} from './settlement.js';
 import {deliverV2,notifyDeliveryQueue} from './delivery.js';
+import {processPaymentPart} from './multi-transfer.js';
 export async function reconcileCandidate(db,item,env){
  if(!item||!['ethereum','bitcoin','tron'].includes(item.chain)||
     !await validateReceivingAddress(item.chain,item.address))
@@ -21,6 +22,17 @@ export async function reconcileCandidate(db,item,env){
     ORDER BY created_at_ms DESC LIMIT 1`;
  const invoice=await db.prepare(query).bind(item.chain,item.address).first();
  if(!invoice)return {status:'ignored',reason:'invoice_not_found'};
+ if(env.MULTI_PARTIAL_AGGREGATION_ENABLED==='true'){
+  let settled;
+  try{settled=await processPaymentPart(db,invoice,hash,env);}
+  catch(error){
+   if(error.message==='invalid_or_late_payment_part')
+    return reviewUnderpayment(db,invoice,hash,env);
+   throw error;
+  }
+  await notifyDeliveryQueue(env,settled);
+  return settled;
+ }
  let proof;
  try{proof=await verifyChainPayment(invoice,hash,env);}
  catch(error){
