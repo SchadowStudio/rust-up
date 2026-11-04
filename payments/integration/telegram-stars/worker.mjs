@@ -1,5 +1,6 @@
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
-import {createStarsCheckout,receiveStarsWebhook} from './stars.mjs';
+import {createStarsCheckout,verifiedWebhook,handleStarsUpdate} from './stars.mjs';
+import {createVariableStarsCheckout,handleVariableStarsUpdate} from './variable-stars.mjs';
 
 const json=(data,status=200,origin=null)=>new Response(JSON.stringify(data),{
   status,headers:{
@@ -19,11 +20,24 @@ export default {
       return json({ok:true,service:'rustup-stars-staging',
         liveEnabled:env.STARS_PAYMENT_ENABLED==='true',
         realGameCredits:false});
-    if(url.pathname==='/telegram/stars/webhook')
-      return receiveStarsWebhook(request,env);
-    if(url.pathname!=='/api/stars/checkout')
-      return json({ok:false,error:'not_found'},404);
-    if(env.STARS_PAYMENT_ENABLED!=='true')
+    if(url.pathname==='/telegram/stars/webhook'){
+      if(request.method!=='POST')return json({ok:false,error:'method'},405);
+      if(!verifiedWebhook(request,env))return json({ok:false,error:'forbidden'},403);
+      const source=await request.text();
+      if(source.length>65536)return json({ok:false,error:'too_large'},413);
+      let update;
+      try{update=JSON.parse(source);}catch{return json({ok:false,error:'bad_json'},400);}
+      const variable=await handleVariableStarsUpdate(update,env);
+      if(variable.handled)return json({ok:true});
+      await handleStarsUpdate(update,env);
+      return json({ok:true});
+    }
+    const isVariable=url.pathname==='/api/stars/topup';
+    const isFixed=url.pathname==='/api/stars/checkout';
+    if(!isVariable&&!isFixed)return json({ok:false,error:'not_found'},404);
+    if(env.STARS_PAYMENT_ENABLED!=='true'||
+      (isVariable&&env.STARS_VARIABLE_TOPUP_ENABLED!=='true')||
+      (isFixed&&env.STARS_FIXED_PRODUCTS_ENABLED!=='true'))
       return json({ok:false,error:'stars_checkout_disabled'},503);
     const origin=request.headers.get('origin');
     if(!allowedOrigin(origin,env))
@@ -52,12 +66,22 @@ export default {
     } catch {
       return json({ok:false,error:'telegram_auth_invalid'},401,origin);
     }
-    if(typeof body.sku!=='string'||!(/^[a-z][a-z0-9_-]{2,39}$/).test(body.sku))
+    if(isFixed&&
+      (typeof body.sku!=='string'||!(/^[a-z][a-z0-9_-]{2,39}$/).test(body.sku)))
       return json({ok:false,error:'invalid_product'},400,origin);
+    if(isVariable&&
+      (body.currency!=='RUB'||!Number.isSafeInteger(body.amountMinor)||
+       typeof body.requestId!=='string'||!(/^[0-9a-f-]{36}$/i).test(body.requestId)))
+      return json({ok:false,error:'invalid_variable_amount_or_request'},400,origin);
     try {
-      const invoice=await createStarsCheckout(env,{
-        verifiedTelegramUserId:user.userId,sku:body.sku
-      });
+      const invoice=isVariable
+        ? await createVariableStarsCheckout(env,{
+            verifiedTelegramUserId:user.userId,
+            amountMinor:body.amountMinor,requestId:body.requestId
+          })
+        : await createStarsCheckout(env,{
+            verifiedTelegramUserId:user.userId,sku:body.sku
+          });
       return json({ok:true,...invoice},200,origin);
     } catch {
       // Do not expose Telegram errors or database details publicly.
