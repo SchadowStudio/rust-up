@@ -22,6 +22,7 @@ function inMemory(){
  const db={
   parts,events,claims,
   prepare(sql){return {bind(...args){return {
+   sql,args,
    async first(){
     if(sql.includes('FROM v2_payment_parts')&&sql.includes('WHERE chain=?'))
      return parts.get(args[0]+':'+args[1])||null;
