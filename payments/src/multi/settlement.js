@@ -1,5 +1,5 @@
 import {ASSETS,txId} from '../assets.js';
-import {verifyChainPayment} from '../chains.js';
+import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 function validProof(invoice,proof){
  const rules=ASSETS[invoice.asset];
  if(!rules||rules.chain!==invoice.chain)throw Error('unsupported_asset');
