@@ -1,5 +1,6 @@
 import {projectWebhookKey} from './keys.js';
 import {safeWebhookUrl} from './identity.js';
+import {verifyChainPaymentQuorum} from './quorum.js';
 const enc=new TextEncoder();
 async function sign(secret,text){
  const key=await crypto.subtle.importKey('raw',enc.encode(secret),
@@ -34,7 +35,26 @@ export async function deliverV2(env,now=Date.now(),onlyEventId=null){
   if(!lease.meta?.changes){result.deferred++;continue;}
   result.attempted++;
   try{
+   // Webhooks are the final money-facing boundary. Re-check chain consensus
+   // immediately before delivery; a stale/reorganized transaction is not proof.
+   const invoice=await db.prepare(`SELECT * FROM v2_invoices
+     WHERE id=? AND project_id=? AND status='verified' AND tx_hash IS NOT NULL`)
+    .bind(event.invoice_id,event.project_id).first();
+   if(!invoice)throw Error('invoice_not_verified');
+   const current=await verifyChainPaymentQuorum(invoice,invoice.tx_hash,env);
+   const recorded=JSON.parse(event.event_body);
+   if(recorded.invoiceId!==invoice.id||
+      recorded.projectId!==invoice.project_id||
+      recorded.transactionHash!==current.txHash||
+      recorded.amountAtomic!==current.actualAtomic||
+      current.paymentTimeMs<invoice.created_at_ms-300000||
+      current.paymentTimeMs>invoice.expires_at_ms)
+    throw Error('chain_proof_changed_since_settlement');
    const url=safeWebhookUrl(event.webhook_url);
+   const host=new URL(url).hostname.toLowerCase();
+   const allow=String(env.MULTI_WEBHOOK_HOST_ALLOWLIST||'').split(',')
+    .map(x=>x.trim().toLowerCase()).filter(Boolean);
+   if(!allow.includes(host))throw Error('callback_host_not_approved');
    const timestamp=Date.now();
    const signature=await signV2Webhook(env.MULTI_WEBHOOK_MASTER_KEY,
     event.project_id,event.event_id,timestamp,event.event_body);
