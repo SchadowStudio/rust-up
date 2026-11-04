@@ -17,6 +17,7 @@ export function readinessV2(env){
   operatorApproval:env.MULTI_OPERATOR_APPROVED==='true',
   acceptingDeposits:env.MULTI_LIVE_ENABLED==='true',
   reconciliation:env.MULTI_AUTO_SCAN_ENABLED==='true',
+  postSettlementAudit:env.MULTI_RECONCILE_ENABLED==='true',
   webhookDelivery:env.MULTI_DELIVERY_ENABLED==='true',
   webhookMasterSecret:typeof env.MULTI_WEBHOOK_MASTER_KEY==='string'&&env.MULTI_WEBHOOK_MASTER_KEY.length>=40,
   ethereumRpc:/^https:\/\//i.test(String(env.ETHEREUM_RPC_URL||'')),
