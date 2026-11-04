@@ -5,6 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {verifyChainPaymentQuorum} from '../src/multi/quorum.js';
+import {verifyChainPayment} from '../src/chains.js';
 import {settleV2} from '../src/multi/settlement.js';
 import {deliverV2} from '../src/multi/delivery.js';
 import {projectWebhookKey} from '../src/multi/keys.js';
@@ -183,6 +184,8 @@ async function withNetwork(network,fn){
  try{return await fn()}finally{globalThis.fetch=previous;}
 }
 async function settle(state){
+ await verifyChainPayment(state.provider.state.invoice,TX,
+  {...state.providerEnv,MULTI_STRICT_QUORUM:'true'});
  const proof=await verifyChainPaymentQuorum(state.provider.state.invoice,
   TX,state.providerEnv);
  assert.equal(proof.actualAtomic,'100');
