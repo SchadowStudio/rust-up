@@ -35,3 +35,9 @@ jobs:
           node --test payments/scripts/recover-live-bot-source.test.mjs
           node --check payments/scripts/prepare-live-bot-deployment.mjs
           node --test payments/scripts/prepare-live-bot-deployment.test.mjs
+          node --check payments/scripts/patch-recovered-admin-panel.mjs
+          node --test payments/scripts/patch-recovered-admin-panel.test.mjs
+          node --check payments/scripts/check-live-admin-panel-release.mjs
+          node --check payments/scripts/patch-existing-support-admin-frontend.mjs
+          node --test payments/scripts/patch-existing-support-admin-frontend.test.mjs
+          node --check payments/frontend/support-admin/payments-tab.js
