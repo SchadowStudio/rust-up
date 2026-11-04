@@ -37,6 +37,9 @@ async function main(){
  if(!original.includes('RUSTUP_PAYMENT_ADMIN_HOOK')||
     !Array.isArray(manifest.files)||manifest.files.length!==9)
   throw Error('original_bot_recovery_unverified');
+ if(!['STARS_PAYMENT_ENABLED','STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED']
+   .every(name=>config.includes(name+' = "false"')))
+  throw Error('stars_staging_flags_must_all_be_off');
  if(!config.includes('PAYMENT_PRODUCTION_ENABLED = "false"')||
     !config.includes('binding = "PAYMENTS_DB"')||
     !config.includes('keep_vars = true')||
