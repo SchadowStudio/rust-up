@@ -1,4 +1,4 @@
-/* RUST UP — front-end demo. All money/skins are virtual and stored in localStorage. */
+/* RUST UP — Telegram Mini App: wallet, inventory and results must be server-authoritative. */
 (function () {
   'use strict';
 
@@ -6,7 +6,8 @@
   const R = window.RUSTUP_RULES;
   const { RTP, MAX_CHANCE, MIN_CHANCE, MAX_SLOTS, TG_CHANNEL, TG_BONUS, PROMOS, DAILY_MS, DAILY_BONUS } = R;
   const MIN_TOPUP = 10;           // below this balance the upgrader suggests getting coins
-  const bonusTxt = () => moneyInt(TG_BONUS);
+  // Rewards are denominated in rubles; the backend must credit exactly 5000 kopecks.
+  const bonusTxt = () => `${R.BONUS_RUB} ₽`;
   const STORE_KEY = 'rustup_demo_v1';
 
   // one catalog for all games; names don't collide ("AK47" in Rust vs "AK-47 | ..." in CS2)
@@ -116,11 +117,18 @@
     };
   }
   function load() {
+    // Never restore mutable wallet, items, history or rewards from browser storage.
+    const st = freshState();
     try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) return Object.assign(freshState(), JSON.parse(raw));
-    } catch (e) { /* private mode / blocked storage: run in-memory */ }
-    return freshState();
+      const cached = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (cached && cached.settings && typeof cached.settings === 'object') {
+        const settings = cached.settings;
+        st.settings.sound = settings.sound !== false;
+        st.settings.fast = settings.fast === true;
+        if (['rub', 'usdt', 'stars'].includes(settings.currency)) st.settings.currency = settings.currency;
+      }
+    } catch (e) { /* corrupt or inaccessible browser storage */ }
+    return st;
   }
   let S = load();
   // catalog can change between versions: drop owned items that no longer exist
@@ -134,10 +142,9 @@
   sanitize();
   const addItem = name => S.inventory.push({ uid: uid(), name, t: Date.now() });
   function save() {
-    S.savedAt = Date.now();
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
-    // before the game server answered the device copy is still the player's progress (it is imported once)
-    if (!gameReady) cloudSave();
+    // No authoritative financial values are ever persisted on the device.
+    try { localStorage.setItem(STORE_KEY, JSON.stringify({ settings: S.settings })); }
+    catch (e) { /* local storage unavailable */ }
   }
 
   // ---------- game server (bot/game.js): balance, items, rewards and every roll live there ----------
@@ -153,23 +160,56 @@
   };
   const gameErr = d => GAME_ERR[d && d.error] || 'Не удалось выполнить — попробуйте ещё раз';
   function applyState(st) {
-    S.balance = st.balance; S.inventory = st.inventory.filter(i => byName[i.name]); S.withdrawals = st.withdrawals;
-    S.history = st.history; S.stats = st.stats; S.seeds = st.seeds; S.rewards = st.rewards; S.tx = st.tx || [];
+    if (!st || !Number.isFinite(st.balance) || st.balance < 0 ||
+        !Array.isArray(st.inventory) || !Array.isArray(st.withdrawals) ||
+        !Array.isArray(st.history) || !st.stats || !st.seeds || !st.rewards ||
+        !st.user || typeof st.user !== 'object') {
+      throw new Error('Invalid authoritative game state');
+    }
+    S.balance = st.balance;
+    S.inventory = st.inventory.filter(i => i && typeof i.uid === 'string' && byName[i.name]);
+    S.withdrawals = st.withdrawals;
+    S.history = st.history;
+    S.stats = st.stats;
+    S.seeds = st.seeds;
+    S.rewards = st.rewards;
+    S.tx = Array.isArray(st.tx) ? st.tx : [];
     const u = tgUser() || {};
-    S.user = { ...(S.user || {}), ...st.user, id: u.id || (S.user && S.user.id), tg: true };
-    if (!S.user.color) S.user.color = AVA_COLORS[(u.id || 0) % AVA_COLORS.length];
+    S.user = { ...st.user, id: u.id || st.user.id, tg: true };
+    if (!/^#[0-9a-f]{6}$/i.test(S.user.color || ''))
+      S.user.color = AVA_COLORS[(Number(u.id) || 0) % AVA_COLORS.length];
     save();
   }
   // one action on the server; the new state is applied before the promise resolves,
   // unless defer is set (the upgrade wheel and the case roulette show the result first, then apply it)
+  // Prevent overlapping client requests while an authoritative result is animating.
+  // Server-side atomicity, uniqueness and idempotency are still required.
+  let actionQueue = Promise.resolve();
+  let releaseVisual = null;
+  function releaseVisualAction() {
+    if (releaseVisual) { const done = releaseVisual; releaseVisual = null; done(); }
+  }
   function api(action, extra = {}, defer = false) {
-    return fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/game', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: TG.initData, action, ...extra })
-    }).then(r => r.json()).then(d => {
+    const running = actionQueue.catch(() => {}).then(async () => {
+      const res = await fetch(window.RUSTUP_API.replace(/\/$/, '') + '/api/game', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: TG.initData, action, ...extra })
+      });
+      if (!res.ok) return { d: { ok: false, error: 'net' } };
+      const d = await res.json();
       if (d && d.state && !(defer && d.ok)) { applyState(d.state); renderHeader(); }
       if (d && d.error === 'items') refreshUpgrade();
-      return d || { ok: false };
-    }).catch(() => ({ ok: false, error: 'net' }));
+      if (defer && d && d.ok) {
+        let release;
+        const gate = new Promise(resolve => { release = resolve; });
+        releaseVisual = release;
+        setTimeout(() => { if (releaseVisual === release) releaseVisualAction(); }, 20000);
+        return { d, gate };
+      }
+      return { d: d || { ok: false } };
+    });
+    actionQueue = running.then(result => result.gate).catch(() => {});
+    return running.then(result => result.d).catch(() => ({ ok: false, error: 'net' }));
   }
   const netToast = d => toast(d.error === 'net' ? 'Нет связи с сервером, попробуйте ещё раз' : gameErr(d), 'error');
 
@@ -177,42 +217,7 @@
   // Only active when opened from a Telegram bot (initData present); otherwise TG is null and the site works as usual.
   const TG = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData ? Telegram.WebApp : null;
   const tgVer = v => TG && TG.isVersionAtLeast && TG.isVersionAtLeast(v);
-  // CloudStorage keeps progress per Telegram account across devices; values are limited to 4096 chars, so the state is chunked
-  const CLOUD_CHUNK = 4000;
-  let cloudTimer = null;
-  function cloudSave() {
-    if (!TG || !tgVer('6.9')) return;
-    clearTimeout(cloudTimer);
-    cloudTimer = setTimeout(() => {
-      const json = JSON.stringify(S);
-      const n = Math.ceil(json.length / CLOUD_CHUNK);
-      for (let i = 0; i < n; i++) TG.CloudStorage.setItem('s_' + i, json.slice(i * CLOUD_CHUNK, (i + 1) * CLOUD_CHUNK));
-      // meta last, so a reader never sees a count pointing at chunks that are not written yet
-      TG.CloudStorage.setItem('s_meta', JSON.stringify({ n, t: S.savedAt }));
-    }, 1500);
-  }
-  // done(changed) is always called once: after the cloud copy is applied, skipped, or after a 4s timeout
-  function cloudLoad(done) {
-    let called = false;
-    const finish = changed => { if (!called) { called = true; done(changed); } };
-    if (!TG || !tgVer('6.9')) return finish(false);
-    setTimeout(() => finish(false), 4000);
-    TG.CloudStorage.getItem('s_meta', (err, meta) => {
-      if (err || !meta) return finish(false);
-      let m; try { m = JSON.parse(meta); } catch (e) { return finish(false); }
-      if (!(m.t > (S.savedAt || 0))) return finish(false);   // local copy is newer or equal
-      const keys = Array.from({ length: m.n }, (_, i) => 's_' + i);
-      TG.CloudStorage.getItems(keys, (err2, vals) => {
-        if (err2 || !vals || called) return finish(false);
-        try {
-          S = Object.assign(freshState(), JSON.parse(keys.map(k => vals[k] || '').join('')));
-          sanitize();
-          try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* ignore */ }
-          finish(true);
-        } catch (e) { finish(false); /* partial/corrupt cloud copy: keep local */ }
-      });
-    });
-  }
+  // Server owns wallet and game progress; do not import Telegram CloudStorage.
   const tgUser = () => TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
   const tgName = u => ((u.first_name || '') + ' ' + (u.last_name || '')).trim().slice(0, 20) || u.username || 'Survivor';
   const haptic = kind => {
@@ -260,7 +265,7 @@
   }
   function shareRef() {
     if (!REF) return;
-    const text = `Залетай в RUST UP — апгрейд скинов Rust, CS2 и NFT-подарков! По моей ссылке +${moneyInt(REF.welcomeBonus)} на старт 🎁`;
+    const text = `Залетай в RUST UP — апгрейд скинов Rust, CS2 и NFT-подарков! По моей ссылке +${bonusTxt()} на старт 🎁`;
     const url = `https://t.me/share/url?url=${encodeURIComponent(REF.link)}&text=${encodeURIComponent(text)}`;
     if (TG && tgVer('6.1')) TG.openTelegramLink(url); else window.open(url, '_blank', 'noopener');
   }
@@ -275,15 +280,15 @@
     if (!box) return;
     const bot = window.RUSTUP_BOT;
     if (!refAvailable()) {
-      box.innerHTML = `<div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${coinInt(5000)} за друга</span></div>
+      box.innerHTML = `<div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${bonusTxt()} за друга</span></div>
         <p class="muted">Реферальная ссылка работает в Telegram-боте. Откройте игру через бота — там будет ваша личная ссылка.</p>
         ${bot ? `<a class="btn btn-tg" href="https://t.me/${esc(bot)}" target="_blank" rel="noopener">${ICON.tg}<span>Открыть @${esc(bot)}</span></a>` : ''}`;
       return;
     }
     if (!REF) { box.innerHTML = `<div class="ref-head"><h4>Пригласи друзей</h4></div><p class="muted">Загрузка…</p>`; return; }
     box.innerHTML = `
-      <div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${coinInt(REF.refBonus)} за друга</span></div>
-      <p class="muted">Друг получает ${coinInt(REF.welcomeBonus)} на старт, а вы — ${coinInt(REF.refBonus)}, как только он зайдёт в игру. Награды начисляются сами.</p>
+      <div class="ref-head"><h4>Пригласи друзей</h4><span class="ref-bonus">${bonusTxt()} за друга</span></div>
+      <p class="muted">Друг получает ${bonusTxt()} на старт, а вы — ${bonusTxt()}, как только он зайдёт в игру. Награды начисляются сами.</p>
       <div class="ref-link"><input id="refLink" class="text-input mono" readonly value="${esc(REF.link)}"><button class="btn btn-ghost" data-ref="copy">Копировать</button></div>
       <button class="btn btn-tg" data-ref="share" style="height:44px">${ICON.tg}<span>Отправить друзьям</span></button>
       <div class="ref-stats">
@@ -370,15 +375,15 @@
   }
   function friendsPage() {
     const nfts = ROAD_ITEMS.filter(r => r.skin.img.includes('assets/nft/')).slice(-3).reverse().map(r => r.skin);
-    const refBonus = REF ? REF.refBonus : 5000, welcome = REF ? REF.welcomeBonus : 2500;
+    // Both accounts receive 50 RUB once; the backend must reject duplicate or reciprocal invitations.
     const steps = [
       [ICON.tg, 'Отправь ссылку', 'Своя ссылка — ниже. Скинь её в чаты, сторис или под ролики'],
-      [ICON.gift, `Друг получает ${coinInt(welcome)}`, 'Сразу, как только зайдёт в игру по твоей ссылке'],
-      [ICON.coin, `Тебе ${coinInt(refBonus)} и шаг по дороге`, `За каждого друга в игре. ${ROAD.length} наград — до РЕАЛЬНЫХ NFT`]];
+      [ICON.gift, `Друг получает ${bonusTxt()}`, 'Сразу, как только зайдёт в игру по твоей ссылке'],
+      [ICON.coin, `Тебе ${bonusTxt()} и шаг по дороге`, `За каждого друга в игре. ${ROAD.length} наград — до РЕАЛЬНЫХ NFT`]];
     $('#page').innerHTML = `<div class="page friends-page">
       <button class="hero-slide hs-friends" type="button" data-ref-invite>
         <span class="hero-text"><span class="hero-kicker real">РЕАЛЬНЫЕ NFT</span><b class="hero-title">Зови друзей —<br>забирай NFT</b>
-          <span class="hero-sub">${coinInt(refBonus)} за каждого друга и ${ROAD.length} наград на дороге</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
+          <span class="hero-sub">${bonusTxt()} за каждого друга и ${ROAD.length} наград на дороге</span><span class="hero-btn">Пригласить ${ICON.right}</span></span>
         <span class="hero-art">${nfts.map((s, i) => `<img class="hr-${i} nft" src="${s.img}" alt="" draggable="false">`).join('')}</span>
       </button>
       <div class="row-head"><h2 class="home-title">Как это работает</h2></div>
@@ -416,7 +421,7 @@
       <h3 class="earn-sub">Как получить ещё</h3>
       <a class="earn-offer earn-friend" href="#/friends">
         <span class="earn-ico">${FRIEND_ICO}</span><b>Пригласить друга</b>
-        <span class="earn-amount">+<b>${coinInt(5000)}</b></span>
+        <span class="earn-amount">+<b>${bonusTxt()}</b></span>
       </a>
     </div>`;
   }
@@ -721,9 +726,13 @@
   // ---------- auth (demo) ----------
   const AVA_COLORS = ['#cd412b', '#467edf', '#7c954d', '#ae6eee', '#d68a1f', '#2c9c8f'];
   // the Telegram profile photo (served by the bot, /api/ava/<id>) over the letter; the letter stays if there is no photo
-  const avaUrl = id => (id && window.RUSTUP_API ? window.RUSTUP_API.replace(/\/$/, '') + '/api/ava/' + id : '');
+  const avaUrl = id => (id && window.RUSTUP_API ? window.RUSTUP_API.replace(/\/$/, '') + '/api/ava/' + encodeURIComponent(String(id)) : '');
   const myPhoto = () => (tgUser() && tgUser().photo_url) || avaUrl(S.user && S.user.id);
-  const avatarHtml = (name, color, cls = 'avatar', photo = '') => `<span class="${cls}" style="background:linear-gradient(135deg,${color},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}${photo ? `<img class="ava-img" src="${esc(photo)}" alt="" loading="lazy" draggable="false" onerror="this.remove()">` : ''}</span>`;
+  const avatarHtml = (name, color, cls = 'avatar', photo = '') => {
+    const safeColor = /^#[0-9a-f]{6}$/i.test(color || '') ? color : '#467edf';
+    const safePhoto = /^(https:\/\/|\/)/i.test(photo || '') ? photo : '';
+    return `<span class="${cls}" style="background:linear-gradient(135deg,${safeColor},#111)">${esc((name || '?').trim()[0] || '?').toUpperCase()}${safePhoto ? `<img class="ava-img" src="${esc(safePhoto)}" alt="" loading="lazy" draggable="false" onerror="this.remove()">` : ''}</span>`;
+  };
 
   // inside Telegram the account is already known: sign in silently with the Telegram name
   // the account is the Telegram one; after the game server loaded it, a new player gets the starter pack
@@ -806,7 +815,7 @@
       <div class="tg-promo-icon"><span class="nav-icon icon-gift"></span></div>
       <div class="tg-promo-body">
         <span class="tg-promo-kicker">Ежедневный подарок</span>
-        <b class="tg-promo-title">Забирай ${coinInt(DAILY_BONUS, 22)} прямо сейчас</b>
+        <b class="tg-promo-title">Забирай ${bonusTxt()} прямо сейчас</b>
         <span class="tg-promo-text">Новый подарок — каждые 24 часа</span>
       </div>
       <button class="btn btn-accent tg-promo-go">Забрать подарок</button>` : `
@@ -814,7 +823,7 @@
       <div class="tg-promo-icon">${ICON.tg}</div>
       <div class="tg-promo-body">
         <span class="tg-promo-kicker">Бонус за подписку</span>
-        <b class="tg-promo-title">Забирай ${coinInt(TG_BONUS, 22)} на аккаунт</b>
+        <b class="tg-promo-title">Забирай ${bonusTxt()} на аккаунт</b>
         <span class="tg-promo-text">за подписку на <b>@${TG_CHANNEL}</b></span>
       </div>
       <button class="btn btn-tg tg-promo-go">Забрать</button>`;
@@ -835,11 +844,11 @@
   }
   function openTgBonus() {
     requireLogin(() => {
-      if (tgBonusDone()) return modal('Бонус за подписку', `<p class="note" style="font-size:14px">Бонус ${coinInt(TG_BONUS)} уже получен. Спасибо, что с нами в <b>@${TG_CHANNEL}</b>! Ещё больше бонусов — в разделе <a href="#/rewards" data-close-go>Rewards</a>.</p>`,
+      if (tgBonusDone()) return modal('Бонус за подписку', `<p class="note" style="font-size:14px">Бонус ${bonusTxt()} уже получен. Спасибо, что с нами в <b>@${TG_CHANNEL}</b>! Ещё больше бонусов — в разделе <a href="#/rewards" data-close-go>Rewards</a>.</p>`,
         m => $('[data-close-go]', m).addEventListener('click', closeModal));
       let opened = !!S.rewards.tgOpened;
       modal('Бонус за подписку', `
-        <div class="tg-bonus"><span class="big">${coinInt(TG_BONUS, 30)}</span><p>Подпишитесь на наш Telegram-канал <b>@${TG_CHANNEL}</b> и получите бонус на баланс. Один раз на аккаунт.</p></div>
+        <div class="tg-bonus"><span class="big">${bonusTxt()}</span><p>Подпишитесь на наш Telegram-канал <b>@${TG_CHANNEL}</b> и получите бонус на баланс. Один раз на аккаунт.</p></div>
         <button class="btn btn-tg" id="tgSub" style="height:48px">${ICON.tg}<span>1. Подписаться на @${TG_CHANNEL}</span></button>
         <button class="btn btn-accent" id="tgClaim" style="height:48px" ${opened ? '' : 'disabled'}><span>2. Получить ${bonusTxt()}</span></button>
         <p class="note">Бонусный баланс виртуальный и не выводится.</p>`,
@@ -858,7 +867,7 @@
             if (!d.ok) return toast(d.error === 'subs' ? `Подпишитесь на @${TG_CHANNEL} и нажмите ещё раз` : gameErr(d), 'error');
             $('.tg-promo')?.remove();
             closeModal(); sfxWin(); bumpBalance();
-            toast(`Бонус за подписку: ${coinInt(TG_BONUS)}`, 'success');
+            toast(`Бонус за подписку: ${bonusTxt()}`, 'success');
             refreshUpgrade();
             if (location.hash === '#/rewards') rewardsPage();
           });
@@ -1345,7 +1354,7 @@
         ? `<div class="empty-overlay"><div class="empty-content"><p>Инвентарь пуст</p><span class="muted" style="font-size:12px">Купите скины в магазине или используйте баланс в апгрейде</span><button class="btn btn-accent" data-tab="shop">${ICON.shop}<span>В магазин</span></button></div></div>`
         : tgBonusDone()
           ? `<div class="empty-overlay"><div class="empty-content"><p>Недостаточно средств</p><span class="muted" style="font-size:12px">Заберите ежедневный бонус или введите промокод</span><a class="btn btn-accent" href="#/rewards"><span>Награды</span></a></div></div>`
-          : `<div class="empty-overlay"><div class="empty-content"><p>Получите ${coinInt(TG_BONUS, 20)}</p><span class="muted" style="font-size:12px">за подписку на Telegram-канал @${TG_CHANNEL}</span><button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>Получить</span></button></div></div>`;
+          : `<div class="empty-overlay"><div class="empty-content"><p>Получите ${bonusTxt()}</p><span class="muted" style="font-size:12px">за подписку на Telegram-канал @${TG_CHANNEL}</span><button class="btn btn-tg" data-tg-bonus>${ICON.tg}<span>Получить</span></button></div></div>`;
     }
     const sel = [...U.inputs];
     html = head + `<div class="grid-container"><div class="grid">${cells.join('')}</div>${overlay}</div>
@@ -1574,6 +1583,7 @@
       }
       refreshUpgrade();
       renderHeader();
+      releaseVisualAction();
     }
   }
 
@@ -1614,7 +1624,7 @@
         if (!d.ok) return netToast(d);
         $('.tg-promo.daily')?.remove();
         sfxWin(); bumpBalance();
-        toast(`Ежедневный подарок: ${coinInt(DAILY_BONUS)}`, 'success');
+        toast(`Ежедневный подарок: ${bonusTxt()}`, 'success');
         refreshUpgrade();
         if (location.hash === '#/rewards') rewardsPage();
       });
@@ -1655,11 +1665,11 @@
 
       <div class="row-head"><h2 class="home-title">Ежедневные</h2></div>
       <div class="bonus-grid">
-        ${tile('bt-daily', `<img src="${giftImg('Подарок')}" alt="" draggable="false">`, 'Подарок дня', coinInt(DAILY_BONUS), 'Каждые 24 часа, не копится',
+        ${tile('bt-daily', `<img src="${giftImg('Подарок')}" alt="" draggable="false">`, 'Подарок дня', bonusTxt(), 'Каждые 24 часа, не копится',
           `<button class="btn ${dailyReady() ? 'btn-accent' : 'btn-ghost'} bt-btn" id="claimDaily" ${dailyReady() ? '' : 'disabled'}>${dailyReady() ? 'Забрать' : `${hh} ч ${mm} мин`}</button>`)}
         ${tile('bt-cash', `<span class="bt-coin">${ICON.coin}</span>`, `Кешбэк ${CASHBACK * 100}%`, coin(cb), 'С проигрышей в апгрейде и кейсах',
           `<button class="btn ${cb >= 0.01 ? 'btn-accent' : 'btn-ghost'} bt-btn" id="claimCashback" ${cb >= 0.01 ? '' : 'disabled'}>${cb >= 0.01 ? 'Забрать' : 'Пока пусто'}</button>`)}
-        ${tile('bt-tg wide', `<span class="bt-tg-ico">${ICON.tg}</span>`, 'Подписка на Telegram', `+${coinInt(TG_BONUS)}`, `Канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Один раз на аккаунт`,
+        ${tile('bt-tg wide', `<span class="bt-tg-ico">${ICON.tg}</span>`, 'Подписка на Telegram', `+${bonusTxt()}`, `Канал <b>@${TG_CHANNEL}</b> — новости, промокоды и розыгрыши. Один раз на аккаунт`,
           `<button class="btn ${tgBonusDone() ? 'btn-ghost' : 'btn-tg'} bt-btn" data-tg-bonus>${tgBonusDone() ? 'Получено' : 'Получить'}</button>`)}
         <div class="bonus-tile bt-promo wide"><span class="bt-art"><span class="bt-promo-ico">%</span></span>
           <span class="bt-body"><b class="bt-title">Промокод</b><span class="bt-text">Новый промокод дня — в боте в 15:00 МСК. Для демо: <b>RUSTUP</b>, <b>WIPE</b>, <b>DEMO</b></span>
@@ -2039,7 +2049,11 @@
   const { SUB_CHANNELS, CASES, PAID_CASES, TIMER_CASE, TIMER_MS } = R;
   PAID_CASES.forEach(c => { c.paid = true; });
   const timerLeft = () => Math.max(0, TIMER_MS - (Date.now() - (S.rewards.timerCase || 0)));
-  const mmss = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const mmss = ms => {
+    const s = Math.ceil(ms / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+  };
   const { CASE_RTP } = R;         // average win is 90% of a paid case's price
   const caseById = id => CASES.find(c => c.id === id) || PAID_CASES.find(c => c.id === id) || (id === TIMER_CASE.id ? TIMER_CASE : null);
   const casesLeft = () => CASES.filter(c => !S.rewards.cases[c.id]);
@@ -2146,11 +2160,11 @@
     const btn = st === 'cooldown' ? `${ICON.history}<span data-timer-left>${mmss(left)}</span>` : 'Бесплатно';
     return `<a class="timer-case ${st}" href="#/case/${c.id}" style="--cc:${c.color}">
       <span class="case-art">${caseArt(c)}</span>
-      <span class="tc-text"><span class="case-kicker">Каждые 15 минут</span><b>${c.name}</b><small>Rust · CS2 · NFT — до ${coinInt(500)}</small></span>
+      <span class="tc-text"><span class="case-kicker">Каждые 24 часа</span><b>${c.name}</b><small>Rust · CS2 · NFT — до ${coinInt(500)}</small></span>
       <span class="case-btn">${btn}</span>
     </a>`;
   }
-  // live countdown: the timer text ticks every second, and the case becomes available without a reload
+  // live 24h countdown: the timer text ticks every second, and the case becomes available without a reload
   let timerWasReady = timerLeft() === 0;
   setInterval(() => {
     const left = timerLeft();
@@ -2270,7 +2284,7 @@
         <div class="case-hero-text">${c.paid
           ? `<span class="case-kicker paid">Кейс ${gameName}</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · ${coinInt(casePrice(c))}</span>`
           : c.timer
-          ? `<span class="case-kicker">Бесплатно каждые 15 минут</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · Rust, CS2 и NFT · до ${coinInt(500)}</span>`
+          ? `<span class="case-kicker">Бесплатно каждые 24 часа</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · Rust, CS2 и NFT · до ${coinInt(500)}</span>`
           : `<span class="case-kicker">Бесплатный кейс</span><h1>${c.name}</h1><span class="muted">${items.length} предметов · один раз на аккаунт</span>`}</div>
       </div>
       <div class="roulettes" id="roulettes">${roulettes(c, countFor(c))}</div>
@@ -2354,6 +2368,7 @@
       if (d.cashback) toast(`Кешбэк +${coin(d.cashback)} — забрать в «Бонусах»`, 'success');
       reportDrops();
       if (curPath() === '/case/' + c.id) $('#caseActions').innerHTML = caseActions(c);
+      releaseVisualAction();
       showCaseWin(c, wins, uids);
     }, dur + 30);
   }
@@ -2421,7 +2436,7 @@
         <span class="hero-art">${heroes.map((s, i) => `<img class="ha-${i}${imgCls(s)}" src="${s.img}" alt="" draggable="false">`).join('')}</span></a>`,
       tgBonusDone()
         ? `<a class="hero-slide hs-daily" href="#/rewards">
-          <span class="hero-text"><span class="hero-kicker">Каждые 24 часа</span><b class="hero-title">Подарок<br>${moneyInt(DAILY_BONUS)}</b><span class="hero-sub">на баланс — бесплатно</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
+          <span class="hero-text"><span class="hero-kicker">Каждые 24 часа</span><b class="hero-title">Подарок<br>${bonusTxt()}</b><span class="hero-sub">на баланс — бесплатно</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
           <span class="hero-art"><img class="ha-gift" src="${giftImg('Подарок')}" alt="" draggable="false">${coins}</span></a>`
         : `<button class="hero-slide hs-tg" data-tg-bonus>
           <span class="hero-text"><span class="hero-kicker">Бонус за подписку</span><b class="hero-title">+${bonusTxt()}<br>на баланс</b><span class="hero-sub">за подписку на @${TG_CHANNEL}</span><span class="hero-btn">Забрать ${ICON.right}</span></span>
@@ -2504,7 +2519,7 @@
       case '/profile': profilePage(); break;
       case '/provably-fair': fairPage(); break;
       case '/tos': textPage('Условия использования', '<p>RUST UP — демонстрационный интерфейс. Баланс, скины и результаты виртуальные и не имеют денежной стоимости, их нельзя вывести или обменять.</p><p>Проект не связан с Valve, Steam и Facepunch Studios. Изображения предметов принадлежат их правообладателям.</p>'); break;
-      case '/privacy': textPage('Политика конфиденциальности', '<p>Демо-версия не отправляет данные на сервер. Ник, баланс, инвентарь и история хранятся только в localStorage вашего браузера. Очистка данных сайта полностью удаляет их.</p>'); break;
+      case '/privacy': textPage('Политика конфиденциальности', '<p>В Telegram-игре используется серверная авторизация. Баланс, инвентарь и история хранятся на сервере; lokal werden nur Anzeigeeinstellungen gespeichert. Eine vollständige Datenschutzerklärung muss vor dem öffentlichen Betrieb ergänzt werden.</p>'); break;
       default: if (path.startsWith('/case/')) casePage(path.slice(6)); else homePage();
     }
     window.scrollTo({ top: 0 });
@@ -2534,8 +2549,7 @@
   route();
   // Telegram: take the newest progress of the device (cloud copy), then the game server; its first load imports that progress once
   function startGame(tries = 0) {
-    const local = { balance: S.balance, inventory: S.inventory, withdrawals: S.withdrawals, history: S.history, stats: S.stats, rewards: S.rewards, user: S.user };
-    api('load', { local }).then(d => {
+    api('load').then(d => {
       if (!d.ok) {
         if (tries < 4) return setTimeout(() => startGame(tries + 1), 1500 * (tries + 1));
         return toast('Не удалось загрузить профиль — перезапустите игру', 'error');
@@ -2549,6 +2563,6 @@
       refSync();
     });
   }
-  cloudLoad(() => startGame());
+  startGame();
   setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();
