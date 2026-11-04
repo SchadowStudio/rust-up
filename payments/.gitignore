@@ -17,3 +17,6 @@ coin-candidates/
 release-evidence.json
 release-evidence.*.json
 !release-evidence.example.json
+
+# Offline regression reports, never commit local run metadata
+.local-test-results/
