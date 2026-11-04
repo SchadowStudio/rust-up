@@ -2,7 +2,7 @@
 // Every candidate must pass chain verification and tenant-isolated settlement.
 import {ASSETS,ERC20_TRANSFER_TOPIC,evm} from '../assets.js';
 import {verifyChainPayment} from '../chains.js';
-import {settleV2,expireV2} from './settlement.js';
+import {settleV2,expireV2,reviewUnderpayment} from './settlement.js';
 import {notifyDeliveryQueue} from './delivery.js';
 
 const at=s=>new Date(s).toISOString();
@@ -48,9 +48,18 @@ async function trySettle(db,order,hash,env,counter){
   if(result.status==='verified')counter.verified++;
   else if(result.status==='manual_review')counter.review++;
  }catch(e){
-  const expected=new Set(['recipient_or_amount_mismatch','insufficient_confirmations',
-   'unconfirmed_or_failed','payment_predates_order','transaction_not_found',
-   'underpaid_or_wrong_recipient']);
+  if(e.message==='recipient_or_amount_mismatch'||e.message==='underpaid_or_wrong_recipient'){
+   try{
+    const partial=await reviewUnderpayment(db,order,hash,env);
+    if(partial.status==='manual_review'){counter.review++;return;}
+   }catch(reviewError){
+    if(!['recipient_or_amount_mismatch','unconfirmed_or_failed',
+      'underpaid_or_wrong_recipient'].includes(reviewError.message))throw reviewError;
+   }
+   counter.ignored++;return;
+  }
+  const expected=new Set(['insufficient_confirmations','unconfirmed_or_failed',
+   'payment_predates_order','transaction_not_found']);
   if(expected.has(e.message)){counter.ignored++;return;}
   // Network failure or inconsistent RPC data: do NOT advance a scan cursor.
   throw e;
@@ -88,7 +97,7 @@ async function scanEthereum(db,orders,env,counter){
    if(!block||Number(BigInt(block.number))!==h)throw Error('ethereum_inconsistent_block');
    for(const tx of block.transactions||[]){
     for(const order of native.get(norm(tx.to))||[]){
-     if(BigInt(tx.value||'0x0')>=BigInt(order.amount_atomic))candidate(order,tx.hash);
+     if(BigInt(tx.value||'0x0')>0n)candidate(order,tx.hash);
     }
    }
   }
@@ -108,7 +117,7 @@ async function scanEthereum(db,orders,env,counter){
    for(const entry of logs){
     const addr='0x'+String(entry.topics?.[2]||'').slice(-40).toLowerCase();
     for(const order of tokens.get(addr)||[]){
-     if(BigInt(entry.data||'0x0')>=BigInt(order.amount_atomic))
+     if(BigInt(entry.data||'0x0')>0n)
       candidate(order,entry.transactionHash);
     }
    }
