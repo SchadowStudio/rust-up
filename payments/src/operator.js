@@ -27,6 +27,7 @@ export async function operatorRoute(request,env,url) {
  if(!await authenticatedOperator(request,env))return fail('operator_unauthorized',401);
  if(!env.DB)return fail('database_not_configured',503);
  const p=url.pathname,db=env.DB;
+ if(p.includes('/offers')||p.includes('/quotes'))return offerRoute(request,db,p);
  if(p==='/v1/operator/receivers'&&request.method==='GET'){
   const rows=await db.prepare(
    'SELECT chain,address,assigned_intent,enabled,source,label,confirmed_at_ms FROM deposit_addresses ORDER BY chain,address'
