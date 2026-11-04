@@ -3,6 +3,7 @@
 // No separate public shop page or direct-chat product store.
 import {receiveExistingBotStarsUpdate,existingBotStarsApi,existingBotPaySupport} from './stars-live-bridge.mjs';
 import {telegramApi} from './stars.mjs';
+import {handleRefundCommand} from './refunds.mjs';
 
 function privateCommand(update,name){
  const msg=update?.message;
@@ -31,6 +32,7 @@ async function openExistingMiniApp(update,env,fetchImpl){
 }
 export function wrapExistingWorker(original,{
  receiveStars=receiveExistingBotStarsUpdate,
+ refundStars=handleRefundCommand,
  handleStarsApi=existingBotStarsApi,
  paySupport=existingBotPaySupport,
  telegramCall=callTelegram,
@@ -55,10 +57,14 @@ export function wrapExistingWorker(original,{
      let update;
      try{update=await request.clone().json();}
      catch{return original.fetch(request,env,ctx);}
-     if(privateCommand(update,'stars')||privateCommand(update,'paysupport')||
+     const refundCandidate=privateCommand(update,'pay')&&
+      /\srefundstars\s/i.test(update.message?.text||'');
+     if(refundCandidate||privateCommand(update,'stars')||privateCommand(update,'paysupport')||
        update?.pre_checkout_query?.currency==='XTR'||
        update?.message?.successful_payment?.currency==='XTR'){
       try{
+       if(refundCandidate&&await refundStars(update,env,fetchImpl))
+        return new Response('ok');
        if(privateCommand(update,'stars')){
         await openExistingMiniApp(update,env,fetchImpl);
         return new Response('ok');
