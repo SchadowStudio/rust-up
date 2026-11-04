@@ -30,13 +30,21 @@ test('new coin is planned but never accepted as money before verified code+schem
  assert.ok(plan.mandatoryChecks.length>=8);
  assert.ok(plan.mandatoryChecks.some(x=>x.includes('database_schema_migration')));
 });
+test('new blockchain can be planned but is never activated by preview',()=>{
+ const plan=planCoinExtension({asset:'SOL',chain:'solana',standard:'native',decimals:9});
+ assert.equal(plan.newNetwork,true);
+ assert.equal(plan.active,false);
+ assert.equal(ASSET_CATALOG.SOL,undefined);
+ const token=planCoinExtension({asset:'USDC_SPL',chain:'solana',standard:'spl',decimals:6});
+ assert.equal(token.newNetwork,true);
+ assert.ok(token.mandatoryChecks.some(x=>x.includes('chain_specific_indexer')));
+});
 test('extension rejects unsafe/mismatched or unsupported coin metadata',()=>{
  for(const value of [
   {asset:'../wallet',chain:'ethereum',standard:'erc20',decimals:6},
   {asset:'USDC_TRC20',chain:'ethereum',standard:'trc20',decimals:6},
   {asset:'USDC',chain:'unknown',standard:'native',decimals:6},
   {asset:'BTC',chain:'bitcoin',standard:'native',decimals:8},
-  {asset:'SOL',chain:'solana',standard:'native',decimals:9},
   {asset:'ERC20',chain:'ethereum',standard:'erc20',decimals:19}
  ])assert.throws(()=>planCoinExtension(value));
 });
