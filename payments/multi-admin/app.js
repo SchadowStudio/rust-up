@@ -199,3 +199,29 @@ $('loadRates').addEventListener('click',()=>loadRates().catch(e=>output(e.messag
 $('clearSecrets').addEventListener('click',()=>{
  $('secrets').textContent='';$('secretView').style.display='none';
 });
+
+async function loadReviews(){
+ const data=await call('/v2/admin/reviews');
+ const holder=$('reviews');holder.replaceChildren();
+ for(const item of data.reviews){
+  const asset=item.asset||item.chain;
+  const reason=item.reason==='underpaid'?'Unterzahlung':
+   item.reason==='late'?'Verspätete Einzahlung':
+   item.reason==='chain_reorg'?'Ketten-Neuorganisation':'Manuelle Prüfung';
+  row(holder,reason+' · '+asset+' · '+item.tx_hash,
+   'Projekt '+item.project_id+' · Rechnung '+item.invoice_id+
+   ' · festgestellt '+new Date(item.created_at_ms).toLocaleString()+
+   ' · Eingegangen (atomar): '+(item.actual_amount_atomic||'nicht erfasst'),[
+   action('Als manuell geprüft schließen',async()=>{
+    if(!window.confirm('Prüfung wirklich abschließen? Dies erzeugt weder Guthaben noch eine Rückzahlung.'))return;
+    await call('/v2/admin/reviews/'+encodeURIComponent(item.id)+'/close',
+     'POST',{confirmation:'I_HAVE_REVIEWED_PAYMENT',resolutionCode:'operator_reviewed'});
+    await loadReviews();
+   })
+  ]);
+ }
+ if(!data.reviews.length){
+  const p=document.createElement('p');p.textContent='Keine offenen Zahlungsprüfungen.';holder.appendChild(p);
+ }
+}
+$('loadReviews').addEventListener('click',()=>loadReviews().catch(e=>output(e.message,true)));
