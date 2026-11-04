@@ -99,6 +99,62 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
 <button class="subtle" id="loadRates">Kurse anzeigen</button>
 <div id="rates"></div>
 </section>
+<section class="panel">
+<h2>Projekt-Zahlungsintegration</h2>
+<p>Das oben ausgewählte Projekt bekommt eigene Einzahlungsregeln. Andere Projekte bleiben davon unberührt. Neue Einstellungen sind anfangs deaktiviert.</p>
+<button id="loadProfile" class="subtle" type="button">Projekt-Einstellungen laden</button>
+<label for="profileName">Anzeigename für die Zahlung</label>
+<input id="profileName" maxlength="60" placeholder="Projektname">
+<div class="grid">
+<div><label for="profileInvoices">Rechnungen</label><select id="profileInvoices">
+<option value="false">Deaktiviert</option><option value="true">Aktiv</option></select></div>
+<div><label for="profileDeposits">Einzahlungen</label><select id="profileDeposits">
+<option value="false">Deaktiviert</option><option value="true">Aktiv</option></select></div>
+<div><label for="profileProducts">Produktkäufe</label><select id="profileProducts">
+<option value="false">Deaktiviert</option><option value="true">Aktiv</option></select></div>
+<div><label for="profileLifetime">Rechnungsdauer (5–20 Minuten)</label>
+<input id="profileLifetime" type="number" min="5" max="20" step="1" value="20"></div>
+</div>
+<button id="saveProfile" type="button">Zahlungsintegration speichern</button>
+<h3>Eigene Fiat-Währungen und Einzahlungsgrenzen</h3>
+<div class="grid">
+<div><label for="profileFiat">Währung</label><select id="profileFiat">
+<option>RUB</option><option>EUR</option><option>USD</option></select></div>
+<div><label for="profileFiatEnabled">Diese Währung akzeptieren?</label><select id="profileFiatEnabled">
+<option value="false">Nein</option><option value="true">Ja</option></select></div>
+<div><label for="profileFiatMin">Mindestbetrag (Cent / Kopeken)</label><input id="profileFiatMin" type="number" value="100" min="1" step="1"></div>
+<div><label for="profileFiatMax">Höchstbetrag (Cent / Kopeken)</label><input id="profileFiatMax" type="number" value="100000000" min="1" step="1"></div>
+</div>
+<button id="saveProfileFiat" type="button">Fiat-Regel speichern</button>
+<h3>Eigene Kryptowährungen</h3>
+<div class="grid">
+<div><label for="profileCrypto">Kryptowährung / Netzwerk</label><select id="profileCrypto">
+<option>BTC</option><option>ETH</option><option>TRX</option>
+<option>USDT_ERC20</option><option>USDT_TRC20</option></select></div>
+<div><label for="profileCryptoEnabled">Für dieses Projekt freigeben?</label><select id="profileCryptoEnabled">
+<option value="false">Nein</option><option value="true">Ja</option></select></div>
+</div>
+<button id="saveProfileCrypto" type="button">Kryptowährung speichern</button>
+<div id="profileSummary"></div>
+</section>
+<section class="panel">
+<h2>Zahlungen, API-Schlüssel und Webhooks pro Projekt</h2>
+<button id="loadProjectSummary" type="button" class="subtle">Projektübersicht laden</button>
+<button id="loadProjectKeys" type="button" class="subtle">Projekt-API-Schlüssel anzeigen</button>
+<div id="projectSummary"></div><div id="projectKeys"></div>
+<label for="projectWebhook">Zahlungsbenachrichtigung an Projekt-Backend (HTTPS)</label>
+<input id="projectWebhook" type="url" maxlength="256" placeholder="https://projekt.example.com/internal/crypto/credit">
+<button id="saveProjectWebhook" type="button">Webhook des Projekts aktualisieren</button>
+<label for="paymentFilter">Rechnungsstatus</label>
+<select id="paymentFilter">
+<option value="all">Alle</option><option value="awaiting_payment">Offen</option>
+<option value="verified">Bestätigt</option><option value="expired">Abgelaufen</option>
+<option value="manual_review">Manuelle Prüfung</option>
+</select>
+<button id="loadProjectPayments" type="button">Zahlungen des Projekts anzeigen</button>
+<div id="projectPayments"></div>
+<button id="olderProjectPayments" class="subtle" type="button" disabled>Ältere Einträge laden</button>
+</section>
 </div>
 <section class="panel" id="secretView">
 <h2>Einmalige Zugangsdaten</h2>
