@@ -1,0 +1,188 @@
+// Self-hosted operator API. No PII, wallet private keys or user credentials stored.
+import {ASSETS} from '../assets.js';
+import {validateReceivingAddress} from '../address.js';
+import {FIATS,positiveAtomic} from './fiat.js';
+import {digestHex,newSecret,projectWebhookKey,safeEqual} from './keys.js';
+import {requireProjectId,isUuid,safeWebhookUrl} from './identity.js';
+const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
+ 'content-type':'application/json','cache-control':'no-store'}});
+const fail=(code,status=400)=>json({ok:false,error:code},status);
+const skuPattern=/^[a-z][a-z0-9_-]{2,39}$/;
+async function readBody(req){
+ const text=await req.text();
+ if(text.length>4096)throw Error('body_too_large');
+ const data=JSON.parse(text);
+ if(!data||typeof data!=='object'||Array.isArray(data))throw Error('invalid_body');
+ return data;
+}
+export function operatorAllowed(request,env) {
+ const actual=request.headers.get('authorization')||'';
+ return typeof env.MULTI_ADMIN_KEY==='string'&&env.MULTI_ADMIN_KEY.length>=48 &&
+  safeEqual(actual,'Bearer '+env.MULTI_ADMIN_KEY);
+}
+async function audit(db,action,projectId,detail={}){
+ await db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
+  VALUES(?,?,?,?,?)`).bind(crypto.randomUUID(),action,projectId,
+   JSON.stringify(detail),Date.now()).run();
+}
+async function createProject(db,b,env){
+ const label=String(b.label||'').trim();
+ if(label.length<3||label.length>60) return fail('invalid_project_label');
+ const callback=safeWebhookUrl(b.webhookUrl);
+ const projectId=crypto.randomUUID(),keyId=crypto.randomUUID();
+ const secret=newSecret(),hash=await digestHex(secret);
+ const now=Date.now();
+ await db.batch([
+  db.prepare(`INSERT INTO v2_projects(id,label,webhook_url,status,created_at_ms,updated_at_ms)
+   VALUES(?,?,?,'disabled',?,?)`).bind(projectId,label,callback,now,now),
+  db.prepare(`INSERT INTO v2_api_keys(id,project_id,secret_sha256,created_at_ms)
+   VALUES(?,?,?,?)`).bind(keyId,projectId,hash,now),
+  db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
+   VALUES(?,'create_project',?,'{}',?)`).bind(crypto.randomUUID(),projectId,now)
+ ]);
+ const webhookSigningSecret=await projectWebhookKey(env.MULTI_WEBHOOK_MASTER_KEY,projectId);
+ return json({ok:true,projectId,keyId,apiKey:secret,webhookSigningSecret,
+   status:'disabled',notice:'Store both secrets in your project server secrets; shown once.'},201);
+}
+async function createProduct(db,b){
+ const projectId=requireProjectId(b.projectId);
+ const sku=String(b.sku||'');
+ if(!skuPattern.test(sku)||!FIATS.includes(b.currency)||
+    !Number.isSafeInteger(b.amountMinor)||b.amountMinor<1||b.amountMinor>100000000000||
+    typeof b.title!=='string'||b.title.trim().length<3||b.title.length>80)
+  return fail('invalid_product');
+ const now=Date.now();
+ await db.batch([
+  db.prepare(`INSERT INTO v2_products
+   (project_id,sku,title,currency,amount_minor,status,updated_at_ms)
+   VALUES(?,?,?,?,?,'disabled',?) ON CONFLICT(project_id,sku)
+   DO UPDATE SET title=excluded.title,currency=excluded.currency,
+     amount_minor=excluded.amount_minor,status='disabled',
+     updated_at_ms=excluded.updated_at_ms`)
+   .bind(projectId,sku,b.title.trim(),b.currency,b.amountMinor,now),
+  db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
+   VALUES(?,'upsert_product',?,?,?)`).bind(crypto.randomUUID(),projectId,
+     JSON.stringify({sku,currency:b.currency,amountMinor:b.amountMinor}),now)
+ ]);
+ return json({ok:true,projectId,sku,status:'disabled'});
+}
+async function setRate(db,b){
+ if(!FIATS.includes(b.fiat)||!ASSETS[b.asset]||
+    !positiveAtomic(b.numeratorAtomic)||!positiveAtomic(b.denominatorMinor)||
+    !Number.isSafeInteger(b.validSeconds)||b.validSeconds<180||
+    b.validSeconds>3600) return fail('invalid_exchange_rate');
+ const now=Date.now(),until=now+b.validSeconds*1000;
+ await db.batch([
+  db.prepare(`INSERT INTO v2_exchange_rates
+   (fiat,asset,numerator_atomic,denominator_minor,valid_from_ms,
+    expires_at_ms,source,enabled)
+   VALUES(?,?,?,?,?,?,'operator_manual',0)
+   ON CONFLICT(fiat,asset) DO UPDATE SET
+   numerator_atomic=excluded.numerator_atomic,
+   denominator_minor=excluded.denominator_minor,
+   valid_from_ms=excluded.valid_from_ms,
+   expires_at_ms=excluded.expires_at_ms,
+   source=excluded.source,enabled=0`)
+  .bind(b.fiat,b.asset,b.numeratorAtomic,b.denominatorMinor,now,until),
+  db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
+   VALUES(?,'replace_fx_rate',NULL,?,?)`)
+  .bind(crypto.randomUUID(),JSON.stringify({fiat:b.fiat,asset:b.asset,until}),now)
+ ]);
+ return json({ok:true,fiat:b.fiat,asset:b.asset,status:'disabled',expiresAt:until});
+}
+async function addReceiver(db,b){
+ if(!['bitcoin','ethereum','tron'].includes(b.chain)||
+    !await validateReceivingAddress(b.chain,b.address))return fail('invalid_receiver');
+ const now=Date.now();
+ const [insert]=await db.batch([
+  db.prepare(`INSERT OR IGNORE INTO deposit_addresses
+   (chain,address,assigned_intent,source,added_at_ms,label,enabled)
+   VALUES(?,?,NULL,'trust_wallet',?,'v2_multi',0)`).bind(b.chain,b.address,now),
+  db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
+   VALUES(?,'add_receiver',NULL,?,?)`)
+   .bind(crypto.randomUUID(),JSON.stringify({chain:b.chain}),now)
+ ]);
+ if(!insert.meta?.changes)return fail('receiver_already_registered',409);
+ return json({ok:true,chain:b.chain,address:b.address,status:'disabled'},201);
+}
+async function toggle(db,resource,b,enabled){
+ const now=Date.now();
+ if(b.confirmation!=='CONFIRM_OPERATOR_CHANGE')return fail('confirmation_required');
+ let stmt,target;
+ if(resource==='projects'){
+  const projectId=requireProjectId(b.projectId);
+  stmt=db.prepare('UPDATE v2_projects SET status=?,updated_at_ms=? WHERE id=?')
+   .bind(enabled?'active':'disabled',now,projectId);
+  target=projectId;
+ }else if(resource==='products'){
+  const projectId=requireProjectId(b.projectId);
+  if(!skuPattern.test(b.sku||''))return fail('invalid_product');
+  stmt=db.prepare('UPDATE v2_products SET status=? WHERE project_id=? AND sku=?')
+   .bind(enabled?'active':'disabled',projectId,b.sku);
+  target=projectId+':'+b.sku;
+ }else if(resource==='rates'){
+  if(!FIATS.includes(b.fiat)||!ASSETS[b.asset])return fail('invalid_rate_pair');
+  stmt=db.prepare(`UPDATE v2_exchange_rates SET enabled=?
+   WHERE fiat=? AND asset=? AND expires_at_ms>?`)
+   .bind(enabled?1:0,b.fiat,b.asset,now+120000);
+  target=b.fiat+':'+b.asset;
+ }else if(resource==='receivers'){
+  if(!['bitcoin','ethereum','tron'].includes(b.chain)||
+     !await validateReceivingAddress(b.chain,b.address))return fail('invalid_receiver');
+  stmt=db.prepare(`UPDATE deposit_addresses SET enabled=?
+   WHERE chain=? AND address=? AND assigned_intent IS NULL`)
+   .bind(enabled?1:0,b.chain,b.address);
+  target=b.chain+':'+b.address;
+ }else return fail('invalid_resource');
+ const result=await stmt.run();
+ if(!result.meta?.changes)return fail('resource_not_changed',404);
+ await audit(db,enabled?'enable_'+resource:'disable_'+resource,null,{target});
+ return json({ok:true,resource,enabled});
+}
+async function keys(db,b){
+ const projectId=requireProjectId(b.projectId);
+ const project=await db.prepare('SELECT id FROM v2_projects WHERE id=?').bind(projectId).first();
+ if(!project)return fail('project_not_found',404);
+ const secret=newSecret(),id=crypto.randomUUID(),sha=await digestHex(secret);
+ await db.prepare(`INSERT INTO v2_api_keys(id,project_id,secret_sha256,created_at_ms)
+  VALUES(?,?,?,?)`).bind(id,projectId,sha,Date.now()).run();
+ await audit(db,'create_project_key',projectId,{keyId:id});
+ return json({ok:true,projectId,keyId:id,apiKey:secret},201);
+}
+export async function multiAdmin(request,env,url){
+ if(!env.DB||!operatorAllowed(request,env))return fail('unauthorized',401);
+ if(env.MULTI_ADMIN_ENABLED!=='true')return fail('admin_disabled',503);
+ const db=env.DB,path=url.pathname;
+ try{
+  if(path==='/v2/admin/status'&&request.method==='GET'){
+   const [projects,open,undelivered]=await Promise.all([
+    db.prepare('SELECT COUNT(*) AS n FROM v2_projects').first(),
+    db.prepare("SELECT COUNT(*) AS n FROM v2_invoices WHERE status='awaiting_payment'").first(),
+    db.prepare('SELECT COUNT(*) AS n FROM v2_delivery_outbox WHERE delivered_at_ms IS NULL').first()
+   ]);
+   return json({ok:true,projects:projects?.n||0,pending:open?.n||0,
+    deliveryBacklog:undelivered?.n||0,checkoutEnabled:env.MULTI_LIVE_ENABLED==='true'});
+  }
+  if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
+  if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
+  if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
+  if(path==='/v2/admin/receivers'&&request.method==='POST')return addReceiver(db,await readBody(request));
+  if(path==='/v2/admin/keys'&&request.method==='POST')return keys(db,await readBody(request));
+  const activation=/^\/v2\/admin\/(projects|products|rates|receivers)\/(enable|disable)$/.exec(path);
+  if(activation&&request.method==='POST')
+   return toggle(db,activation[1],await readBody(request),activation[2]==='enable');
+  if(path==='/v2/admin/projects'&&request.method==='GET'){
+   const rows=await db.prepare('SELECT id,label,webhook_url,status,created_at_ms FROM v2_projects ORDER BY created_at_ms DESC LIMIT 100').all();
+   return json({ok:true,projects:rows.results||[]});
+  }
+  if(path==='/v2/admin/rates'&&request.method==='GET'){
+   const rows=await db.prepare('SELECT fiat,asset,numerator_atomic,denominator_minor,expires_at_ms,source,enabled FROM v2_exchange_rates ORDER BY fiat,asset').all();
+   return json({ok:true,rates:rows.results||[]});
+  }
+  return fail('not_found',404);
+ }catch(error){
+  if(['invalid_project_id','invalid_webhook_url'].includes(error.message))
+   return fail(error.message);
+  return fail('operator_request_failed',503);
+ }
+}
