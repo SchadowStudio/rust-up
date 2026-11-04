@@ -39,3 +39,14 @@ test('invalid invoice status and numeric amounts fail closed',()=>{
  assert.throws(()=>validatePublicInvoice({...base,amountMinor:-1}));
  assert.throws(()=>validatePublicInvoice({...base,amountAtomic:'not_a_number'}));
 });
+
+test('Toncoin checkout is a separate TON mainnet network with 9 nanoTON digits',()=>{
+ const ton=validatePublicInvoice({...base,asset:'TON',chain:'ton',
+  amountAtomic:'1000000001',
+  receiveAddress:'UQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPuwA'});
+ assert.equal(ton.asset,'TON');
+ assert.equal(ton.chain,'ton');
+ assert.equal(ASSET_DIGITS.TON,9);
+ assert.equal(formatCryptoAtomic('1000000001',9),'1.000000001');
+ assert.throws(()=>validatePublicInvoice({...base,asset:'TON',chain:'tron'}));
+});

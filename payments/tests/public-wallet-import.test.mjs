@@ -71,3 +71,16 @@ test('headless coin plan requires no wallet secret or admin server',async()=>{
  assert.deepEqual(parseOperatorCommand(['coin-plan','NEW_TRX','tron','trc20','6'])[1],
   'coin-plan');
 });
+
+test('TON public wallet import normalizes bounceable and non-bounceable to same mainnet address',async()=>{
+ const eq='EQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPrHF';
+ const uq='UQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPuwA';
+ const validated=await validatePublicWalletImport(
+  manifest([{chain:'ton',address:eq}]));
+ assert.equal(validated.addresses[0].address,uq);
+ await assert.rejects(()=>validatePublicWalletImport(
+  manifest([{chain:'ton',address:eq},{chain:'ton',address:uq}])),
+  /duplicate_public_receiver/);
+ await assert.rejects(()=>validatePublicWalletImport(
+  manifest([{chain:'ton',address:'kQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPgpP'}])));
+});

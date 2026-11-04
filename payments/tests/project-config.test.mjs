@@ -121,3 +121,15 @@ test('operator cannot accidentally enable unapproved assets or fiat limits',asyn
  }
  assert.equal(db.writes.length,0);
 });
+
+test('TON cannot be enabled for a project before TON network operator configuration',async()=>{
+ const db=new ProjectStub();
+ const url='/v2/admin/projects/'+P1+'/crypto-method';
+ const body={asset:'TON',enabled:true,
+  confirmation:'CONFIRM_PROJECT_PAYMENT_SETTINGS'};
+ const result=await paymentProfileAdmin(request(url,body),
+  {DB:db,MULTI_TON_ENABLED:'false'},
+  new URL('https://gateway.example.com'+url));
+ assert.equal(result.status,403);
+ assert.equal(db.writes.length,0);
+});
