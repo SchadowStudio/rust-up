@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/self-hosted-crypto-payments
+      - feature/rustup-payments-staging
     paths:
       - 'payments/**'
       - '.github/workflows/crypto-payments-checks.yml'
@@ -24,3 +25,5 @@ jobs:
           node-version: '22'
       - name: Run same 0-euro offline suite as Windows
         run: cd payments && npm run test:local
+      - name: Run isolated Telegram Stars and crypto checkout integration tests
+        run: cd payments && node --test integration/telegram-stars/stars.test.mjs
