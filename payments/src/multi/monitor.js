@@ -1,7 +1,7 @@
 // This scanner is isolated from the original single-project payment system.
 // Every candidate must pass chain verification and tenant-isolated settlement.
-import {ASSETS,ERC20_TRANSFER_TOPIC,evm} from './assets.js';
-import {verifyChainPayment} from './chains.js';
+import {ASSETS,ERC20_TRANSFER_TOPIC,evm} from '../assets.js';
+import {verifyChainPayment} from '../chains.js';
 import {settleV2,expireV2} from './settlement.js';
 
 const at=s=>new Date(s).toISOString();
