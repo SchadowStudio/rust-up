@@ -6,7 +6,7 @@ import {verifyChainPayment} from '../chains.js';
 import {quoteFromRate} from './fiat.js';
 import {digestHex,authenticateProject} from './keys.js';
 import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity.js';
-import {settleV2,expireV2} from './settlement.js';
+import {settleV2,expireV2,reviewUnderpayment} from './settlement.js';
 import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 import {scanMultiPayments} from './monitor.js';
 import {consumePaymentEvents} from './candidate.js';
@@ -121,7 +121,17 @@ async function verifyInvoice(db,project,invoice,b,env){
  if(!['awaiting_payment','expired'].includes(invoice.status))
   return fail('invoice_not_claimable',409);
  if(!isHash(b.transactionHash))return fail('invalid_transaction_id');
- const proof=await verifyChainPayment(invoice,b.transactionHash,env);
+ let proof;
+ try{proof=await verifyChainPayment(invoice,b.transactionHash,env);}
+ catch(error){
+  if(error.message==='recipient_or_amount_mismatch'||
+     error.message==='underpaid_or_wrong_recipient'){
+   const partial=await reviewUnderpayment(db,invoice,b.transactionHash,env);
+   if(partial.status==='manual_review')
+    return fail('payment_requires_manual_review',409);
+  }
+  throw error;
+ }
  const result=await settleV2(db,invoice,proof);
  await notifyDeliveryQueue(env,result);
  if(result.status==='manual_review')return fail('payment_requires_manual_review',409);
