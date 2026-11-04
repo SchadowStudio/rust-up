@@ -95,7 +95,7 @@ test('TRX checks walletsolidity transfer recipient and block confirmation',async
   const out=String(url).endsWith('gettransactionbyid')?
    {txID:hash,raw_data:{contract:[{type:'TransferContract',parameter:{value:{to_address:trxHex,amount:1000000}}}]}}:
    String(url).endsWith('gettransactioninfobyid')?
-    {blockNumber:100,receipt:{result:'SUCCESS'}}:
+    {blockNumber:100,blockTimeStamp:1762300000000,receipt:{result:'SUCCESS'}}:
     {block_header:{raw_data:{number:101}}};
   return {ok:true,json:async()=>out};
  };
@@ -117,7 +117,7 @@ test('USDT TRC20 verifies official token contract, event recipient and six decim
   const out=String(url).endsWith('gettransactionbyid')?
     {txID:hash,raw_data:{contract:[]}}:
     String(url).endsWith('gettransactioninfobyid')?
-      {blockNumber:100,receipt:{result:'SUCCESS'},log:[log]}:
+      {blockNumber:100,blockTimeStamp:1762300000000,receipt:{result:'SUCCESS'},log:[log]}:
       {block_header:{raw_data:{number:101}}};
   return {ok:true,json:async()=>out};
  };
