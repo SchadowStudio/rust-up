@@ -8,6 +8,7 @@
 >
 > - [Wallet-Import, Trust Wallet und neue Coins](./WALLET-COIN-ONBOARDING-DE.md)
 > - [Projektübergreifende Integrationen](./PROJECT-INTEGRATIONS-DE.md)
+> - [Aktueller Release-Status & Blocker](./RELEASE-STATUS-2026-11-04-DE.md)
 > - [Sicherheits- und Ausfallkonzept](./SECURITY-FAILOVER-DE.md)
 > - [Headless CLI ohne eigene Provider-Website](./HEADLESS-CLI-DE.md)
 >
