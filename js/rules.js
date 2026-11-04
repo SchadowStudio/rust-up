@@ -6,13 +6,16 @@ window.RUSTUP_RULES = {
   MIN_CHANCE: 1,
   MAX_SLOTS: 6,           // items in one upgrade stake
   TG_CHANNEL: 'up_rust',
-  TG_BONUS: 10000,        // one-time reward for subscribing to the Telegram channel
+  TG_BONUS: 31,       // Legacy coin fallback only; 50 RUB must be credited on the server
+  BONUS_RUB: 50,      // Exactly 5000 kopecks per eligible bonus, server ledger
+  REF_BONUS: 31,      // Legacy fallback; inviter receives 50 RUB once
+  WELCOME_BONUS: 31,  // Legacy fallback; invited friend receives 50 RUB once        // one-time reward for subscribing to the Telegram channel
   PROMOS: { RUSTUP: 50, WIPE: 25, DEMO: 100 },
   DAILY_MS: 24 * 60 * 60 * 1000,
-  DAILY_BONUS: 3500,
+  DAILY_BONUS: 31,    // Legacy fallback; server must award exactly 50 RUB
   CASHBACK: 0.02,         // share of a lost upgrade stake / of a paid case that paid out less than its price
   CASE_RTP: 0.9,          // average win is 90% of a paid case's price
-  TIMER_MS: 15 * 60 * 1000,
+  TIMER_MS: 24 * 60 * 60 * 1000,
   SUB_CHANNELS: [
     { id: 'up_rust', name: 'RUST UP', sub: 'Новости, промокоды, розыгрыши' },
     { id: 'rustuper', name: 'RUST UP · Отзывы', sub: 'Отзывы игроков о выводах' }
@@ -35,6 +38,6 @@ window.RUSTUP_RULES = {
     { id: 'nft-collector', game: 'nft', name: 'Коллекционер', color: '#2ea6e0', tiers: [[300, 500, 6, 70], [500, 1500, 3, 22], [1500, 5000, 2, 7], [5000, 20000, 1, 1]] },
     { id: 'nft-fragment', game: 'nft', name: 'Fragment', color: '#ffd166', tiers: [[1000, 4000, 6, 70], [4000, 15000, 3, 22], [15000, 60000, 2, 7], [60000, 300000, 1, 1]] }
   ],
-  // free every 15 minutes, no conditions: cheap loot from all three games, nothing above 500 coins; per-game item count in a 'mix' tier
-  TIMER_CASE: { id: 'quarter', game: 'mix', name: 'Кейс 15 минут', color: '#4fc27a', timer: true, tiers: [[1, 15, 3, 72], [15, 60, 2, 22], [60, 300, 1, 5.5], [300, 500.01, 1, 0.5]] }
+  // free once per 24 hours per verified Telegram account (backend enforced), no conditions: cheap loot from all three games, nothing above 500 coins; per-game item count in a 'mix' tier
+  TIMER_CASE: { id: 'quarter', game: 'mix', name: 'Кейс 24 часа', color: '#4fc27a', timer: true, tiers: [[1, 15, 3, 72], [15, 60, 2, 22], [60, 300, 1, 5.5], [300, 500.01, 1, 0.5]] }
 };
