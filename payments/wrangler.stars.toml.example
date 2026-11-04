@@ -1,0 +1,20 @@
+# ISOLATED STAGING ONLY. Not rustup-bot and not rustup-stats.
+# Copy to payments/wrangler.stars.toml and substitute staging D1 UUID.
+name = "rustup-stars-staging"
+main = "integration/telegram-stars/worker.mjs"
+compatibility_date = "2026-11-04"
+workers_dev = true
+
+[vars]
+STARS_PAYMENT_ENABLED = "false"
+STARS_ALLOWED_ORIGIN = "https://example.invalid"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rustup-stars-staging"
+database_id = "REPLACE_WITH_NEW_STAGING_D1_ID"
+
+# REQUIRED: a separate TEST bot, never the existing RUST UP Telegram bot
+# npx wrangler secret put TG_STARS_BOT_TOKEN --config wrangler.stars.toml
+# npx wrangler secret put TG_STARS_WEBHOOK_SECRET --config wrangler.stars.toml
+# Do not commit these values.
