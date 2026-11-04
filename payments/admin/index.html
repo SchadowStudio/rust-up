@@ -58,6 +58,24 @@ benötigst du mehrere tatsächlich kontrollierte Empfangsadressen.</small></p>
 <div id="receivers"><p>Noch keine Serverabfrage.</p></div>
 </section>
 <section class="panel">
+<h2>4. Zahlungsangebote und feste Wechselkurse</h2>
+<p>Währung und Betrag werden serverseitig gespeichert. Angebote und Kurse bleiben nach jeder Änderung deaktiviert, bis du sie ausdrücklich freigibst.</p>
+<div class="row">
+<div><label for="pkgId">Angebotskennung</label><input id="pkgId" placeholder="credit_100" maxlength="36"></div>
+<div><label for="pkgTitle">Bezeichnung</label><input id="pkgTitle" placeholder="100 ₽ Guthaben" maxlength="80"></div></div>
+<label for="pkgKopecks">Guthaben in Kopeken (100 ₽ = 10000)</label>
+<input id="pkgKopecks" inputmode="numeric" type="number" min="100" max="1000000000" step="1">
+<button id="newPackage" type="button">Angebot deaktiviert erstellen</button>
+<div class="row"><div><label for="quoteAsset">Krypto-Netzwerk</label><select id="quoteAsset">
+<option value="BTC">BTC / Bitcoin</option><option value="ETH">ETH / Ethereum</option>
+<option value="TRX">TRX / TRON</option><option value="USDT_ERC20">USDT / ERC-20</option>
+<option value="USDT_TRC20">USDT / TRC-20</option></select></div>
+<div><label for="quoteAmount">Exakter Krypto-Betrag</label><input id="quoteAmount" placeholder="z. B. 1.25" inputmode="decimal"></div></div>
+<button id="setQuote" type="button">Kurs deaktiviert hinterlegen</button>
+<button id="listOffers" class="secondary" type="button">Angebote aktualisieren</button>
+<div id="offerList"></div>
+</section>
+<section class="panel">
 <h2>Systemstatus</h2><div id="message" role="status" aria-live="polite">Noch nicht verbunden.</div>
 </section>
 <footer><small>Private Schlüssel und Recovery Phrases niemals in dieses Formular eintragen.</small></footer>
