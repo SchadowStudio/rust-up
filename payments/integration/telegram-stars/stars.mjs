@@ -19,7 +19,9 @@ function validUserId(id) {
 
 export function validPreCheckout(order, query, now = Date.now()) {
   return !!order && !!query && UUID.test(String(order.id)) &&
-    order.status === 'pending' && validUserId(query.from?.id) &&
+    (order.status === 'pending' ||
+      (order.status === 'checkout_approved' && order.checkout_query_id === query.id)) &&
+    validUserId(query.from?.id) &&
     query.from.id === order.telegram_user_id &&
     Number.isSafeInteger(order.price_stars) && order.price_stars > 0 &&
     order.expires_at_ms > now && order.expires_at_ms <= now + MAX_AGE_MS &&
@@ -32,7 +34,7 @@ export function validSuccessfulPayment(order, message, now = Date.now()) {
   // SuccessfulPayment is authoritative after Telegram sends it. A delayed
   // webhook must still be recorded even if the 15-minute checkout TTL passed.
   return !!pay && !!order && UUID.test(String(order.id)) &&
-    (order.status === 'pending' || order.status === 'paid') &&
+    (order.status === 'checkout_approved' || order.status === 'paid') &&
     validUserId(message?.from?.id) &&
     message.from.id === order.telegram_user_id &&
     pay.currency === 'XTR' && pay.total_amount === order.price_stars &&
@@ -113,7 +115,7 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
   try {
     const res = await db.prepare(
       "UPDATE rustup_stars_orders SET status='paid',telegram_charge_id=?,paid_at_ms=? " +
-      "WHERE id=? AND status='pending' AND telegram_user_id=? AND price_stars=?"
+      "WHERE id=? AND status='checkout_approved' AND telegram_user_id=? AND price_stars=?"
     ).bind(charge,now,order.id,message.from.id,order.price_stars).run();
     if (res.meta?.changes === 1)
       return {accepted:true,duplicate:false,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
@@ -136,9 +138,21 @@ export async function handleStarsUpdate(update, env, fetchImpl = fetch) {
   if (q) {
     const order = UUID.test(String(q.invoice_payload))
       ? await env.DB.prepare(
-        'SELECT id,telegram_user_id,price_stars,status,expires_at_ms FROM rustup_stars_orders WHERE id=?'
+        'SELECT id,telegram_user_id,price_stars,status,expires_at_ms,checkout_query_id FROM rustup_stars_orders WHERE id=?'
       ).bind(q.invoice_payload).first() : null;
-    const ok = validPreCheckout(order,q);
+    let ok = validPreCheckout(order,q);
+    if(ok && order.status==='pending'){
+      // Only one checkout query can be approved for a one-use invoice.
+      // Concurrent payment attempts cannot both reserve this order.
+      try {
+        const claimed=await env.DB.prepare(
+          "UPDATE rustup_stars_orders SET status='checkout_approved',checkout_query_id=? " +
+          "WHERE id=? AND status='pending' AND telegram_user_id=? " +
+          "AND price_stars=? AND expires_at_ms>?"
+        ).bind(q.id,order.id,q.from.id,order.price_stars,Date.now()).run();
+        ok=claimed.meta?.changes===1;
+      }catch {ok=false;}
+    }
     await telegramApi(env,'answerPreCheckoutQuery',{
       pre_checkout_query_id:q.id,ok,
       ...(!ok?{error_message:'Order unavailable, expired or mismatched.'}:{})
