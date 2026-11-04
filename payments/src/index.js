@@ -124,5 +124,11 @@ export default {
   const headers=new Headers(response.headers);
   for(const [key,value] of Object.entries(cors))headers.set(key,value);
   return new Response(response.body,{status:response.status,headers});
+ },
+ async scheduled(_event,env,ctx){
+  ctx.waitUntil(scanPendingPayments(env).then(report=>{
+   if(report.errors?.length)console.error('Crypto scan warnings:',report.errors);
+   else console.log('Crypto scan finished:',JSON.stringify(report));
+  }).catch(e=>console.error('Crypto scan failed:',String(e.message))));
  }
 };
