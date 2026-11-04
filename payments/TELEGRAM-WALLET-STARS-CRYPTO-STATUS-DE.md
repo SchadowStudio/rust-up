@@ -58,3 +58,58 @@ Der separate Multi-Projekt-Krypto-Provider unterstützt in seinem Code BTC, ETH,
 Telegram-Vorgaben:
 - https://core.telegram.org/bots/payments-stars
 - https://telegram.org/tos/bot-developers
+
+
+## Nachtrag: Ende-zu-Ende-Tests und gesicherter Worker-Build (04.11.2026)
+
+Der SQLite-basierte Test `stars-sqlite-e2e.test.mjs` deckt signiertes `initData`,
+den festen Katalog, die gebundene Rechnung, manipulationssicheren XTR-Preis,
+Precheckout, `successful_payment`, Auslieferungsfreigabe, erneute Zustellung,
+Not-Aus, nur dem Käufer sichtbare digitale Inhalte und Rückerstattung ab.
+Ein zusätzlicher D1-Lock verhindert mehrere gleichzeitig erstellte
+Telegram-Rechnungen für denselben Kunden und dasselbe Produkt. Die Tabelle
+`rustup_stars_purchase_locks` wurde bereits in der isolierten
+Cloudflare-D1 `rustup-stars-staging` ergänzt; NICHT in `rustup-stats`.
+
+**WICHTIG:** Der Benutzer hat das ältere 340-KB-Bundle bereits lokal gebaut.
+Nach dem Einbau der Reservierung ist ein erneuter sicherer Staging-Schritt
+nötig. Die Dateien `stars-live-bridge.mjs.before-miniapp` und
+`worker.before-stars.bundle.js` bleiben als Sicherungen unangetastet.
+
+```powershell
+cd "$HOME\RUST-UP-Local"
+git pull --ff-only origin feature/rustup-payment-admin-controls
+$folder = "$HOME\RUST-UP-Local\.private\rustup-bot-recovered\2026-11-04T17-51-22-065Z-f7ac5f36e2"
+node .\payments\scripts\stage-stars-purchase-locks.mjs "$folder"
+if ($LASTEXITCODE -ne 0) { throw "Stars-Lock-Schutz nicht vorbereitet" }
+node .\payments\scripts\add-safe-stars-worker-vars.mjs "$folder"
+if ($LASTEXITCODE -ne 0) { throw "Sichere Flags fehlen" }
+npx --yes esbuild "$folder\worker.stars-entry.mjs" --bundle --platform=browser --format=esm --target=es2022 --outfile="$folder\worker.payment-admin.bundle.js"
+if ($LASTEXITCODE -ne 0) { throw "Worker-Build fehlgeschlagen" }
+node --check "$folder\worker.payment-admin.bundle.js"
+if ($LASTEXITCODE -ne 0) { throw "Worker ungültig" }
+node .\payments\scripts\check-telegram-wallet-bundle.mjs "$folder"
+if ($LASTEXITCODE -ne 0) { throw "Worker-Sicherheitscheck fehlgeschlagen" }
+npx --yes wrangler deploy --dry-run --config "$folder\wrangler.rustup-bot.toml"
+if ($LASTEXITCODE -ne 0) { throw "Wrangler Dry-Run fehlgeschlagen" }
+```
+
+Vor einer tatsächlichen Bereitstellung zusätzlich die Cloudflare-Live-Version
+per `payments/scripts/check-live-admin-panel-release.mjs` gegen die unveränderte
+frühere Version prüfen und die vorherigen Versionen als Rollback bereithalten.
+Die Produktionsfreigabe und alle drei Stars-Flags bleiben im vorbereiteten
+Wrangler-Setup explizit auf `false`.
+
+Eine kontrollierte Worker-Bereitstellung hinter diesen Sperren macht den
+authentifizierten Katalog und die Hilfsendpunkte technisch erreichbar,
+aktiviert aber KEINE Echtgeldzahlungen. Weitere Freigabe bedarf
+vollständiger kontrollierter Live-Tests, realer auslieferbarer Produkte
+und eines überprüften Rückerstattungs- und Supportbetriebs.
+
+Bei digitalen Gütern darf innerhalb Telegrams nur mit Stars bezahlt werden.
+Zusätzlich verlangen die aktuellen Telegram Bot Developer Terms von
+Mini Apps mit Krypto-Funktionen grundsätzlich die TON-Blockchain und
+TON Connect für Wallet-Verbindungen.
+
+Quellen: https://core.telegram.org/bots/payments-stars
+und https://telegram.org/tos/bot-developers
