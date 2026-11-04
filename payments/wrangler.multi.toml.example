@@ -11,6 +11,7 @@ MULTI_OPERATOR_APPROVED = "false"
 MULTI_AUTO_SCAN_ENABLED = "false"
 MULTI_DELIVERY_ENABLED = "false"
 MULTI_AUTO_QUEUE_ENABLED = "false"
+MULTI_STRICT_QUORUM = "false" # must be enabled only after configuring three independent RPCs per blockchain
 MULTI_ADMIN_ORIGIN = "https://your-private-admin.example.com"
 MULTI_WEBHOOK_HOST_ALLOWLIST = ""
 MULTI_MAX_INVOICES_PER_MINUTE = "1000"
@@ -30,7 +31,18 @@ crons = ["*/2 * * * *"]
 # Required Cloudflare secrets (DO NOT write values into this file):
 # wrangler secret put MULTI_ADMIN_KEY
 # wrangler secret put MULTI_WEBHOOK_MASTER_KEY
+# Three different HTTPS RPC HOSTS per blockchain (prefer separate vendors/nodes)
 # wrangler secret put ETHEREUM_RPC_URL
+# wrangler secret put ETHEREUM_RPC_URL_SECONDARY
+# wrangler secret put ETHEREUM_RPC_URL_TERTIARY
+# wrangler secret put TRON_RPC_URL_SECONDARY
+# wrangler secret put TRON_RPC_URL_TERTIARY
+# wrangler secret put TRON_RPC_API_KEY_SECONDARY
+# wrangler secret put TRON_RPC_API_KEY_TERTIARY
+# wrangler secret put BITCOIN_RPC_URL_SECONDARY
+# wrangler secret put BITCOIN_RPC_URL_TERTIARY
+# wrangler secret put BITCOIN_RPC_BASIC_B64_SECONDARY
+# wrangler secret put BITCOIN_RPC_BASIC_B64_TERTIARY
 # wrangler secret put TRON_RPC_URL
 # wrangler secret put TRON_RPC_API_KEY
 # wrangler secret put BITCOIN_RPC_URL
