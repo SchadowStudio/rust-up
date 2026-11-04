@@ -1,0 +1,25 @@
+# Copy to wrangler.toml inside payments/. Do NOT commit real tokens.
+name = "rustup-crypto-staging"
+main = "src/index.js"
+compatibility_date = "2026-11-04"
+workers_dev = true
+
+[vars]
+# SAFETY: default is disabled. No client integration or real charges until launch review.
+CRYPTO_PAYMENTS_ENABLED = "false"
+ALLOWED_ORIGIN = "https://example.invalid"
+USDT_ERC20_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otq"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rustup-crypto-staging"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Configure these as worker secrets, not vars or GitHub files:
+# wrangler secret put TG_BOT_TOKEN
+# wrangler secret put ETHEREUM_RPC_URL
+# wrangler secret put TRON_RPC_URL
+# wrangler secret put BITCOIN_RPC_URL
+# wrangler secret put BITCOIN_RPC_BASIC_B64
+# Optional: wrangler secret put TRON_RPC_API_KEY

@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+wrangler.toml
+.wrangler/
+*.log
+!.env.example

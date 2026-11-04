@@ -1,0 +1,28 @@
+name: Crypto payments branch tests
+
+on:
+  push:
+    branches:
+      - feature/self-hosted-crypto-payments
+    paths:
+      - 'payments/**'
+      - '.github/workflows/crypto-payments-checks.yml'
+  pull_request:
+    paths:
+      - 'payments/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate payment JavaScript
+        run: cd payments && npm run validate
+      - name: Test D1 SQLite uniqueness constraints
+        run: python3 -m unittest discover -s payments/tests -p 'schema_test.py' -v
