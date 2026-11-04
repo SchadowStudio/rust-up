@@ -29,11 +29,14 @@ export function validPreCheckout(order, query, now = Date.now()) {
 
 export function validSuccessfulPayment(order, message, now = Date.now()) {
   const pay = message?.successful_payment;
-  return !!pay && validUserId(message?.from?.id) &&
-    validPreCheckout(order, {
-      from: message.from, currency: pay.currency, total_amount: pay.total_amount,
-      invoice_payload: pay.invoice_payload
-    }, now) &&
+  // SuccessfulPayment is authoritative after Telegram sends it. A delayed
+  // webhook must still be recorded even if the 15-minute checkout TTL passed.
+  return !!pay && !!order && UUID.test(String(order.id)) &&
+    (order.status === 'pending' || order.status === 'paid') &&
+    validUserId(message?.from?.id) &&
+    message.from.id === order.telegram_user_id &&
+    pay.currency === 'XTR' && pay.total_amount === order.price_stars &&
+    pay.invoice_payload === order.id &&
     typeof pay.telegram_payment_charge_id === 'string' &&
     pay.telegram_payment_charge_id.length >= 1 &&
     pay.telegram_payment_charge_id.length <= 256;
@@ -110,8 +113,8 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
   try {
     const res = await db.prepare(
       "UPDATE rustup_stars_orders SET status='paid',telegram_charge_id=?,paid_at_ms=? " +
-      "WHERE id=? AND status='pending' AND telegram_user_id=? AND price_stars=? AND expires_at_ms>?"
-    ).bind(charge,now,order.id,message.from.id,order.price_stars,now).run();
+      "WHERE id=? AND status='pending' AND telegram_user_id=? AND price_stars=?"
+    ).bind(charge,now,order.id,message.from.id,order.price_stars).run();
     if (res.meta?.changes === 1)
       return {accepted:true,duplicate:false,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
   } catch {
