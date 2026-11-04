@@ -3,6 +3,7 @@
 import {ASSETS,ERC20_TRANSFER_TOPIC,evm} from '../assets.js';
 import {verifyChainPayment} from '../chains.js';
 import {settleV2,expireV2} from './settlement.js';
+import {notifyDeliveryQueue} from './delivery.js';
 
 const at=s=>new Date(s).toISOString();
 const hex=x=>'0x'+BigInt(x).toString(16);
@@ -43,6 +44,7 @@ async function trySettle(db,order,hash,env,counter){
  try{
   const proof=await verifyChainPayment(order,hash,env);
   const result=await settleV2(db,order,proof);
+  await notifyDeliveryQueue(env,result);
   if(result.status==='verified')counter.verified++;
   else if(result.status==='manual_review')counter.review++;
  }catch(e){
