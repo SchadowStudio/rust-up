@@ -36,7 +36,7 @@ export function hardPaymentGate(env,channel){
   if(env?.PAYMENT_PRODUCTION_ENABLED!=='true')return false;
   if(channel==='stars')
     return env.STARS_PAYMENT_ENABLED==='true';
-  return env.EXTERNAL_VARIABLE_CRYPTO_CHECKOUT_ENABLED==='true';
+  return env.EXTERNAL_VARIABLE_CRYPTO_CHECKOUT_ENABLED==='true'&&env.CRYPTO_GATEWAY_CONNECTED==='true';
 }
 export async function isPaymentEnabled(env,channel){
   // Fail closed on missing migration, DB failure or unset hard gates.
