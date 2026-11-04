@@ -1,4 +1,4 @@
-// RUST UP Telegram Mini App: in-app Stars view, not a separate shop.
+// RUST UP Telegram Mini App: Stars section in EXISTING Wallet > Deposit, not a new route or public shop.
 // All catalog, invoice and ownership data is requested with signed Telegram initData.
 (() => {
   'use strict';
@@ -47,8 +47,8 @@
     support.append(link);
     tab.append(catalogButton,purchaseButton);
     main.append(h,note,status,tab,content,support);target.append(main);
-    let alive=true,busy=false,mode='catalog';
-    const stillHere=()=>target.contains(main)&&location.hash.replace(/^#/,'').startsWith('/stars');
+    let busy=false,mode='catalog';
+    const stillHere=()=>target.contains(main)&&target.isConnected&&target.id==='rustupStarsBody'&&location.hash.replace(/^#/,'').startsWith('/wallet');
     const loading=()=>content.replaceChildren(element('p','rustup-stars-empty','Загрузка…'));
     const error=(msg)=>content.replaceChildren(element('p','rustup-stars-empty',msg));
     async function showCatalog(){
