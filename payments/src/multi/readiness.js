@@ -1,8 +1,18 @@
 // Config-level gates only. A green configuration check is NOT a substitute for
 // live receipt verification, wallet ownership proofs, backups and load testing.
+import {validateIndependentRpcs} from './quorum.js';
+function hasRpcQuorum(env,chain){
+ try{validateIndependentRpcs(env,chain);return true;}
+ catch{return false;}
+}
 export function readinessV2(env){
  const checks={
   database:!!env.DB,
+  strictQuorumEnabled:env.MULTI_STRICT_QUORUM==='true',
+  ethereumQuorum:hasRpcQuorum(env,'ethereum'),
+  bitcoinQuorum:hasRpcQuorum(env,'bitcoin'),
+  tronQuorum:hasRpcQuorum(env,'tron'),
+  operatorKey:typeof env.MULTI_ADMIN_KEY==='string'&&env.MULTI_ADMIN_KEY.length>=48,
   operatorApproval:env.MULTI_OPERATOR_APPROVED==='true',
   acceptingDeposits:env.MULTI_LIVE_ENABLED==='true',
   reconciliation:env.MULTI_AUTO_SCAN_ENABLED==='true',
