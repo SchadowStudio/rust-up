@@ -105,5 +105,10 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#e3e3e3;font-size:12px}
 <p>Diese Schlüssel werden nur in dieser Ansicht angezeigt. In einem Passwortmanager und im jeweiligen Projektserver speichern, nicht im Browser oder GitHub.</p>
 <pre id="secrets"></pre><button id="clearSecrets" class="subtle">Anzeige löschen</button>
 </section>
+<section class="panel"><h2>Manuelle Zahlungsprüfungen</h2>
+<p>Unter- und verspätete Zahlungen werden hier angezeigt. Abschließen bucht keine Gutschrift und löst keine Rückzahlung aus.</p>
+<button class="subtle" type="button" id="loadReviews">Offene Prüfungen laden</button>
+<div id="reviews"></div>
+</section>
 <section class="panel"><h2>Aktueller Status</h2><p id="output" role="status" aria-live="polite">Noch nicht verbunden.</p></section>
 </main><script type="module" src="./app.js"></script></body></html>
