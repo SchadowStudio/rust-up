@@ -1,0 +1,29 @@
+name: RUST UP frontend and security checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'js/**'
+      - 'creator/app.js'
+      - 'backend/**'
+      - 'tests/**'
+      - '.github/workflows/security-checks.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify JavaScript syntax
+        run: |
+          node --check js/app.js
+          node --check js/rules.js
+          node --check creator/app.js
+      - name: Test referral uniqueness and cooldown constraints
+        run: python3 -m unittest discover -s tests -v
