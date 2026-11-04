@@ -164,15 +164,27 @@ export async function multiAdmin(request,env,url){
  const db=env.DB,path=url.pathname;
  try{
   if(path==='/v2/admin/status'&&request.method==='GET'){
-   const [projects,open,undelivered]=await Promise.all([
+   const [projects,open,undelivered,pool,reviews,staleFx,failed]=await Promise.all([
     db.prepare('SELECT COUNT(*) AS n FROM v2_projects').first(),
     db.prepare("SELECT COUNT(*) AS n FROM v2_invoices WHERE status='awaiting_payment'").first(),
-    db.prepare('SELECT COUNT(*) AS n FROM v2_delivery_outbox WHERE delivered_at_ms IS NULL').first()
+    db.prepare('SELECT COUNT(*) AS n FROM v2_delivery_outbox WHERE delivered_at_ms IS NULL').first(),
+    db.prepare(`SELECT chain,COUNT(*) AS n FROM deposit_addresses
+     WHERE enabled=1 AND assigned_intent IS NULL GROUP BY chain`).all(),
+    db.prepare(`SELECT COUNT(*) AS n FROM v2_payment_reviews
+     WHERE resolved_at_ms IS NULL`).first(),
+    db.prepare(`SELECT COUNT(*) AS n FROM v2_exchange_rates
+     WHERE enabled=1 AND expires_at_ms<?`).bind(Date.now()).first(),
+    db.prepare(`SELECT COUNT(*) AS n FROM v2_delivery_outbox
+     WHERE delivered_at_ms IS NULL AND attempts>=5`).first()
    ]);
+   const capacity={bitcoin:0,ethereum:0,tron:0};
+   for(const row of pool.results||[])if(row.chain in capacity)capacity[row.chain]=row.n;
+   const readiness=readinessV2(env);
    return json({ok:true,projects:projects?.n||0,pending:open?.n||0,
-    deliveryBacklog:undelivered?.n||0,
-    checkoutEnabled:readinessV2(env).ready,
-    missingPrerequisites:readinessV2(env).missing});
+    deliveryBacklog:undelivered?.n||0,deliveryRetryFailures:failed?.n||0,
+    manualReviews:reviews?.n||0,expiredEnabledRates:staleFx?.n||0,
+    availableReceivers:capacity,checkoutEnabled:readiness.ready,
+    missingPrerequisites:readiness.missing});
   }
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
