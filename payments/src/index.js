@@ -106,7 +106,7 @@ export default {
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
   let response;
   try{
-   if(url.pathname==='/health')response=json({ok:true,enabled:env.CRYPTO_PAYMENTS_ENABLED==='true'});
+   if(url.pathname==='/health')response=json({ok:true,enabled:readiness(env).ready});
    else if(isOperator)response=await operatorRoute(request,env,url);
    else if(!env.DB||!env.TG_BOT_TOKEN||env.CRYPTO_PAYMENTS_ENABLED!=='true')
     response=error('payment_service_disabled',503);
