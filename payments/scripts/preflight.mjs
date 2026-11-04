@@ -42,6 +42,7 @@ export function assessOperationalStatus(status,{minFreePerChain=1,maxPendingPart
   readyForFurtherManualReview:blockers.length===0,
   blockers,warnings,
   projectCount:Number(status.projects||0),
+  tonNetworkEnabled:status.tonNetworkEnabled===true,
   freeReceiversByChain:receivers,
   securityChecksAreNotLiveTransactionTests:true
  };
