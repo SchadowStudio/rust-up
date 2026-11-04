@@ -31,7 +31,18 @@ export function checkoutReady(env){
   env.MULTI_AUTO_SCAN_ENABLED==='true'&&
   env.MULTI_DELIVERY_ENABLED==='true'&&
   typeof env.MULTI_WEBHOOK_MASTER_KEY==='string'&&
-  env.MULTI_WEBHOOK_MASTER_KEY.length>=40;
+  env.MULTI_WEBHOOK_MASTER_KEY.length>=40 &&
+  /^https:\/\//.test(String(env.ETHEREUM_RPC_URL||'')) &&
+  /^https:\/\//.test(String(env.TRON_RPC_URL||'')) &&
+  /^https:\/\//.test(String(env.TRON_INDEXER_URL||'')) &&
+  /^https:\/\//.test(String(env.BITCOIN_RPC_URL||'')) &&
+  typeof env.BITCOIN_RPC_BASIC_B64==='string' &&
+  env.BITCOIN_RPC_BASIC_B64.length>16 &&
+  /^[a-f0-9]{64}$/i.test(String(env.BITCOIN_START_BLOCKHASH||'')) &&
+  Number.isSafeInteger(Number(env.ETHEREUM_START_BLOCK)) &&
+  Number(env.ETHEREUM_START_BLOCK)>0 &&
+  /^0x[a-f0-9]{40}$/i.test(String(env.USDT_ERC20_CONTRACT||'')) &&
+  /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(String(env.USDT_TRC20_CONTRACT||''));
 }
 function responseInvoice(row,delivered=false){
  const conf=ASSETS[row.asset];
