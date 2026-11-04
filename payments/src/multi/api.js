@@ -72,10 +72,10 @@ async function createInvoice(db,project,b,req,env,now=Date.now()){
   if(existing.request_hash!==requestHash)return fail('idempotency_conflict',409);
   return json({ok:true,replayed:true,invoice:responseInvoice(existing)});
  }
- const recent=await db.prepare(`SELECT COUNT(*) AS n FROM v2_invoices
-  WHERE project_id=? AND created_at_ms>=?`).bind(project.id,now-60000).first();
+ // Coarse minute bucket is enforced atomically in the SAME D1 transaction as
+ // the address reservation and invoice creation; no check-then-write race.
  const quota=Math.max(1,Math.min(10000,Number(env.MULTI_MAX_INVOICES_PER_MINUTE)||1000));
- if(recent.n>=quota)return fail('project_capacity_exceeded',429);
+ const bucketMinute=Math.floor(now/60000)*60000;
  const product=await db.prepare(`SELECT currency,amount_minor,title FROM v2_products
   WHERE project_id=? AND sku=? AND status='active'`).bind(project.id,b.sku).first();
  if(!product)return fail('product_unavailable',404);
@@ -92,22 +92,34 @@ async function createInvoice(db,project,b,req,env,now=Date.now()){
   return fail('invalid_receiver_configuration',503);
  const id=crypto.randomUUID();
  const changes=[
+  db.prepare(`INSERT INTO v2_invoice_quota
+   (project_id,bucket_minute_ms,invoice_count,last_invoice_id)
+   VALUES(?,?,1,?) ON CONFLICT(project_id,bucket_minute_ms)
+   DO UPDATE SET invoice_count=invoice_count+1,last_invoice_id=excluded.last_invoice_id
+   WHERE invoice_count<?`)
+   .bind(project.id,bucketMinute,id,quota),
   db.prepare(`UPDATE deposit_addresses SET assigned_intent=?
-   WHERE chain=? AND address=? AND enabled=1 AND assigned_intent IS NULL`)
-   .bind(id,quoted.chain,pool.address),
+   WHERE chain=? AND address=? AND enabled=1 AND assigned_intent IS NULL
+   AND EXISTS(SELECT 1 FROM v2_invoice_quota
+     WHERE project_id=? AND bucket_minute_ms=? AND last_invoice_id=?)`)
+   .bind(id,quoted.chain,pool.address,project.id,bucketMinute,id),
   db.prepare(`INSERT INTO v2_invoices
    (id,project_id,project_order_ref,idempotency_key,request_hash,sku,
     fiat,amount_minor,asset,chain,receive_address,amount_atomic,
     rate_numerator,rate_denominator,created_at_ms,expires_at_ms)
    SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-   WHERE EXISTS(SELECT 1 FROM deposit_addresses WHERE chain=? AND address=? AND assigned_intent=?)`)
+   WHERE EXISTS(SELECT 1 FROM deposit_addresses
+     WHERE chain=? AND address=? AND assigned_intent=?)
+     AND EXISTS(SELECT 1 FROM v2_invoice_quota
+     WHERE project_id=? AND bucket_minute_ms=? AND last_invoice_id=?)`)
   .bind(id,project.id,orderRef,key,requestHash,b.sku,product.currency,
    product.amount_minor,b.asset,quoted.chain,pool.address,quoted.amountAtomic,
    quoted.rateNumerator,quoted.rateDenominator,now,quoted.expiry,
-   quoted.chain,pool.address,id)
+   quoted.chain,pool.address,id,project.id,bucketMinute,id)
  ];
  try{
-  const [reserved,insert]=await db.batch(changes);
+  const [debited,reserved,insert]=await db.batch(changes);
+  if(!debited.meta?.changes)return fail('project_capacity_exceeded',429);
   if(!reserved.meta?.changes||!insert.meta?.changes)return fail('address_claim_conflict',409);
  }catch{
   // Concurrent retries are idempotent by project + key.
