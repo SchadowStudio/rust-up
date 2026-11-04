@@ -23,6 +23,10 @@ export function readinessV2(env){
   tronIndexer:/^https:\/\//i.test(String(env.TRON_INDEXER_URL||'')),
   bitcoinRpc:/^https:\/\//i.test(String(env.BITCOIN_RPC_URL||'')),
   bitcoinAuth:typeof env.BITCOIN_RPC_BASIC_B64==='string'&&env.BITCOIN_RPC_BASIC_B64.length>16,
+  bitcoinSecondaryAuth:typeof env.BITCOIN_RPC_BASIC_B64_SECONDARY==='string'&&
+   env.BITCOIN_RPC_BASIC_B64_SECONDARY.length>16,
+  bitcoinTertiaryAuth:typeof env.BITCOIN_RPC_BASIC_B64_TERTIARY==='string'&&
+   env.BITCOIN_RPC_BASIC_B64_TERTIARY.length>16,
   bitcoinStart:/^[a-f0-9]{64}$/i.test(String(env.BITCOIN_START_BLOCKHASH||'')),
   ethereumStart:Number.isSafeInteger(Number(env.ETHEREUM_START_BLOCK))&&Number(env.ETHEREUM_START_BLOCK)>0,
   erc20Contract:/^0x[a-f0-9]{40}$/i.test(String(env.USDT_ERC20_CONTRACT||'')),
