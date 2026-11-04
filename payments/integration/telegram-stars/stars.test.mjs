@@ -205,3 +205,11 @@ test('only one Stars pre-checkout reservation, same query retries allowed',async
   assert.equal(n,1);
   assert.deepEqual(replies.map(x=>x.ok),[true,true,false]);
 });
+
+
+test('external crypto refuses Telegram Mini App digital payment context',async()=>{
+ await assert.rejects(
+  ()=>createExternalCryptoCheckout({}, {sourceChannel:'telegram-miniapp'}),
+  /telegram_digital_goods_require_stars/
+ );
+});
