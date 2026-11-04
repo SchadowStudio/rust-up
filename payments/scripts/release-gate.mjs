@@ -75,7 +75,8 @@ export async function runReleaseGate({manifest,now=Date.now(),commitSha,
  if(!preflight||typeof preflight!=='object'||
     !Array.isArray(preflight.blockers)||!Array.isArray(preflight.warnings))
   throw Error('invalid_preflight_result');
- const tonEnabled=Boolean(manifest?.tonEnabled);
+ // Never trust the submitted manifest to hide an enabled TON payment method.
+ const tonEnabled=preflight.tonNetworkEnabled===true||manifest?.tonEnabled===true;
  const evidence=assessReleaseEvidence(manifest,{now,commitSha,tonEnabled});
  const blockers=[...preflight.blockers,...evidence.blockers];
  if(!preflight.readyForFurtherManualReview)
