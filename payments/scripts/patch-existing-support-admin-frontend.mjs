@@ -21,6 +21,8 @@ function replaceOnce(source,needle,replacement){
  return source.replace(needle,replacement);
 }
 export function patchAdminFrontendIndex(source){
+ if(source.includes('data-tab="payments"')||source.includes('payments-tab.js')||source.includes('payments.css'))
+  throw Error('payment_panel_already_exists');
  let out=replaceOnce(source,
   '<button type="button" data-tab="log">Журнал</button>',
   '<button type="button" data-tab="log">Журнал</button>\n    <button type="button" data-tab="payments">Платежи</button>');
