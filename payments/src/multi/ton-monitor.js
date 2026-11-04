@@ -4,6 +4,30 @@
 import {tonHashHex,tonRawAddress} from '../ton.js';
 import {tonIndexerGet} from '../ton-chain.js';
 
+// Discovery is not settlement proof. A failed primary indexer must not stop
+// the scanner when a separately configured backup can provide candidate hints.
+// Every hint still passes the independent chain-proof quorum in trySettle.
+export async function discoverTonPage(env,params){
+ const suffixes=['','_SECONDARY','_TERTIARY'];
+ const seen=new Set();
+ let lastError=Error('ton_discovery_indexers_unavailable');
+ for(const suffix of suffixes){
+  const url=env['TON_INDEXER_URL'+suffix];
+  if(typeof url!=='string'||!url||seen.has(url))continue;
+  seen.add(url);
+  try{
+   const data=await tonIndexerGet({
+    ...env,TON_INDEXER_URL:url,
+    TON_INDEXER_API_KEY:env['TON_INDEXER_API_KEY'+suffix]||''
+   },'transactions',params);
+   if(!Array.isArray(data.transactions)||data.transactions.length>100)
+    throw Error('ton_indexer_invalid_transactions');
+   return data;
+  }catch(error){lastError=error;}
+ }
+ throw Error('ton_discovery_indexers_unavailable',{cause:lastError});
+}
+
 export async function scanTonPayments(db,orders,env,counter,helpers){
  if(env.MULTI_TON_ENABLED!=='true')return;
  const ton=orders.filter(x=>x.asset==='TON'&&x.chain==='ton');
@@ -20,13 +44,10 @@ export async function scanTonPayments(db,orders,env,counter,helpers){
   let offsetPage=0;
   const known=new Set();
   for(let page=0;page<5;page++){
-   const result=await tonIndexerGet(env,'transactions',{
+   const result=await discoverTonPage(env,{
     account:raw,start_utime:start,sort:'desc',limit:100,
     offset:offsetPage
    });
-   if(!Array.isArray(result.transactions)||
-      result.transactions.length>100)
-    throw Error('ton_indexer_invalid_transactions');
    for(const tx of result.transactions){
     if(tx?.emulated===true||!Number.isSafeInteger(tx.mc_block_seqno)||
        tx.mc_block_seqno<1||tx.in_msg?.bounced===true||
