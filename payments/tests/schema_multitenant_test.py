@@ -17,6 +17,12 @@ def make():
   db.execute("""INSERT INTO v2_products
   (project_id,sku,title,currency,amount_minor,status,updated_at_ms)
   VALUES (?,'rank1','Rank','RUB',5000,'active',100)""",(id,))
+  # Mirrors the atomic project creation API, after all migrations are installed.
+  db.execute("INSERT INTO v2_project_payment_profiles(project_id,display_name,updated_at_ms) VALUES(?,?,100)",(id,'Project'))
+  for fiat in ('RUB','EUR','USD'):
+   db.execute("INSERT INTO v2_project_fiat_methods(project_id,currency) VALUES(?,?)",(id,fiat))
+  for asset in ('BTC','ETH','TRX','USDT_ERC20','USDT_TRC20'):
+   db.execute("INSERT INTO v2_project_crypto_methods(project_id,asset) VALUES(?,?)",(id,asset))
  for n,address in enumerate(('0xaaa','0xbbb','0xccc')):
   db.execute("""INSERT INTO deposit_addresses(chain,address,enabled,assigned_intent)
     VALUES ('ethereum',?,1,NULL)""",(address,))
