@@ -7,3 +7,5 @@ wrangler.toml
 .wrangler/
 *.log
 !.env.example
+
+dist-admin/
