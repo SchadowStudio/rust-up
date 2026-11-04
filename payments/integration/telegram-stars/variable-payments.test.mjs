@@ -65,8 +65,9 @@ function makeStarsDb(){
           }
           throw Error('unexpected_stars_sql');
         }
-      }};
+      };
     }};
+    }
   };
 }
 
@@ -165,7 +166,8 @@ function makeCryptoDb(){
         }
         throw Error('unexpected_crypto_sql');
       }
-    }};};
+    };
+  }};
   }};
 }
 test('variable crypto fiat input goes to server-scoped project, not browser key',async()=>{
