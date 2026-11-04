@@ -176,6 +176,47 @@ export async function multiAdmin(request,env,url){
   if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
   if(path==='/v2/admin/receivers'&&request.method==='POST')return addReceiver(db,await readBody(request));
   if(path==='/v2/admin/keys'&&request.method==='POST')return keys(db,await readBody(request));
+  if(path==='/v2/admin/keys/revoke'&&request.method==='POST'){
+   const b=await readBody(request),pid=requireProjectId(b.projectId);
+   if(!isUuid(b.keyId)||b.confirmation!=='CONFIRM_KEY_REVOCATION')
+    return fail('key_revoke_confirmation_required');
+   const changed=await db.prepare(`UPDATE v2_api_keys SET status='revoked',revoked_at_ms=?
+     WHERE id=? AND project_id=? AND status='active'
+     AND (SELECT COUNT(*) FROM v2_api_keys
+       WHERE project_id=? AND status='active')>1`)
+    .bind(Date.now(),b.keyId,pid,pid).run();
+   if(!changed.meta?.changes)return fail('cannot_revoke_last_active_key',409);
+   await audit(db,'revoke_project_key',pid,{keyId:b.keyId});
+   return json({ok:true,revokedKeyId:b.keyId});
+  }
+  if(path==='/v2/admin/projects/webhook'&&request.method==='POST'){
+   const b=await readBody(request),pid=requireProjectId(b.projectId);
+   if(b.confirmation!=='CONFIRM_WEBHOOK_UPDATE')return fail('confirmation_required');
+   const webhook=safeWebhookUrl(b.webhookUrl);
+   const allowed=String(env.MULTI_WEBHOOK_HOST_ALLOWLIST||'').split(',')
+    .map(x=>x.trim().toLowerCase()).filter(Boolean);
+   if(!allowed.includes(new URL(webhook).hostname))
+    return fail('callback_host_not_approved',403);
+   const changed=await db.prepare(`UPDATE v2_projects SET webhook_url=?,updated_at_ms=?
+     WHERE id=?`).bind(webhook,Date.now(),pid).run();
+   if(!changed.meta?.changes)return fail('project_not_found',404);
+   await audit(db,'update_project_webhook',pid,{host:new URL(webhook).hostname});
+   return json({ok:true,projectId:pid,webhookUrl:webhook});
+  }
+  if(path==='/v2/admin/products'&&request.method==='GET'){
+   const pid=requireProjectId(url.searchParams.get('projectId'));
+   const rows=await db.prepare(`SELECT sku,title,currency,amount_minor,status,updated_at_ms
+     FROM v2_products WHERE project_id=? ORDER BY sku LIMIT 500`).bind(pid).all();
+   return json({ok:true,projectId:pid,products:rows.results||[]});
+  }
+  if(path==='/v2/admin/receivers'&&request.method==='GET'){
+   const rows=await db.prepare(`SELECT chain,address,enabled,source,assigned_intent
+     FROM deposit_addresses ORDER BY chain,address LIMIT 500`).all();
+   return json({ok:true,receivers:(rows.results||[]).map(x=>({
+     chain:x.chain,address:x.address,enabled:x.enabled===1,assigned:x.assigned_intent!=null,
+     source:x.source
+   }))});
+  }
   const activation=/^\/v2\/admin\/(projects|products|rates|receivers)\/(enable|disable)$/.exec(path);
   if(activation&&request.method==='POST')
    return toggle(db,activation[1],await readBody(request),activation[2]==='enable');
