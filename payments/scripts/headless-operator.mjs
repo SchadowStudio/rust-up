@@ -3,6 +3,8 @@
 // Outputs project API credentials only once, when explicitly creating projects
 // or rotating a key. Never redirects or follows gateway-supplied URLs.
 import {pathToFileURL} from 'node:url';
+import {readFileSync} from 'node:fs';
+import {planCoinExtension,walletSetupPlan} from '../src/asset-registry.js';
 
 const HELP=`RUST UP / Multi-project crypto payments - headless operator CLI
 
@@ -26,6 +28,9 @@ Commands:
   project-key-create <project-uuid> --confirm
   project-key-revoke <project-uuid> <key-uuid> --confirm
   project-webhook <project-uuid> <https-webhook> --confirm
+  wallet-setup-plan
+  coin-plan <ASSET_SYMBOL> <bitcoin|ethereum|tron> <native|erc20|trc20> <decimals>
+  wallet-import-public <public-addresses.json> --confirm
   address-list
   address-add <bitcoin|ethereum|tron> <public-address> --confirm
   address-enable <bitcoin|ethereum|tron> <public-address> --confirm
@@ -138,6 +143,33 @@ function operation(argv){
    if(args.length!==2)fail('usage:_project-webhook_id_url_--confirm');
    return ['POST','/v2/admin/projects/webhook',{projectId:id(args[0]),webhookUrl:args[1],
     confirmation:'CONFIRM_WEBHOOK_UPDATE'}];
+  case 'wallet-setup-plan':
+   if(args.length)fail('usage:_wallet-setup-plan');
+   return ['LOCAL','wallet-setup-plan',{networks:walletSetupPlan()}];
+  case 'coin-plan':
+   if(args.length!==4)fail('usage:_coin-plan_symbol_chain_standard_decimals');
+   return ['LOCAL','coin-plan',
+    planCoinExtension({asset:args[0],chain:args[1],
+     standard:args[2],decimals:integer(args[3],0,18)})];
+  case 'wallet-import-public':{
+   mustConfirm(confirmed);
+   if(args.length!==1)fail('usage:_wallet-import-public_path_--confirm');
+   // The file contains PUBLIC receiving addresses ONLY. Fail closed before
+   // sending any accidental secret-bearing configuration to the network.
+   let raw;
+   try{raw=readFileSync(args[0]);}catch{fail('public_wallet_file_unreadable')}
+   if(raw.length<2||raw.length>3800)fail('public_wallet_file_invalid_size');
+   let obj;try{obj=JSON.parse(raw.toString('utf8'));}catch{fail('invalid_public_wallet_json')}
+   if(!obj||Array.isArray(obj)||typeof obj!=='object'||
+      Object.keys(obj).some(k=>!['walletLabel','addresses'].includes(k))||
+      typeof obj.walletLabel!=='string'||!Array.isArray(obj.addresses)||
+      obj.addresses.length<1||obj.addresses.length>25||
+      obj.addresses.some(x=>!x||typeof x!=='object'||Array.isArray(x)||
+       Object.keys(x).some(k=>!['chain','address'].includes(k))))
+    fail('public_addresses_only_no_wallet_secrets');
+   return ['POST','/v2/admin/wallet-import',{
+    ...obj,confirmation:'CONFIRM_PUBLIC_ADDRESS_IMPORT'}];
+  }
   case 'address-list':return ['GET','/v2/admin/receivers'];
   case 'address-add':
    mustConfirm(confirmed);
@@ -166,8 +198,10 @@ function operation(argv){
 export function parseOperatorCommand(args){
  return operation(args);
 }
-export async function executeOperator(args,{adminUrl=endpoint(),adminKey=credentials(),fetchFn=fetch}={}){
+export async function executeOperator(args,options={}){
  const [method,route,body]=operation(args);
+ if(method==='LOCAL')return {ok:true,kind:route,...body};
+ const {adminUrl=endpoint(),adminKey=credentials(),fetchFn=fetch}=options;
  const response=await fetchFn(adminUrl+route,{
   method,redirect:'error',cache:'no-store',
   headers:{authorization:'Bearer '+adminKey,
