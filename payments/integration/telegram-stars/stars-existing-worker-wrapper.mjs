@@ -20,7 +20,7 @@ async function openExistingMiniApp(update,env,fetchImpl){
  if(app.protocol!=='https:'||app.search||app.username||app.password)
   throw Error('existing_rustup_miniapp_url_invalid');
  // Same existing Main Mini App, just deep-link to its Stars route.
- app.hash='/stars';
+ app.hash='/wallet?tab=deposit&method=stars';
  await callTelegram(env,'sendMessage',{
   chat_id:update.message.from.id,
   text:'⭐ Telegram Stars теперь в RUST UP Mini App. Покупки только внутри Telegram.',
