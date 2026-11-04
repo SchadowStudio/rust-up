@@ -52,3 +52,11 @@ CREATE TABLE IF NOT EXISTS rustup_stars_purchase_locks(
   expires_at_ms INTEGER NOT NULL,
   PRIMARY KEY(telegram_user_id,sku)
 );
+
+-- Persist a generated XTR invoice before returning it to the Mini App.
+-- A repeated tap can reuse the SAME invoice instead of creating a new charge.
+CREATE TABLE IF NOT EXISTS rustup_stars_invoice_links(
+ order_id TEXT PRIMARY KEY REFERENCES rustup_stars_orders(id),
+ invoice_url TEXT NOT NULL CHECK(length(invoice_url) BETWEEN 15 AND 1024),
+ created_at_ms INTEGER NOT NULL CHECK(created_at_ms>0)
+);
