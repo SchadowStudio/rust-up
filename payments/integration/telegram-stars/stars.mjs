@@ -134,15 +134,16 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
 export async function handleStarsUpdate(update, env, fetchImpl = fetch) {
   // Keep recording legitimate already-approved payments after a switch-off.
   // The switch must reject new precheckout requests, not lose paid receipts.
-  if (env.STARS_PAYMENT_ENABLED !== 'true' && !update?.message?.successful_payment)
+  if (env.STARS_PAYMENT_ENABLED !== 'true' &&
+      !update?.pre_checkout_query && !update?.message?.successful_payment)
     return {handled:false,disabled:true};
   const q = update?.pre_checkout_query;
   if (q) {
-    const order = UUID.test(String(q.invoice_payload))
+    const order = env.STARS_PAYMENT_ENABLED === 'true' && UUID.test(String(q.invoice_payload))
       ? await env.DB.prepare(
         'SELECT id,telegram_user_id,price_stars,status,expires_at_ms,checkout_query_id FROM rustup_stars_orders WHERE id=?'
       ).bind(q.invoice_payload).first() : null;
-    let ok = validPreCheckout(order,q);
+    let ok = env.STARS_PAYMENT_ENABLED === 'true' && validPreCheckout(order,q);
     if(ok && order.status==='pending'){
       // Only one checkout query can be approved for a one-use invoice.
       // Concurrent payment attempts cannot both reserve this order.
