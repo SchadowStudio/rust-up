@@ -54,38 +54,22 @@ async function createOrder(db,uid,b){
 }
 async function verifyOrder(db,row,b,env){
  if(row.status==='verified')return json({ok:true,payment:publicOrder(row)});
- if(row.status!=='awaiting_payment')return error('not_pending',409);
- const now=Date.now();
- if(now>=row.expires_at_ms){
-  await db.prepare("UPDATE payment_intents SET status='expired' WHERE id=? AND status='awaiting_payment'").bind(row.id).run();
-  return error('expired_contact_support',410);
- }
+ if(!['awaiting_payment','expired'].includes(row.status))return error('not_claimable',409);
  if(typeof b.transactionId!=='string'||b.transactionId.length>80)return error('bad_transaction_id');
+ const now=Date.now();
  const attempt=await db.prepare(`UPDATE payment_intents
   SET last_verify_ms=?,verify_attempts=verify_attempts+1
-  WHERE id=? AND status='awaiting_payment' AND verify_attempts<20 AND last_verify_ms<?`)
+  WHERE id=? AND status IN ('awaiting_payment','expired')
+  AND verify_attempts<20 AND last_verify_ms<?`)
   .bind(now,row.id,now-20000).run();
  if(!attempt.meta?.changes)return error('verification_rate_limited',429);
  const proof=await verifyChainPayment(row,b.transactionId,env);
- const payload=JSON.stringify({eventId:'crypto:'+row.id,intentId:row.id,
-  telegramId:row.telegram_id,creditKopecks:row.credit_kopecks,
-  asset:row.asset,chain:row.chain,txHash:proof.txHash,amountAtomic:proof.actualAtomic});
- const [updated]=await db.batch([
-  db.prepare(`UPDATE payment_intents SET status='verified',tx_hash=?,verified_at_ms=?
-   WHERE id=? AND status='awaiting_payment' AND expires_at_ms>?`)
-   .bind(proof.txHash,now,row.id,now),
-  db.prepare(`INSERT INTO payment_verifications(chain,tx_hash,intent_id,confirmations,verified_at_ms)
-    SELECT chain,tx_hash,id,?,? FROM payment_intents
-    WHERE id=? AND status='verified' AND tx_hash=?`)
-   .bind(proof.confirmations,now,row.id,proof.txHash),
-  db.prepare(`INSERT INTO payment_outbox(event_id,intent_id,event_type,payload,created_at_ms)
-    SELECT ?,id,'crypto_payment_verified',?,? FROM payment_intents
-    WHERE id=? AND status='verified' AND tx_hash=?`)
-   .bind('crypto:'+row.id,payload,now,row.id,proof.txHash)
- ]);
- if(!updated.meta?.changes)return error('order_changed',409);
- return json({ok:true,payment:publicOrder(await owned(db,row.id,row.telegram_id)),
-  confirmations:proof.confirmations,note:'Chain confirmed; game balance not yet credited.'});
+ const outcome=await settleVerified(db,row,proof);
+ if(outcome.status==='manual_review')return error('late_payment_under_review',409);
+ if(outcome.status==='already_claimed')return error('already_claimed',409);
+ const updated=await owned(db,row.id,row.telegram_id);
+ return json({ok:true,payment:publicOrder(updated),
+  confirmations:proof.confirmations,creditedToGame:false});
 }
 async function route(request,env,url,uid){
  const db=env.DB,path=url.pathname;
