@@ -120,8 +120,14 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
     if (res.meta?.changes === 1)
       return {accepted:true,duplicate:false,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
   } catch {
-    // Unique charge conflict or storage failure must never credit the user.
-    return {accepted:false,reason:'database_conflict'};
+    // Distinguish an idempotent replay from a D1 failure. Never ACK a
+    // legitimate payment when the receipt could not be persisted.
+    const prior=await db.prepare(
+      'SELECT status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
+    ).bind(order.id).first();
+    if(prior?.status==='paid'&&prior.telegram_charge_id===charge)
+      return {accepted:true,duplicate:true,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
+    throw Error('stars_receipt_write_failed_retry');
   }
   const previous = await db.prepare(
     'SELECT status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
