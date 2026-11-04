@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS v2_chain_audit_state (
  failed_checks INTEGER NOT NULL DEFAULT 0,
  state TEXT NOT NULL DEFAULT 'pending'
    CHECK(state IN ('pending','confirmed','uncertain','manual_review')),
- last_error TEXT
+ last_error TEXT,
+ last_block_hash TEXT
 );
 CREATE INDEX IF NOT EXISTS v2_chain_audit_due
  ON v2_chain_audit_state(next_check_ms,state);
