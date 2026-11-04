@@ -47,11 +47,20 @@ def old_db():
 
 def migrate(db):
  # D1 executes a migration in a transaction; reproduce the D1 semantics.
- script='BEGIN;\n'+(MIGRATIONS/'0017_ton_mainnet.sql').read_text(encoding='utf8')+'\nCOMMIT;'
- try:db.executescript(script)
+ source=(MIGRATIONS/'0017_ton_mainnet.sql').read_text(encoding='utf8')
+ db.execute('BEGIN')
+ statement=''
+ try:
+  for line in source.splitlines(keepends=True):
+   statement+=line
+   if not sqlite3.complete_statement(statement):continue
+   db.execute(statement)
+   statement=''
+  db.commit()
  except sqlite3.IntegrityError as exc:
   violations=db.execute('PRAGMA foreign_key_check').fetchall()
-  raise AssertionError(f'TON schema migration FK error: {exc}; violations={violations}') from exc
+  db.rollback()
+  raise AssertionError(f'TON migration failed: {statement[:110]!r}; {exc}; FK={violations}') from exc
 
 class TonMigrationSafety(unittest.TestCase):
  def test_existing_wallets_invoice_parts_webhooks_are_preserved(self):
