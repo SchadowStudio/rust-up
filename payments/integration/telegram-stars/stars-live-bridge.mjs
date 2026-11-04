@@ -198,7 +198,7 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
  // No charge occurs before Telegram approves the actual precheckout query.
  const invoice=await telegramApi(asPaymentsEnv(env,true),
   'createInvoiceLink',invoiceBody(product,id),fetchImpl);
- if(typeof invoice!=='string'||!/^https:\/\/[^\\s]+$/.test(invoice)||invoice.length>1024)
+ if(typeof invoice!=='string'||!/^https:\/\/\S+$/.test(invoice)||invoice.length>1024)
   throw Error('invalid_stars_invoice_link');
  const saved=await db.prepare(
   'INSERT OR IGNORE INTO rustup_stars_invoice_links(order_id,invoice_url,created_at_ms) '+
