@@ -1,6 +1,9 @@
 # RUST UP — own cryptocurrency payment service (development branch)
 
-> **0-Euro-Lokaltests (Windows/Node.js/Python):** \`npm run test:local\`.\n> Kein Cloudflare, keine Wallet, kein Docker, keine Testzahlungen.\n> Anleitung: [LOCAL-ZERO-COST-TESTS-DE.md](./LOCAL-ZERO-COST-TESTS-DE.md).\n> Für eine schnelle Prüfung: \`npm run test:local:quick\`.\n> Diese Tests sind simuliert und keine Produktionsfreigabe.\n>\n> **Neuer Stand (Multi-Projekt-Provider):** Das eigenständige, headless
+> **0-Euro-Lokaltests (Windows/Node.js/Python):** \`npm run test:local\`.\n> Kein Cloudflare, keine Wallet, kein Docker, keine Testzahlungen.\n> Anleitung: [LOCAL-ZERO-COST-TESTS-DE.md](./LOCAL-ZERO-COST-TESTS-DE.md).
+> **Phase 2 (localhost payment simulator):** `npm run demo:local` in PowerShell 1, danach
+> `npm run demo:local:check` in PowerShell 2.
+> Anleitung: [LOCAL-DEMO-SERVER-DE.md](./LOCAL-DEMO-SERVER-DE.md).\n> Für eine schnelle Prüfung: \`npm run test:local:quick\`.\n> Diese Tests sind simuliert und keine Produktionsfreigabe.\n>\n> **Neuer Stand (Multi-Projekt-Provider):** Das eigenständige, headless
 > Backend unter `src/multi/` ist die aktuelle Entwicklungsgrundlage.
 > Einzahlungen werden pro Projekt in RUB/EUR/USD berechnet und in BTC, ETH,
 > TRX oder USDT bezahlt. Das bisherige Beispiel unten betrifft das ältere
