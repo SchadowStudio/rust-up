@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {buildSafeWranglerConfig,verifySnapshot} from './prepare-live-bot-deployment.mjs';
+import {buildSafeWranglerConfig,verifySnapshot,writeConfigIfUnchanged} from './prepare-live-bot-deployment.mjs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const files=new Map([['worker.js','an original test script'],['admin.js','original admin module']]);
 const manifest={worker:'rustup-bot',files:[...files].map(([name,data])=>({
@@ -45,4 +48,15 @@ test('snapshot comparer blocks live deployment changes',()=>{
  assert.equal(verifySnapshot(complete,m),true);
  complete.set('worker.js','modified by a different deployer');
  assert.throws(()=>verifySnapshot(complete,m),/live_bot_changed_since_recovery_worker/);
+});
+
+test('preflight rerun accepts unchanged config but refuses any local drift', async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'rustup-preflight-'));
+  const p=path.join(dir,'wrangler.rustup-bot.toml');
+  try{
+    await writeConfigIfUnchanged(p,'name = "rustup-bot"\\n');
+    await writeConfigIfUnchanged(p,'name = "rustup-bot"\\n');
+    await assert.rejects(()=>writeConfigIfUnchanged(p,'name = "wrong"\\n'),/local_deploy_config_drift/);
+    assert.equal(await fs.readFile(p,'utf8'),'name = "rustup-bot"\\n');
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
