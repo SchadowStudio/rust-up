@@ -19,6 +19,9 @@ function setup(){
    async run(){return {meta:{changes:s.run(...args).changes}};}
   };
  }
+ // D1 serializes atomic batches; emulate that guarantee with a promise FIFO
+ // over the one in-memory SQLite connection.
+ let batchTail=Promise.resolve();
  const db={
   prepare(query){return {
    bind(...args){return prepared(query,args)},
@@ -26,14 +29,19 @@ function setup(){
    all(){return prepared(query).all()},
    run(){return prepared(query).run()}
   }},
-  async batch(statements){
-   sql.exec('BEGIN IMMEDIATE');
-   try{
-    const results=[];
-    for(const statement of statements)results.push(await statement.run());
-    sql.exec('COMMIT');
-    return results;
-   }catch(e){sql.exec('ROLLBACK');throw e;}
+  batch(statements){
+   const run=async()=>{
+    sql.exec('BEGIN IMMEDIATE');
+    try{
+     const results=[];
+     for(const statement of statements)results.push(await statement.run());
+     sql.exec('COMMIT');
+     return results;
+    }catch(e){sql.exec('ROLLBACK');throw e;}
+   };
+   const task=batchTail.then(run,run);
+   batchTail=task.catch(()=>{});
+   return task;
   }
  };
  return {db,sql,close(){sql.close()}};
