@@ -132,6 +132,12 @@ CREATE INDEX v2_payment_parts_invoice
 -- TON must additionally pass per-project opt-in, enabled receiving-address
 -- and independent RPC quorum / masterchain finality checks.
 PRAGMA foreign_key_check;
+-- Fail the entire D1 migration if ANY FK relationship was damaged; the
+-- fail-closed assertion is a constraint, not merely an ignored PRAGMA result.
+CREATE TABLE v2_ton_fk_guard(checked INTEGER NOT NULL CHECK(checked=1));
+INSERT INTO v2_ton_fk_guard(checked)
+ SELECT 0 FROM pragma_foreign_key_check LIMIT 1;
+DROP TABLE v2_ton_fk_guard;
 -- The existing children still point to unchanged primary keys. Clearing the
 -- deferred-violation bookkeeping after explicit FK validation is required by
 -- SQLite when parent tables were rebuilt in place.
