@@ -52,4 +52,7 @@ jobs:
           node --check payments/scripts/install-telegram-wallet-payments.mjs
           node --test payments/scripts/install-telegram-wallet-payments.test.mjs
           node --check payments/frontend/telegram-miniapp/stars-panel.js
+          node --check payments/scripts/refresh-staged-telegram-stars.mjs
+          node --check payments/scripts/retire-standalone-stars-shop.mjs
+          node --check payments/integration/telegram-stars/refunds.mjs
           node --check payments/integration/telegram-stars/stars-telegram-shop.mjs
