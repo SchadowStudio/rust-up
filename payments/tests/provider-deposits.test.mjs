@@ -169,7 +169,7 @@ test('payment provider methods are RUB EUR USD and the five supported crypto net
  const data=await r.json();
  assert.deepEqual(data.fiatCurrencies.map(x=>x.currency),['RUB','EUR','USD']);
  assert.equal(data.supportedAssets.length,5);
- assert.match(data.note,/Fiat denotes invoice value/);
+ assert.match(data.note,/Fiat is invoice value/);
 });
 test('provider stays disabled without real merchant approval and infrastructure',async()=>{
  const db=new FakeD1(await digestHex(API_KEY),'RUB');
