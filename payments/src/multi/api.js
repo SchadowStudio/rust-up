@@ -115,15 +115,17 @@ async function createInvoice(db,project,b,req,env,{deposit=false}={},now=Date.no
    (id,project_id,project_order_ref,idempotency_key,request_hash,sku,
     fiat,amount_minor,asset,chain,receive_address,amount_atomic,
     rate_numerator,rate_denominator,created_at_ms,expires_at_ms)
-   SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-   WHERE EXISTS(SELECT 1 FROM deposit_addresses
-     WHERE chain=? AND address=? AND assigned_intent=?)
+   SELECT CASE WHEN
+     EXISTS(SELECT 1 FROM deposit_addresses
+       WHERE chain=? AND address=? AND assigned_intent=?)
      AND EXISTS(SELECT 1 FROM v2_invoice_quota
-     WHERE project_id=? AND bucket_minute_ms=? AND last_invoice_id=?)`)
-  .bind(id,project.id,orderRef,key,requestHash,invoiceSku,product.currency,
+       WHERE project_id=? AND bucket_minute_ms=? AND last_invoice_id=?)
+     THEN ? ELSE NULL END,
+     ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?`)
+  .bind(quoted.chain,pool.address,id,project.id,bucketMinute,id,
+   id,project.id,orderRef,key,requestHash,invoiceSku,product.currency,
    product.amount_minor,b.asset,quoted.chain,pool.address,quoted.amountAtomic,
-   quoted.rateNumerator,quoted.rateDenominator,now,quoted.expiry,
-   quoted.chain,pool.address,id,project.id,bucketMinute,id)
+   quoted.rateNumerator,quoted.rateDenominator,now,quoted.expiry)
  ];
  try{
   const [debited,reserved,insert]=await db.batch(changes);
