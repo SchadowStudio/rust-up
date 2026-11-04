@@ -25,7 +25,7 @@ test('hashes must match chain',()=>{
  assert.equal(evm('0x'+'AB'.repeat(20)),'0x'+'ab'.repeat(20));
 });
 test('TRON address checksum including real USDT contract',async()=>{
- assert.equal(await tronHex('TR7NHqjeKQxGTCi8q8ZY4pL8otq'),
+ assert.equal(await tronHex('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'),
  '41a614f803b6fd780986a42c78ec9c7f77e6ded13c');
  await assert.rejects(()=>tronHex('TR7NHqjeKQxGTCi8q8ZY4pL8ot1'));
 });
