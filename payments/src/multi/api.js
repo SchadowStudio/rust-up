@@ -8,6 +8,7 @@ import {digestHex,authenticateProject} from './keys.js';
 import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity.js';
 import {settleV2,expireV2} from './settlement.js';
 import {deliverV2} from './delivery.js';
+import {scanMultiPayments} from './monitor.js';
 import {multiAdmin} from './admin.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
@@ -49,7 +50,7 @@ async function getInvoice(db,projectId,id){
    FROM v2_invoices i LEFT JOIN v2_delivery_outbox o ON o.invoice_id=i.id
    WHERE i.project_id=? AND i.id=?`).bind(projectId,id).first();
 }
-async function createInvoice(db,project,b,req,now=Date.now()){
+async function createInvoice(db,project,b,req,env,now=Date.now()){
  const orderRef=requireOrderRef(b.projectOrderRef),key=requireIdempotency(req.headers.get('idempotency-key'));
  if(!cleanSku(b.sku)||!ASSETS[b.asset])return fail('invalid_product_or_asset');
  const requestHash=await digestHex(JSON.stringify({sku:b.sku,asset:b.asset,ref:orderRef}));
@@ -61,7 +62,7 @@ async function createInvoice(db,project,b,req,now=Date.now()){
  }
  const recent=await db.prepare(`SELECT COUNT(*) AS n FROM v2_invoices
   WHERE project_id=? AND created_at_ms>=?`).bind(project.id,now-60000).first();
- const quota=Math.max(1,Math.min(10000,Number(envValue(req,'dummy')||1000)));
+ const quota=Math.max(1,Math.min(10000,Number(env.MULTI_MAX_INVOICES_PER_MINUTE)||1000));
  if(recent.n>=quota)return fail('project_capacity_exceeded',429);
  const product=await db.prepare(`SELECT currency,amount_minor,title FROM v2_products
   WHERE project_id=? AND sku=? AND status='active'`).bind(project.id,b.sku).first();
@@ -107,7 +108,6 @@ async function createInvoice(db,project,b,req,now=Date.now()){
  const invoice=await getInvoice(db,project.id,id);
  return json({ok:true,invoice:responseInvoice(invoice)},201);
 }
-function envValue(_request,_key){return null}
 async function verifyInvoice(db,project,invoice,b,env){
  if(invoice.status==='verified')
   return json({ok:true,invoice:responseInvoice(invoice,invoice.delivered!=null)});
@@ -143,7 +143,7 @@ async function projectRoute(req,env,url){
  if(url.pathname==='/v2/me'&&req.method==='GET')
   return json({ok:true,projectId:project.id});
  if(url.pathname==='/v2/invoices'&&req.method==='POST')
-  return createInvoice(env.DB,project,await body(req),req);
+  return createInvoice(env.DB,project,await body(req),req,env);
  if(url.pathname==='/v2/events'&&req.method==='GET')
   return listEvents(env.DB,project.id,url);
  const found=/^\/v2\/invoices\/([a-zA-Z0-9-]+)(\/verify)?$/.exec(url.pathname);
@@ -174,7 +174,7 @@ export default {
  fetch:handleMulti,
  async scheduled(_event,env,ctx){
   ctx.waitUntil(Promise.allSettled([
-   expireV2(env.DB),deliverV2(env)
+   expireV2(env.DB),deliverV2(env),scanMultiPayments(env)
   ]).then(results=>{
    for(const r of results)if(r.status==='rejected')console.error('multi-payments background job failed');
   }));
