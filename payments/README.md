@@ -1,5 +1,19 @@
 # RUST UP — own cryptocurrency payment service (development branch)
 
+> **Neuer Stand (Multi-Projekt-Provider):** Das eigenständige, headless
+> Backend unter `src/multi/` ist die aktuelle Entwicklungsgrundlage.
+> Einzahlungen werden pro Projekt in RUB/EUR/USD berechnet und in BTC, ETH,
+> TRX oder USDT bezahlt. Das bisherige Beispiel unten betrifft das ältere
+> einzelne Telegram-Projekt und wird nicht produktiv aktiviert.
+>
+> - [Wallet-Import, Trust Wallet und neue Coins](./WALLET-COIN-ONBOARDING-DE.md)
+> - [Projektübergreifende Integrationen](./PROJECT-INTEGRATIONS-DE.md)
+> - [Sicherheits- und Ausfallkonzept](./SECURITY-FAILOVER-DE.md)
+> - [Headless CLI ohne eigene Provider-Website](./HEADLESS-CLI-DE.md)
+>
+> Neue Assets werden über die zentrale Registry und Coin-Vorlagen vorbereitet,
+> aber **nie** ungeprüft automatisch für echte Zahlungen freigeschaltet.
+
 **Branch:** `feature/self-hosted-crypto-payments`. **Not deployed, not integrated,
 and NOT enabled in the existing Telegram Mini App.** The live original Worker
 `rustup-bot.ttzoomrust.workers.dev` is not part of this repository.
