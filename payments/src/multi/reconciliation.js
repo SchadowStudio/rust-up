@@ -1,7 +1,7 @@
 // Independent post-settlement reconciliation. A delivered webhook is not
 // irreversible blockchain finality. This is an operator-alerting safety net;
 // it NEVER spends wallet funds, revokes credit, or falsely marks a refund.
-import {verifyChainPaymentQuorum} from './quorum.js';
+import {verifyRecordedInvoice} from './receipt-proof.js';
 
 const MAX_AGE_DAYS=30;
 const clamp=(n,lo,hi,def)=>(Number.isSafeInteger(Number(n))&&Number(n)>=lo&&Number(n)<=hi)?
@@ -38,7 +38,7 @@ export async function auditVerifiedInvoices(env,now=Date.now()){
   report.checked++;
   try{
    if(!invoice.tx_hash)throw Error('missing_verified_transaction');
-   const proof=await verifyChainPaymentQuorum(invoice,invoice.tx_hash,env);
+   const {proof}=await verifyRecordedInvoice(db,invoice,env);
    if(proof.txHash!==invoice.tx_hash||
       BigInt(proof.actualAtomic)<BigInt(invoice.amount_atomic)||
       proof.paymentTimeMs<invoice.created_at_ms-300000||
