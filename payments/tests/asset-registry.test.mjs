@@ -43,7 +43,7 @@ test('extension rejects unsafe/mismatched or unsupported coin metadata',()=>{
  for(const value of [
   {asset:'../wallet',chain:'ethereum',standard:'erc20',decimals:6},
   {asset:'USDC_TRC20',chain:'ethereum',standard:'trc20',decimals:6},
-  {asset:'USDC',chain:'unknown',standard:'native',decimals:6},
+  {asset:'USDC',chain:'wrong.chain',standard:'native',decimals:6},
   {asset:'BTC',chain:'bitcoin',standard:'native',decimals:8},
   {asset:'ERC20',chain:'ethereum',standard:'erc20',decimals:19}
  ])assert.throws(()=>planCoinExtension(value));
