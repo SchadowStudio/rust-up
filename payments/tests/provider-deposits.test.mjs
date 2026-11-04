@@ -78,7 +78,7 @@ class FakeD1 {
   if(!sql[0].includes('v2_invoice_quota')||!sql[1].includes('deposit_addresses')||
      !sql[2].includes('INSERT INTO v2_invoices'))
    throw Error('missing atomic invoice safeguards');
-  const p=stmts[2].args;
+  const p=stmts[2].args.slice(6); // first six bind values enforce the atomic reservation guard
   this.orders.push({
    id:p[0],project_id:p[1],project_order_ref:p[2],idempotency_key:p[3],
    request_hash:p[4],sku:p[5],fiat:p[6],amount_minor:p[7],asset:p[8],
