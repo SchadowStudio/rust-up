@@ -1,0 +1,21 @@
+# Rate oracle is a separate, independently deployed Worker.
+name = "rustup-multi-rates-staging"
+main = "src/multi/fx-worker.js"
+compatibility_date = "2026-11-04"
+
+[vars]
+MULTI_AUTO_FX_ENABLED = "false"
+MULTI_RATE_BUFFER_BPS = "100"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rustup-multi-payments-staging"
+database_id = "REPLACE_WITH_SAME_D1_DATABASE_UUID"
+
+# 1 call per price source every 10 minutes (~4,320 calls/month).
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Set these as Cloudflare Worker secrets:
+# wrangler secret put COINGECKO_DEMO_KEY
+# wrangler secret put CRYPTOCOMPARE_API_KEY
