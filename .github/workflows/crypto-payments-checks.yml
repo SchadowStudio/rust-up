@@ -42,3 +42,10 @@ jobs:
           node --check payments/scripts/patch-existing-support-admin-frontend.mjs
           node --test payments/scripts/patch-existing-support-admin-frontend.test.mjs
           node --check payments/frontend/support-admin/payments-tab.js
+          node --check payments/integration/telegram-stars/stars-live-bridge.mjs
+          node --check payments/integration/telegram-stars/stars-existing-worker-wrapper.mjs
+          node --check payments/integration/telegram-stars/worker.stars-entry.mjs
+          node --check payments/scripts/prepare-stars-recovered-worker.mjs
+          node --check payments/scripts/install-stars-shop.mjs
+          node --check payments/frontend/stars-shop/app.js
+          node --check payments/frontend/stars-shop/config.js
