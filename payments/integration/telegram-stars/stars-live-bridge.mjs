@@ -57,7 +57,13 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
  if(receipt&&receipt.currency!=='XTR')return false;
 
  const db=env?.PAYMENTS_DB;
- const enabled=await available(env);
+ let enabled=false;
+ try{enabled=await available(env);}
+ catch{
+  if(!q)throw Error('payment_db_unavailable_retry_receipt');
+  // Never leave a precheckout unanswered because of a database read failure.
+  enabled=false;
+ }
  // Even with gates OFF, legitimate already-approved receipts MUST be stored.
  if(receipt&&!db)throw Error('payment_db_unavailable_retry_receipt');
  if(q&&!db){
@@ -68,8 +74,17 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
  }
  const guarded=asPaymentsEnv(env,enabled);
  if(q){
-  // Answer within Telegram's 10-second deadline, including DB failures.
+  // Never approve payment unless the deterministic delivery snapshot exists.
+  // This protects users from being charged for an order with nothing to deliver.
   try{
+   if(enabled&&UUID.test(String(q.invoice_payload))){
+    const snapshot=await db.prepare(
+     'SELECT 1 FROM rustup_stars_order_content WHERE order_id=?'
+    ).bind(q.invoice_payload).first();
+    if(!snapshot)throw Error('stars_missing_delivery_snapshot');
+   }else if(enabled){
+    throw Error('stars_invalid_order_payload');
+   }
    await handleStarsUpdate(update,guarded,fetchImpl);
   }catch{
    await telegramApi(guarded,'answerPreCheckoutQuery',{
