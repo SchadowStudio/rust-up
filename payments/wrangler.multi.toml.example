@@ -10,6 +10,9 @@ MULTI_LIVE_ENABLED = "false"
 MULTI_OPERATOR_APPROVED = "false"
 MULTI_AUTO_SCAN_ENABLED = "false"
 MULTI_DELIVERY_ENABLED = "false"
+MULTI_AUTO_QUEUE_ENABLED = "false"
+MULTI_ADMIN_ORIGIN = "https://your-private-admin.example.com"
+MULTI_WEBHOOK_HOST_ALLOWLIST = ""
 MULTI_MAX_INVOICES_PER_MINUTE = "1000"
 ETHEREUM_START_BLOCK = "0"
 TRON_INDEXER_URL = "https://api.trongrid.io"
@@ -34,3 +37,16 @@ crons = ["*/2 * * * *"]
 # wrangler secret put BITCOIN_RPC_BASIC_B64
 # wrangler secret put BITCOIN_START_BLOCKHASH
 # No wallet seed/private key is EVER required by this Worker.
+
+# Optional scalable payment-candidate + delivery work queue. Create the queues
+# in Cloudflare first, then attach a trusted, privately managed chain indexer.
+[[queues.producers]]
+binding = "MULTI_EVENT_QUEUE"
+queue = "rustup-multi-events"
+
+[[queues.consumers]]
+queue = "rustup-multi-events"
+max_batch_size = 25
+max_batch_timeout = 5
+max_retries = 10
+dead_letter_queue = "rustup-multi-dead-letter"
