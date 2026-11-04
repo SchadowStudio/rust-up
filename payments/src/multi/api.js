@@ -9,6 +9,7 @@ import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity
 import {settleV2,expireV2} from './settlement.js';
 import {deliverV2} from './delivery.js';
 import {scanMultiPayments} from './monitor.js';
+import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
