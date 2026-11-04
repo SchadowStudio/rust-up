@@ -20,9 +20,12 @@ function bounds(env) {
 // the actual blockchain amount comes from the provider's signed quote.
 // No default real-world FX conversion is silently assumed.
 export async function createExternalVariableCryptoCheckout(env,{
-  verifiedExternalCustomerRef,merchantRequestId,amountMinor,currency,asset,
+  verifiedExternalCustomerRef,merchantRequestId,amountMinor,currency,asset,sourceChannel='external_store',
   fetchImpl=fetch
 }) {
+  // Reject third-party cryptocurrency purchases in Telegram Mini Apps/Bots.
+  if(sourceChannel==='telegram-miniapp'||sourceChannel==='telegram-bot')
+   throw Error('telegram_digital_goods_require_stars');
   if(env.EXTERNAL_VARIABLE_CRYPTO_CHECKOUT_ENABLED!=='true')
     throw Error('external_variable_crypto_disabled');
   const {min,max}=bounds(env);
