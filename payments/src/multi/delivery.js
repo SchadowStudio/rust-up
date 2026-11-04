@@ -18,13 +18,14 @@ export async function deliverV2(env,now=Date.now(),onlyEventId=null){
  const base=`SELECT o.event_id,o.project_id,o.invoice_id,
     o.event_body,o.attempts,o.next_attempt_ms,p.webhook_url,p.status
    FROM v2_delivery_outbox o JOIN v2_projects p ON p.id=o.project_id
-   WHERE o.delivered_at_ms IS NULL AND o.next_attempt_ms<=?`;
+   WHERE o.delivered_at_ms IS NULL AND o.next_attempt_ms<=?
+   AND p.status='active'`;
  const rows=onlyEventId?
   await db.prepare(base+' AND o.event_id=? LIMIT 1').bind(now,onlyEventId).all():
   await db.prepare(base+' ORDER BY o.created_at_ms LIMIT 25').bind(now).all();
  const result={attempted:0,delivered:0,deferred:0,failed:0};
  for(const event of rows.results||[]){
-  if(event.status!=='active'){result.deferred++;continue;}
+  // Paused projects are excluded in SQL and cannot starve active projects.
   // Lease each event before any network access. Crashes eventually retry.
   const lease=await db.prepare(`UPDATE v2_delivery_outbox
    SET next_attempt_ms=?,attempts=attempts+1
