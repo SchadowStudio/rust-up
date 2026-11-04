@@ -39,7 +39,7 @@ function safeInvoice(i,order) {
   };
 }
 
-async function providerInvoice(env,order,fetchImpl) {
+export async function providerInvoice(env,order,fetchImpl) {
   const origin=gatewayOrigin(env.CRYPTO_PROVIDER_URL);
   if(!/^rup2_[0-9a-f]{64}$/.test(env.CRYPTO_PROJECT_API_KEY||'')||
     !UUID.test(env.CRYPTO_PROJECT_ID||''))
