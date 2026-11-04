@@ -11,6 +11,7 @@ import {deliverV2,notifyDeliveryQueue} from './delivery.js';
 import {scanMultiPayments} from './monitor.js';
 import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
+import {readinessV2} from './readiness.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
  'x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
@@ -26,25 +27,7 @@ async function body(req){
  if(!obj||Array.isArray(obj)||typeof obj!=='object')throw Error('invalid_body');
  return obj;
 }
-export function checkoutReady(env){
- return !!env.DB && env.MULTI_LIVE_ENABLED==='true' &&
-  env.MULTI_OPERATOR_APPROVED==='true' &&
-  env.MULTI_AUTO_SCAN_ENABLED==='true'&&
-  env.MULTI_DELIVERY_ENABLED==='true'&&
-  typeof env.MULTI_WEBHOOK_MASTER_KEY==='string'&&
-  env.MULTI_WEBHOOK_MASTER_KEY.length>=40 &&
-  /^https:\/\//.test(String(env.ETHEREUM_RPC_URL||'')) &&
-  /^https:\/\//.test(String(env.TRON_RPC_URL||'')) &&
-  /^https:\/\//.test(String(env.TRON_INDEXER_URL||'')) &&
-  /^https:\/\//.test(String(env.BITCOIN_RPC_URL||'')) &&
-  typeof env.BITCOIN_RPC_BASIC_B64==='string' &&
-  env.BITCOIN_RPC_BASIC_B64.length>16 &&
-  /^[a-f0-9]{64}$/i.test(String(env.BITCOIN_START_BLOCKHASH||'')) &&
-  Number.isSafeInteger(Number(env.ETHEREUM_START_BLOCK)) &&
-  Number(env.ETHEREUM_START_BLOCK)>0 &&
-  /^0x[a-f0-9]{40}$/i.test(String(env.USDT_ERC20_CONTRACT||'')) &&
-  /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(String(env.USDT_TRC20_CONTRACT||''));
-}
+export function checkoutReady(env){return readinessV2(env).ready;}
 function responseInvoice(row,delivered=false){
  const conf=ASSETS[row.asset];
  return {invoiceId:row.id,projectOrderRef:row.project_order_ref,
