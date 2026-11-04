@@ -1,0 +1,68 @@
+name: Sync all branches from original RUST UP
+
+on:
+  schedule:
+    - cron: '3-58/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-all-branches
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge original branches into this fork
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fetch and merge all original branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream https://github.com/ttzoomrust-hub/rust-up.git
+          git fetch upstream '+refs/heads/*:refs/remotes/upstream/*' --prune
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
+
+          failed=0
+          while IFS= read -r ref; do
+            branch="${ref#refs/remotes/upstream/}"
+            [[ -n "$branch" && "$branch" != "HEAD" ]] || continue
+            echo "::group::Synchronizing $branch"
+
+            if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+              git switch --detach "refs/remotes/origin/$branch"
+              if git merge --no-edit "refs/remotes/upstream/$branch"; then
+                if ! git push origin "HEAD:refs/heads/$branch"; then
+                  echo "::error::Could not push branch: $branch"
+                  failed=1
+                fi
+              else
+                git merge --abort || true
+                echo "::warning::Merge conflict in $branch; skipping to protect existing changes"
+                failed=1
+              fi
+            else
+              if ! git push origin "refs/remotes/upstream/$branch:refs/heads/$branch"; then
+                echo "::error::Could not create new branch: $branch"
+                failed=1
+              fi
+            fi
+
+            echo "::endgroup::"
+          done < <(git for-each-ref --format='%(refname)' refs/remotes/upstream)
+
+          if [[ "$failed" -ne 0 ]]; then
+            echo "::error::One or more branches require manual attention"
+            exit 1
+          fi
