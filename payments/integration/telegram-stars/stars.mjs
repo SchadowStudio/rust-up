@@ -132,7 +132,9 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
 }
 
 export async function handleStarsUpdate(update, env, fetchImpl = fetch) {
-  if (env.STARS_PAYMENT_ENABLED !== 'true')
+  // Keep recording legitimate already-approved payments after a switch-off.
+  // The switch must reject new precheckout requests, not lose paid receipts.
+  if (env.STARS_PAYMENT_ENABLED !== 'true' && !update?.message?.successful_payment)
     return {handled:false,disabled:true};
   const q = update?.pre_checkout_query;
   if (q) {
