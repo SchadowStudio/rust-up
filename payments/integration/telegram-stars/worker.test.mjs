@@ -49,7 +49,7 @@ test('Stars Worker is publicly health-checkable but disabled by default',async()
 });
 test('Stars Worker rejects unauthorized origin and forged initData',async()=>{
  const env={STARS_PAYMENT_ENABLED:'true',
-   STARS_ALLOWED_ORIGIN:'https://store.example',TG_STARS_BOT_TOKEN:token,
+   STARS_ALLOWED_ORIGIN:'https://store.example',STARS_FIXED_PRODUCTS_ENABLED:'true',TG_STARS_BOT_TOKEN:token,
    DB:{}};
  let response=await worker.fetch(new Request('https://example.invalid/api/stars/checkout',{
    method:'POST',headers:{origin:'https://attacker.example','content-type':'application/json'},
