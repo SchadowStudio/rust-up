@@ -1,0 +1,25 @@
+// Config-level gates only. A green configuration check is NOT a substitute for
+// live receipt verification, wallet ownership proofs, backups and load testing.
+export function readinessV2(env){
+ const checks={
+  database:!!env.DB,
+  operatorApproval:env.MULTI_OPERATOR_APPROVED==='true',
+  acceptingDeposits:env.MULTI_LIVE_ENABLED==='true',
+  reconciliation:env.MULTI_AUTO_SCAN_ENABLED==='true',
+  webhookDelivery:env.MULTI_DELIVERY_ENABLED==='true',
+  webhookMasterSecret:typeof env.MULTI_WEBHOOK_MASTER_KEY==='string'&&env.MULTI_WEBHOOK_MASTER_KEY.length>=40,
+  ethereumRpc:/^https:\/\//i.test(String(env.ETHEREUM_RPC_URL||'')),
+  tronRpc:/^https:\/\//i.test(String(env.TRON_RPC_URL||'')),
+  tronIndexer:/^https:\/\//i.test(String(env.TRON_INDEXER_URL||'')),
+  bitcoinRpc:/^https:\/\//i.test(String(env.BITCOIN_RPC_URL||'')),
+  bitcoinAuth:typeof env.BITCOIN_RPC_BASIC_B64==='string'&&env.BITCOIN_RPC_BASIC_B64.length>16,
+  bitcoinStart:/^[a-f0-9]{64}$/i.test(String(env.BITCOIN_START_BLOCKHASH||'')),
+  ethereumStart:Number.isSafeInteger(Number(env.ETHEREUM_START_BLOCK))&&Number(env.ETHEREUM_START_BLOCK)>0,
+  erc20Contract:/^0x[a-f0-9]{40}$/i.test(String(env.USDT_ERC20_CONTRACT||'')),
+  trc20Contract:/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(String(env.USDT_TRC20_CONTRACT||'')),
+  approvedWebhookHosts:typeof env.MULTI_WEBHOOK_HOST_ALLOWLIST==='string'&&
+    env.MULTI_WEBHOOK_HOST_ALLOWLIST.split(',').some(x=>x.trim().length>5)
+ };
+ const missing=Object.keys(checks).filter(x=>!checks[x]);
+ return {ready:missing.length===0,missing};
+}
