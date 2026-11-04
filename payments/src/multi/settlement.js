@@ -1,4 +1,5 @@
 import {ASSETS,txId} from '../assets.js';
+import {verifyChainPayment} from '../chains.js';
 function validProof(invoice,proof){
  const rules=ASSETS[invoice.asset];
  if(!rules||rules.chain!==invoice.chain)throw Error('unsupported_asset');
@@ -61,4 +62,24 @@ export async function expireV2(db,now=Date.now()){
  return db.prepare(`UPDATE v2_invoices SET status='expired'
    WHERE status='awaiting_payment' AND expires_at_ms<?`)
   .bind(now).run();
+}
+
+/**
+ * Independently verify underpayments addressed to an invoice.
+ * Never issue a credit for a partial transfer. Preserve a manual review ticket
+ * so actual funds are not silently lost after a customer mistakes the amount.
+ */
+export async function reviewUnderpayment(db,invoice,hash,env,now=Date.now()){
+ const probe={...invoice,amount_atomic:'1'};
+ const proof=await verifyChainPayment(probe,hash,env);
+ if(BigInt(proof.actualAtomic)>=BigInt(invoice.amount_atomic))
+  return {status:'full_amount_needs_retry'};
+ if(proof.paymentTimeMs<invoice.created_at_ms-300000)
+  return {status:'not_an_invoice_payment'};
+ const reason=proof.paymentTimeMs>invoice.expires_at_ms?'late':'underpaid';
+ await db.prepare(`INSERT OR IGNORE INTO v2_payment_reviews
+  (id,invoice_id,tx_hash,reason,created_at_ms,actual_amount_atomic)
+  VALUES(?,?,?,?,?,?)`)
+  .bind(crypto.randomUUID(),invoice.id,proof.txHash,reason,now,proof.actualAtomic).run();
+ return {status:'manual_review',reason,receivedAtomic:proof.actualAtomic};
 }
