@@ -7,6 +7,8 @@ import {requireProjectId,isUuid,safeWebhookUrl} from './identity.js';
 import {readinessV2} from './readiness.js';
 import {paymentProfileAdmin,initializeProjectPayments} from './project-config.js';
 import {projectReport} from './project-reports.js';
+import {importPublicWalletReceivers,canonicalPublicAddress} from './public-wallet-import.js';
+import {ASSET_CATALOG,walletSetupPlan} from '../asset-registry.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
  'content-type':'application/json','cache-control':'no-store'}});
 const fail=(code,status=400)=>json({ok:false,error:code},status);
@@ -105,17 +107,23 @@ async function setRate(db,b){
 async function addReceiver(db,b){
  if(!['bitcoin','ethereum','tron'].includes(b.chain)||
     !await validateReceivingAddress(b.chain,b.address))return fail('invalid_receiver');
+ const address=canonicalPublicAddress(b.chain,b.address);
+ const existing=await db.prepare(b.chain==='ethereum'
+  ?'SELECT address FROM deposit_addresses WHERE chain=? AND address=? COLLATE NOCASE LIMIT 1'
+  :'SELECT address FROM deposit_addresses WHERE chain=? AND address=? LIMIT 1')
+  .bind(b.chain,address).first();
+ if(existing)return fail('receiver_already_registered',409);
  const now=Date.now();
  const [insert]=await db.batch([
   db.prepare(`INSERT OR IGNORE INTO deposit_addresses
    (chain,address,assigned_intent,source,added_at_ms,label,enabled)
-   VALUES(?,?,NULL,'trust_wallet',?,'v2_multi',0)`).bind(b.chain,b.address,now),
+   VALUES(?,?,NULL,'trust_wallet',?,'v2_multi',0)`).bind(b.chain,address,now),
   db.prepare(`INSERT INTO v2_operator_audit(id,action,project_id,details,created_at_ms)
    VALUES(?,'add_receiver',NULL,?,?)`)
    .bind(crypto.randomUUID(),JSON.stringify({chain:b.chain}),now)
  ]);
  if(!insert.meta?.changes)return fail('receiver_already_registered',409);
- return json({ok:true,chain:b.chain,address:b.address,status:'disabled'},201);
+ return json({ok:true,chain:b.chain,address,status:'disabled'},201);
 }
 async function toggle(db,resource,b,enabled){
  const now=Date.now();
@@ -229,6 +237,24 @@ export async function multiAdmin(request,env,url){
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
   if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
+  if(path==='/v2/admin/wallet-plan'&&request.method==='GET')
+   return json({ok:true,coins:Object.values(ASSET_CATALOG),networks:walletSetupPlan(),
+    neverRequestSecrets:true});
+  if(path==='/v2/admin/wallet-import'&&request.method==='POST'){
+   const requestBody=await readBody(request);
+   if(requestBody.confirmation!=='CONFIRM_PUBLIC_ADDRESS_IMPORT')
+    return fail('confirmation_required');
+   const {confirmation,...manifest}=requestBody;
+   try{
+    const result=await importPublicWalletReceivers(db,manifest);
+    return json({ok:true,...result},201);
+   }catch(error){
+    if(['invalid_public_wallet_manifest','invalid_public_receiver','public_addresses_only',
+      'duplicate_public_receiver','receiver_already_registered'].includes(error.message))
+     return fail(error.message,error.message==='receiver_already_registered'?409:400);
+    return fail('receiver_import_failed',503);
+   }
+  }
   if(path==='/v2/admin/receivers'&&request.method==='POST')return addReceiver(db,await readBody(request));
   if(path==='/v2/admin/keys'&&request.method==='POST')return keys(db,await readBody(request));
   if(path==='/v2/admin/keys/revoke'&&request.method==='POST'){
