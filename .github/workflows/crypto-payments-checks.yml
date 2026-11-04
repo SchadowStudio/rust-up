@@ -22,11 +22,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate payment JavaScript
-        run: cd payments && npm run validate
-      - name: Build isolated Trust Wallet operator console
-        run: cd payments && npm run build:operator
-      - name: Build public checkout module
-        run: cd payments && npm run build:checkout
-      - name: Test D1 SQLite uniqueness constraints
-        run: python3 -m unittest discover -s payments/tests -p 'schema*_test.py' -v
+      - name: Run same 0-euro offline suite as Windows
+        run: cd payments && npm run test:local
