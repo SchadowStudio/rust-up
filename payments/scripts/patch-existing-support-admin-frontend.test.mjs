@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {patchAdminFrontendIndex,patchAdminFrontendApp} from './patch-existing-support-admin-frontend.mjs';
+import {patchAdminFrontendIndex,patchAdminFrontendApp,gitBlobHash} from './patch-existing-support-admin-frontend.mjs';
 test('existing Support Mini App gets a fifth payment tab and separate script',()=>{
  const html='<link rel="stylesheet" href="style.css?v=20261105d">\n'+
   '<button type="button" data-tab="log">Журнал</button>\n'+
@@ -21,4 +21,11 @@ test('admin app loads payment tab through existing signed Telegram initData API'
  assert.match(result,/payments'\].includes\(start\)/);
  assert.match(result,/usersPage\(\)/);
  assert.throws(()=>patchAdminFrontendApp(result),/website_layout_changed/);
+});
+
+test('Windows CRLF is the same tracked Git blob as LF without accepting changed content',()=>{
+ const lf='<!doctype html>\n<html>\n<title>RUST UP</title>\n';
+ const crlf=lf.replace(/\n/g,'\r\n');
+ assert.equal(gitBlobHash(crlf),gitBlobHash(lf));
+ assert.notEqual(gitBlobHash(crlf+'tampering'),gitBlobHash(lf));
 });
