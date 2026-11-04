@@ -12,6 +12,7 @@ import {scanMultiPayments} from './monitor.js';
 import {consumePaymentEvents} from './candidate.js';
 import {multiAdmin} from './admin.js';
 import {readinessV2} from './readiness.js';
+import {getProjectMethodPolicy,getProjectPaymentConfig} from './project-config.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
  'x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
@@ -78,11 +79,19 @@ async function createInvoice(db,project,b,req,env,{deposit=false}={},now=Date.no
   await db.prepare(`SELECT currency,amount_minor,title FROM v2_products
    WHERE project_id=? AND sku=? AND status='active'`).bind(project.id,b.sku).first();
  if(!product)return fail('product_unavailable',404);
+ const policy=await getProjectMethodPolicy(db,project.id,product.currency,b.asset);
+ if(!policy||!policy.invoicesEnabled||
+    (deposit?!policy.depositsEnabled:!policy.productsEnabled)||
+    !policy.fiatEnabled||!policy.cryptoEnabled)
+  return fail('project_payment_method_disabled',403);
+ if(product.amount_minor<policy.minMinor||product.amount_minor>policy.maxMinor)
+  return fail('project_payment_limit_exceeded',400);
  const rate=await db.prepare(`SELECT fiat,asset,numerator_atomic,denominator_minor,
   valid_from_ms,expires_at_ms,enabled FROM v2_exchange_rates
   WHERE fiat=? AND asset=?`).bind(product.currency,b.asset).first();
  if(!rate)return fail('rate_unavailable',503);
  const quoted=quoteFromRate(product,rate,b.asset,now);
+ quoted.expiry=Math.min(quoted.expiry,now+policy.lifetimeMinutes*60000);
  const pool=await db.prepare(`SELECT address FROM deposit_addresses
    WHERE chain=? AND enabled=1 AND assigned_intent IS NULL ORDER BY added_at_ms LIMIT 1`)
   .bind(quoted.chain).first();
@@ -182,15 +191,22 @@ async function projectRoute(req,env,url){
  catch{return fail('unauthorized_project',401);}
  if(url.pathname==='/v2/me'&&req.method==='GET')
   return json({ok:true,projectId:project.id});
- if(url.pathname==='/v2/methods'&&req.method==='GET')
-  return json({ok:true,fiatCurrencies:['RUB','EUR','USD'],
-   supportedAssets:Object.entries(ASSETS).map(([asset,details])=>({
-    asset,chain:details.chain,decimals:details.decimals,
-    minConfirmations:details.confirmations
+ if(url.pathname==='/v2/methods'&&req.method==='GET'){
+  const profile=await getProjectPaymentConfig(env.DB,project.id);
+  if(!profile||!profile.invoicesEnabled)return fail('project_payment_integration_disabled',403);
+  return json({ok:true,projectId:project.id,displayName:profile.displayName,
+   depositsEnabled:profile.depositsEnabled,
+   productsEnabled:profile.productsEnabled,
+   fiatCurrencies:profile.fiatMethods.filter(x=>x.enabled).map(x=>({
+    currency:x.currency,minMinor:x.minMinor,maxMinor:x.maxMinor
    })),
-   depositMinMinor:Number(env.MULTI_DEPOSIT_MIN_MINOR||100),
-   depositMaxMinor:Number(env.MULTI_DEPOSIT_MAX_MINOR||100000000),
-   note:'Fiat denotes invoice value. Settlement is made in cryptocurrency.'});
+   supportedAssets:profile.cryptoMethods.filter(x=>x.enabled).map(x=>({
+    asset:x.asset,chain:x.chain,
+    decimals:ASSETS[x.asset].decimals,
+    minConfirmations:ASSETS[x.asset].confirmations
+   })),
+   note:'Fiat is invoice value; funds are received in cryptocurrency. No game credit here.'});
+ }
  if(url.pathname==='/v2/invoices'&&req.method==='POST')
   return createInvoice(env.DB,project,await body(req),req,env);
  if(url.pathname==='/v2/deposits'&&req.method==='POST')
