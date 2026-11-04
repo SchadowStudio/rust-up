@@ -27,8 +27,8 @@ function database(){
  const sql=new DatabaseSync(':memory:');
  for(const name of ['migration.sql','payment-controls-migration.sql','stars-ready-migration.sql'])
   sql.exec(fs.readFileSync(path.join(here,name),'utf8'));
- sql.prepare('UPDATE rustup_payment_settings SET enabled=1 WHERE channel IN (?,?)')
-  .run('master','stars');
+ sql.prepare('UPDATE rustup_payment_settings SET enabled=1,updated_by=?,updated_at_ms=? WHERE channel IN (?,?)')
+  .run(adminId,Date.now(),'master','stars');
  sql.prepare('INSERT INTO rustup_stars_products(sku,title,description,kind,price_stars,enabled) VALUES(?,?,?,?,?,?)')
   .run('fixed_badge','Support Badge','Permanent nontransferable badge','fixed_nontransferable',30,1);
  sql.prepare('INSERT INTO rustup_stars_fixed_content(sku,delivery_text) VALUES (?,?)')
@@ -126,7 +126,7 @@ test('Telegram-only integration: pay, unlock, replay, owner-bound purchases, ref
   assert.equal((await request('purchases',{},userId+1)).json.purchases.length,0);
   assert.equal(await receiveExistingBotStarsUpdate(msg,env,telegram.api),true);
   assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM rustup_stars_orders WHERE status=?').get('paid').n,1);
-  sql.prepare("UPDATE rustup_payment_settings SET enabled=0 WHERE channel='master'").run();
+  sql.prepare("UPDATE rustup_payment_settings SET enabled=0,updated_by=?,updated_at_ms=? WHERE channel='master'").run(adminId,Date.now());
   assert.equal((await request('catalog')).json.checkoutEnabled,false);
   assert.equal((await request('checkout',{sku:'fixed_badge'})).status,503);
   // A paid receipt still gets idempotently replayed after the admin kill-switch.
