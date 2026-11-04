@@ -1,11 +1,6 @@
-// Currency and network are inseparable: USDT exists on multiple chains.
-export const ASSETS = Object.freeze({
- BTC:{chain:'bitcoin',decimals:8,confirmations:3},
- ETH:{chain:'ethereum',decimals:18,confirmations:12},
- TRX:{chain:'tron',decimals:6,confirmations:1},
- USDT_ERC20:{chain:'ethereum',decimals:6,confirmations:12},
- USDT_TRC20:{chain:'tron',decimals:6,confirmations:1}
-});
+// All supported assets and their networks are centrally reviewed in one manifest.
+import {ASSETS} from './asset-registry.js';
+export {ASSETS};
 export const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 export function decimalToAtomic(amount, decimals) {
  if(typeof amount!=='string'||!/^(0|[1-9][0-9]{0,24})(\.[0-9]{1,18})?$/.test(amount)) throw new Error('invalid_amount');
