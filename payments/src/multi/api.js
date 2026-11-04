@@ -2,7 +2,7 @@
 // Merchant backend calls this API with project-scoped credentials.
 import {ASSETS} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
-import {verifyChainPayment} from '../chains.js';
+import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 import {quoteFromRate,allowedFiat} from './fiat.js';
 import {digestHex,authenticateProject} from './keys.js';
 import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity.js';
