@@ -27,6 +27,34 @@ export function walletSetupPlan(){
   requiresUniqueUnusedAddressPerInvoice:true
  }));
 }
+// Explicit verifier certification is separate from the display catalog.
+// New symbols cannot piggyback on USDT Transfer-event logic.
+const CERTIFIED_ADAPTERS=Object.freeze({
+ BTC:'bitcoin-core',ETH:'evm-native',TRX:'tron-native',
+ USDT_ERC20:'evm-erc20',USDT_TRC20:'tron-trc20'
+});
+export const PINNED_MAINNET_CONTRACTS=Object.freeze({
+ USDT_ERC20:Object.freeze({
+  envKey:'USDT_ERC20_CONTRACT',
+  address:'0xdAC17F958D2ee523a2206206994597C13D831ec7'
+ }),
+ USDT_TRC20:Object.freeze({
+  envKey:'USDT_TRC20_CONTRACT',
+  address:'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+ })
+});
+export function requireCertifiedPaymentAsset(asset,env={}){
+ const item=ASSET_CATALOG[asset];
+ if(!item||CERTIFIED_ADAPTERS[asset]!==item.adapter)
+  throw Error('asset_verifier_not_certified');
+ const pinned=PINNED_MAINNET_CONTRACTS[asset];
+ if(item.standard!=='native'){
+  if(!pinned||String(env[pinned.envKey]||'').toLowerCase()!==
+      pinned.address.toLowerCase())
+   throw Error('untrusted_token_mainnet_contract');
+ }
+ return item;
+}
 export function planCoinExtension({asset,chain,standard,decimals}={}){
  if(typeof asset!=='string'||!/^[A-Z][A-Z0-9_]{1,31}$/.test(asset)||
     typeof chain!=='string'||!['bitcoin','ethereum','tron'].includes(chain)||
