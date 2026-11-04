@@ -95,7 +95,9 @@ async function route(request,env,url,uid){
 export default {
  async fetch(request,env){
   const url=new URL(request.url),origin=request.headers.get('origin');
-  if(origin&&origin!==env.ALLOWED_ORIGIN)return error('origin_denied',403);
+  const isOperator=url.pathname.startsWith('/v1/operator/');
+  const allowedOrigin=isOperator?env.OPERATOR_ORIGIN:env.ALLOWED_ORIGIN;
+  if(origin&&origin!==allowedOrigin)return error('origin_denied',403);
   const cors=origin?{'access-control-allow-origin':origin,'vary':'origin',
    'access-control-allow-headers':'content-type,x-telegram-init-data',
    'access-control-allow-methods':'GET,POST,OPTIONS'}:{};
