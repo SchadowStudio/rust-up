@@ -3,7 +3,7 @@
 import {ASSETS} from '../assets.js';
 import {validateReceivingAddress} from '../address.js';
 import {verifyChainPayment} from '../chains.js';
-import {quoteFromRate} from './fiat.js';
+import {quoteFromRate,allowedFiat} from './fiat.js';
 import {digestHex,authenticateProject} from './keys.js';
 import {isUuid,requireIdempotency,requireOrderRef,compactError} from './identity.js';
 import {settleV2,expireV2,reviewUnderpayment} from './settlement.js';
@@ -45,10 +45,22 @@ async function getInvoice(db,projectId,id){
    FROM v2_invoices i LEFT JOIN v2_delivery_outbox o ON o.invoice_id=i.id
    WHERE i.project_id=? AND i.id=?`).bind(projectId,id).first();
 }
-async function createInvoice(db,project,b,req,env,now=Date.now()){
+async function createInvoice(db,project,b,req,env,{deposit=false}={},now=Date.now()){
  const orderRef=requireOrderRef(b.projectOrderRef),key=requireIdempotency(req.headers.get('idempotency-key'));
- if(!cleanSku(b.sku)||!ASSETS[b.asset])return fail('invalid_product_or_asset');
- const requestHash=await digestHex(JSON.stringify({sku:b.sku,asset:b.asset,ref:orderRef}));
+ if(!ASSETS[b.asset]||(!deposit&&!cleanSku(b.sku)))
+  return fail('invalid_product_or_asset');
+ // Only the project backend (authenticated by its API key) may set a deposit's
+ // fiat amount; the checkout browser never has access to project API credentials.
+ const minMinor=Number(env.MULTI_DEPOSIT_MIN_MINOR||100);
+ const maxMinor=Number(env.MULTI_DEPOSIT_MAX_MINOR||100000000);
+ if(deposit&&(!allowedFiat(b.currency)||!Number.isSafeInteger(b.amountMinor)||
+    b.amountMinor<minMinor||b.amountMinor>maxMinor))
+  return fail('invalid_deposit_amount',400);
+ const invoiceSku=deposit?'__crypto_deposit__':b.sku;
+ const requestHash=await digestHex(JSON.stringify({
+  kind:deposit?'deposit':'product',sku:invoiceSku,asset:b.asset,ref:orderRef,
+  ...(deposit?{currency:b.currency,amountMinor:b.amountMinor}:{})
+ }));
  const existing=await db.prepare(`SELECT * FROM v2_invoices
   WHERE project_id=? AND idempotency_key=?`).bind(project.id,key).first();
  if(existing){
@@ -59,8 +71,9 @@ async function createInvoice(db,project,b,req,env,now=Date.now()){
  // the address reservation and invoice creation; no check-then-write race.
  const quota=Math.max(1,Math.min(10000,Number(env.MULTI_MAX_INVOICES_PER_MINUTE)||1000));
  const bucketMinute=Math.floor(now/60000)*60000;
- const product=await db.prepare(`SELECT currency,amount_minor,title FROM v2_products
-  WHERE project_id=? AND sku=? AND status='active'`).bind(project.id,b.sku).first();
+ const product=deposit?{currency:b.currency,amount_minor:b.amountMinor,title:'Crypto deposit'}:
+  await db.prepare(`SELECT currency,amount_minor,title FROM v2_products
+   WHERE project_id=? AND sku=? AND status='active'`).bind(project.id,b.sku).first();
  if(!product)return fail('product_unavailable',404);
  const rate=await db.prepare(`SELECT fiat,asset,numerator_atomic,denominator_minor,
   valid_from_ms,expires_at_ms,enabled FROM v2_exchange_rates
@@ -95,7 +108,7 @@ async function createInvoice(db,project,b,req,env,now=Date.now()){
      WHERE chain=? AND address=? AND assigned_intent=?)
      AND EXISTS(SELECT 1 FROM v2_invoice_quota
      WHERE project_id=? AND bucket_minute_ms=? AND last_invoice_id=?)`)
-  .bind(id,project.id,orderRef,key,requestHash,b.sku,product.currency,
+  .bind(id,project.id,orderRef,key,requestHash,invoiceSku,product.currency,
    product.amount_minor,b.asset,quoted.chain,pool.address,quoted.amountAtomic,
    quoted.rateNumerator,quoted.rateDenominator,now,quoted.expiry,
    quoted.chain,pool.address,id,project.id,bucketMinute,id)
@@ -168,6 +181,8 @@ async function projectRoute(req,env,url){
   return json({ok:true,projectId:project.id});
  if(url.pathname==='/v2/invoices'&&req.method==='POST')
   return createInvoice(env.DB,project,await body(req),req,env);
+ if(url.pathname==='/v2/deposits'&&req.method==='POST')
+  return createInvoice(env.DB,project,await body(req),req,env,{deposit:true});
  if(url.pathname==='/v2/events'&&req.method==='GET')
   return listEvents(env.DB,project.id,url);
  const found=/^\/v2\/invoices\/([a-zA-Z0-9-]+)(\/verify)?$/.exec(url.pathname);
