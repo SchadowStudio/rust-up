@@ -30,7 +30,12 @@ async function userIdFromBody(body,env){
 }
 async function available(env){
  // All three layers fail closed. A /pay stars on by itself never permits money.
+ // No Stars charge without a viable support/refund operator path.
+ const authorizedRefundOperator=typeof env.PAYMENT_ADMIN_IDS==='string'&&
+  env.PAYMENT_ADMIN_IDS.split(',').some(id=>/^[1-9][0-9]{0,15}$/.test(id.trim()));
  return env.STARS_FIXED_PRODUCTS_ENABLED==='true'&&
+  env.STARS_REFUNDS_ENABLED==='true'&&
+  authorizedRefundOperator&&
   !!env.PAYMENTS_DB&&
   await isPaymentEnabled(env,'stars');
 }
