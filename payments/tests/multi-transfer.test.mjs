@@ -17,10 +17,10 @@ const proof=(txHash,actualAtomic)=>({
  paymentTimeMs:TIME,confirmations:20
 });
 function inMemory(){
- const parts=new Map(),events=[],claims=[],queue=new Map();
+ const parts=new Map(),events=[],claims=[],queue=new Map(),reviews=[];
  let paid=false;
  const db={
-  parts,events,claims,queue,
+  parts,events,claims,queue,reviews,
   prepare(sql){return {bind(...args){return {
    sql,args,
    async first(){
@@ -50,6 +50,10 @@ function inMemory(){
     }
     if(sql.includes('INSERT INTO v2_partial_reconcile_queue')){
      queue.set(args[0],{next_check_ms:args[1],attempts:0});
+     return {meta:{changes:1}};
+    }
+    if(sql.includes('INSERT OR IGNORE INTO v2_payment_reviews')){
+     reviews.push(args);
      return {meta:{changes:1}};
     }
     throw Error('unexpected_run_query:'+sql);
@@ -135,4 +139,17 @@ test('late or insufficiently confirmed parts never enter the payment ledger',asy
    /invalid_or_late_payment_part/);
  }
  assert.equal(db.parts.size,0);
+});
+
+test('overpayment settles invoice once and preserves manual excess-funds review',async()=>{
+ const db=inMemory(),order={...invoice(),amount_atomic:'90'};
+ await fakeEthRpc(async()=>{
+  await acceptVerifiedPaymentPart(db,order,proof(TX1,'30'),env,TIME+10000);
+  const result=await acceptVerifiedPaymentPart(db,order,proof(TX2,'70'),env,TIME+11000);
+  assert.equal(result.status,'verified');
+  assert.equal(db.events.length,1);
+  assert.equal(db.events[0].amountAtomic,'100');
+  assert.equal(db.reviews.length,1);
+  assert.equal(db.reviews[0].at(-1),'100');
+ });
 });
