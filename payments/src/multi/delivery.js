@@ -41,6 +41,17 @@ export async function deliverV2(env,now=Date.now(),onlyEventId=null){
      WHERE id=? AND project_id=? AND status='verified' AND tx_hash IS NOT NULL`)
     .bind(event.invoice_id,event.project_id).first();
    if(!invoice)throw Error('invoice_not_verified');
+   // A previously detected chain dispute or any unresolved payment review
+   // must halt merchant credit, even if a later RPC read looks plausible.
+   // Operators must resolve the issue; never silently overwrite evidence.
+   const hold=await db.prepare(`SELECT
+     EXISTS(SELECT 1 FROM v2_chain_audit_state
+       WHERE invoice_id=? AND state IN ('uncertain','manual_review')) AS audit_hold,
+     EXISTS(SELECT 1 FROM v2_payment_reviews
+       WHERE invoice_id=? AND resolved_at_ms IS NULL) AS review_hold`)
+    .bind(invoice.id,invoice.id).first();
+   if(!hold||hold.audit_hold||hold.review_hold)
+    throw Error('invoice_under_payment_review');
    const {proof:current,recorded}=await verifyRecordedInvoice(db,invoice,env);
    if(JSON.stringify(recorded)!==event.event_body)
     throw Error('outbox_payload_changed');
