@@ -1,0 +1,8 @@
+# Recovered Cloudflare backend, credentials and local-only build artifacts.
+# Do not publish private source recovered from deployed Workers.
+.private/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
