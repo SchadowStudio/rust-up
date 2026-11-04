@@ -8,6 +8,8 @@ workers_dev = true
 # SAFETY: default is disabled. No client integration or real charges until launch review.
 CRYPTO_PAYMENTS_ENABLED = "false"
 CRYPTO_AUTO_SCAN_ENABLED = "false"
+GAME_LEDGER_DELIVERY_ENABLED = "false"
+OWNER_APPROVED_PRODUCTION = "false"
 # Set to the first Ethereum mainnet block you want to scan. Required before auto-scan.
 ETHEREUM_START_BLOCK = "0"
 TRON_INDEXER_URL = "https://api.trongrid.io"
