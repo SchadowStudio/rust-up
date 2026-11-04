@@ -93,3 +93,79 @@ test('external crypto callback is disabled, never credits game balance',async()=
     accepted:false,disabled:true
   });
 });
+
+// Separate offline external-store gateway simulation. No payment is transmitted.
+import {createExternalCryptoCheckout} from './crypto-checkout.mjs';
+import {randomUUID} from 'node:crypto';
+
+function externalDb(){
+  const p={sku:'fixed_badge',kind:'fixed_nontransferable',currency:'EUR',amount_minor:2500,enabled:1};
+  let row;
+  return {get row(){return row},prepare(query){
+    return {bind(...args){
+      return {
+        async first(){
+          if(query.includes('FROM rustup_external_fixed_products'))return p;
+          if(query.includes('WHERE merchant_request_id='))return row||null;
+          if(query.includes('SELECT provider_invoice_id'))return {provider_invoice_id:row?.provider_invoice_id};
+          return null;
+        },
+        async run(){
+          if(query.includes('INSERT INTO rustup_external_fixed_orders')){
+            row={project_order_ref:args[0],merchant_request_id:args[1],
+              external_customer_ref:args[2],sku:args[3],
+              product_kind:'fixed_nontransferable',currency:args[4],
+              amount_minor:args[5],asset:args[6],
+              provider_invoice_id:null,status:'pending'};
+            return {meta:{changes:1}};
+          }
+          if(query.includes('UPDATE rustup_external_fixed_orders')){
+            row.provider_invoice_id=args[0];return {meta:{changes:1}};
+          }
+          throw Error('unexpected_sql');
+        }
+      };
+    }};
+  }};
+}
+
+test('external crypto checkout disabled by default',async()=>{
+  await assert.rejects(()=>createExternalCryptoCheckout({},{}),/disabled/);
+});
+
+test('external crypto gateway uses fixed product prices and stable idempotency',async()=>{
+  const db=externalDb(), customer=randomUUID(),requestId=randomUUID();
+  let calls=0;const key='rup2_'+'a'.repeat(64);
+  const env={EXTERNAL_CRYPTO_CHECKOUT_ENABLED:'true',EXTERNAL_DB:db,
+    CRYPTO_PROVIDER_URL:'https://payments.example.test',
+    CRYPTO_PROJECT_ID:randomUUID(),CRYPTO_PROJECT_API_KEY:key};
+  const send=async (url,opts)=>{
+    calls++;assert.equal(url,'https://payments.example.test/v2/deposits');
+    assert.equal(opts.headers.authorization,'Bearer '+key);
+    assert.equal(opts.headers['idempotency-key'],requestId);
+    const body=JSON.parse(opts.body);
+    assert.equal(body.currency,'EUR');
+    assert.equal(body.amountMinor,2500);
+    assert.equal(body.projectOrderRef,db.row.project_order_ref);
+    return {ok:true,async json(){return {ok:true,invoice:{
+      invoiceId:id,projectOrderRef:db.row.project_order_ref,
+      fiat:'EUR',amountMinor:2500,asset:'TRX',
+      chain:'tron',receiveAddress:'T123456789012345678901234567890',
+      amountAtomic:'100000000',expiresAt:now+60000,
+      confirmedOnChain:false
+    }}}};
+  };
+  const params={verifiedExternalCustomerRef:customer,merchantRequestId:requestId,
+    sku:'fixed_badge',asset:'TRX',fetchImpl:send};
+  const first=await createExternalCryptoCheckout(env,params);
+  const second=await createExternalCryptoCheckout(env,params);
+  assert.equal(first.invoiceId,id);
+  assert.equal(first.paymentVerified,false);
+  assert.equal(first.fulfilled,false);
+  assert.deepEqual(second,first);
+  assert.equal(calls,2);
+  await assert.rejects(()=>createExternalCryptoCheckout(env,{
+    ...params,verifiedExternalCustomerRef:randomUUID()
+  }),/idempotency_conflict/);
+  assert.equal(db.row.provider_invoice_id,id);
+});
