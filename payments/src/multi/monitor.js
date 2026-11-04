@@ -5,6 +5,7 @@ import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 import {settleV2,expireV2,reviewUnderpayment} from './settlement.js';
 import {notifyDeliveryQueue} from './delivery.js';
 import {processPaymentPart} from './multi-transfer.js';
+import {scanTonPayments} from './ton-monitor.js';
 
 const at=s=>new Date(s).toISOString();
 const hex=x=>'0x'+BigInt(x).toString(16);
@@ -213,10 +214,13 @@ export async function scanMultiPayments(env) {
  await expireV2(db,now);
  const orders=await activeOrders(db,now);
  const results={orders:orders.length,verified:0,review:0,ignored:0,
-  scannedEthereumBlocks:0,scannedBitcoinTransactions:0,scannedTronTransactions:0,errors:[]};
+  scannedEthereumBlocks:0,scannedBitcoinTransactions:0,scannedTronTransactions:0,
+  scannedTonTransactions:0,errors:[]};
  // One chain failing never blocks other chains, but failed cursors don't advance.
  for(const [name,func] of [
-  ['ethereum',scanEthereum],['bitcoin',scanBitcoin],['tron',scanTron]
+  ['ethereum',scanEthereum],['bitcoin',scanBitcoin],['tron',scanTron],
+  ['ton',(db,orders,env,counter)=>scanTonPayments(db,orders,env,counter,
+    {scanCursor,advance,trySettle})]
  ]){
   try{await func(db,orders,env,results)}
   catch(e){results.errors.push(name+':'+String(e.message).slice(0,100))}
