@@ -42,3 +42,13 @@ CREATE TABLE IF NOT EXISTS rustup_stars_refund_intents(
 
 -- No price, product, or content seeded. Operator must explicitly configure
 -- real non-transferable, non-wagering digital goods and confirm deliverability.
+
+-- One active checkout per customer and fixed product. Abandoned reservations
+-- can be replaced after the 15-minute invoice expires.
+CREATE TABLE IF NOT EXISTS rustup_stars_purchase_locks(
+  telegram_user_id INTEGER NOT NULL CHECK(telegram_user_id>0),
+  sku TEXT NOT NULL REFERENCES rustup_stars_products(sku),
+  order_id TEXT NOT NULL UNIQUE REFERENCES rustup_stars_orders(id),
+  expires_at_ms INTEGER NOT NULL,
+  PRIMARY KEY(telegram_user_id,sku)
+);
