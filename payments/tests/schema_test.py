@@ -1,5 +1,5 @@
 import pathlib, sqlite3, unittest
-schema=(pathlib.Path(__file__).parent.parent/'migrations'/'0001_crypto.sql').read_text()
+schema='\n'.join(p.read_text() for p in sorted((pathlib.Path(__file__).parent.parent/'migrations').glob('*.sql')))
 class PaymentSchema(unittest.TestCase):
  def setUp(self):
   self.db=sqlite3.connect(':memory:')
@@ -7,7 +7,7 @@ class PaymentSchema(unittest.TestCase):
   self.db.executescript(schema)
   self.db.execute("INSERT INTO payment_packages(id,title,credit_kopecks,enabled) VALUES('p','Test',10000,1)")
   self.db.execute("INSERT INTO payment_quotes VALUES('p','ETH','100000',1)")
-  self.db.execute("INSERT INTO deposit_addresses VALUES('ethereum','0xaaa','order1')")
+  self.db.execute("INSERT INTO deposit_addresses(chain,address,assigned_intent) VALUES('ethereum','0xaaa','order1')")
  def order(self,id,address='0xaaa',tx=None):
   self.db.execute("""INSERT INTO payment_intents
     (id,telegram_id,package_id,asset,chain,receive_address,amount_atomic,
@@ -18,7 +18,7 @@ class PaymentSchema(unittest.TestCase):
   with self.assertRaises(sqlite3.IntegrityError):self.order('order2')
  def test_one_tx_hash_per_chain(self):
   self.order('order1',tx='0xtest')
-  self.db.execute("INSERT INTO deposit_addresses VALUES('ethereum','0xbbb','order2')")
+  self.db.execute("INSERT INTO deposit_addresses(chain,address,assigned_intent) VALUES('ethereum','0xbbb','order2')")
   with self.assertRaises(sqlite3.IntegrityError):self.order('order2','0xbbb','0xtest')
  def test_only_one_outbox_event_per_order(self):
   self.order('order1')
