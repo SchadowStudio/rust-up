@@ -152,3 +152,20 @@ test('malformed or missing settings returns error without applying an admin comm
   assert.equal(db.audit.length,0);
   assert.equal(db.values.master,0);
 });
+
+test('existing bot admin authorization can use verified Telegram admin identity and isolated D1',async()=>{
+  const productionDb={prepare(){throw Error('must not touch existing game DB');}};
+  const paymentsDb=makeDb();
+  const cfg={...env(productionDb,{PAYMENTS_DB:paymentsDb,PAYMENT_ADMIN_IDS:''})};
+  const out=sink();
+  let calls=0;
+  const options={...out,authorize:async user=>{calls++;return user.id===OWNER;}};
+  const result=await handlePaymentAdminCommand(update('/pay stars on'),cfg,options);
+  assert.equal(result.ok,true);
+  assert.equal(paymentsDb.values.stars,1);
+  assert.equal(paymentsDb.audit.length,1);
+  assert.equal(calls,1);
+  assert.equal((await handlePaymentAdminCommand(update('/pay master on',OWNER+1),cfg,options)).authorized,false);
+  assert.equal(paymentsDb.values.master,0);
+  assert.equal(await isPaymentEnabled({...cfg,PAYMENT_PRODUCTION_ENABLED:'true'},'stars'),false);
+});
