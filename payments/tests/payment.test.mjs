@@ -79,7 +79,7 @@ test('USDT ERC-20 checks contract and Transfer recipient',async()=>{
 test('Bitcoin Core output must pay correct address',async()=>{
  const hash='a'.repeat(64),address='bc1qtestaddress0000000000000000000000000000';
  const order={asset:'BTC',chain:'bitcoin',receive_address:address,amount_atomic:'10000'};
- await fakeRpc({getrawtransaction:{txid:hash,confirmations:3,
+ await fakeRpc({getrawtransaction:{txid:hash,confirmations:3,blocktime:1762300000,
  vout:[{value:0.0001,scriptPubKey:{address}}]}},async()=>{
   assert.equal((await verifyChainPayment(order,hash,{BITCOIN_RPC_URL:'https://btc.example'})).actualAtomic,'10000');
  });
