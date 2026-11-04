@@ -141,9 +141,17 @@ $('walletConnect').addEventListener('click',()=>connectWallet().catch(e=>output(
 $('status').addEventListener('click',async()=>{
  try{
   const r=await call('/v2/admin/status');
+  const capacity=r.availableReceivers||{};
+  const missing=(r.missingPrerequisites||[]).join(', ')||'keine';
   output('Projekte: '+r.projects+' · offene Rechnungen: '+r.pending+
-    ' · offene Webhooks: '+r.deliveryBacklog+
-    ' · Checkout-Freigabe beantragt: '+(r.checkoutEnabled?'ja':'nein'));
+    ' · ausstehende Webhooks: '+r.deliveryBacklog+
+    ' · Webhooks mit vielen Fehlversuchen: '+(r.deliveryRetryFailures||0)+
+    ' · manuelle Zahlungsprüfungen: '+(r.manualReviews||0)+
+    ' · abgelaufene aktive Wechselkurse: '+(r.expiredEnabledRates||0)+
+    ' · freie Empfangsadressen BTC/ETH/TRON: '+(capacity.bitcoin||0)+'/'+
+     (capacity.ethereum||0)+'/'+(capacity.tron||0)+
+    ' · Checkout aktiv: '+(r.checkoutEnabled?'ja':'nein')+
+    (r.checkoutEnabled?'':' · fehlende Voraussetzungen: '+missing));
  }catch(e){output(e.message,true)}
 });
 $('createProject').addEventListener('click',async()=>{
