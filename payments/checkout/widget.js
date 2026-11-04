@@ -47,8 +47,8 @@ export function mountCryptoPayment(container,initialInvoice,{refresh,onSubmitTra
    'Verbleibende Zeit: '+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0'):
    'Bei verspäteter Zahlung bitte den Projektsupport kontaktieren.';
   copy.disabled=!readyToPay();
-  verifyBtn.disabled=typeof onSubmitTransaction!=='function'||busy;
-  hashInput.disabled=typeof onSubmitTransaction!=='function'||busy;
+  verifyBtn.disabled=typeof onSubmitTransaction!=='function'||typeof refresh!=='function'||busy;
+  hashInput.disabled=typeof onSubmitTransaction!=='function'||typeof refresh!=='function'||busy;
   refreshBtn.disabled=typeof refresh!=='function'||busy;
  }
  async function refreshInvoice(){
@@ -56,7 +56,9 @@ export function mountCryptoPayment(container,initialInvoice,{refresh,onSubmitTra
   busy=true;render();
   try{
    const next=await refresh(invoice.invoiceId);
-   invoice=validatePublicInvoice(next);
+   const checked=validatePublicInvoice(next);
+   if(checked.invoiceId!==invoice.invoiceId)throw Error('invoice_changed');
+   invoice=checked;
    error.textContent='';
   }catch{error.textContent='Statusprüfung derzeit nicht verfügbar.'}
   finally{busy=false;render();}
@@ -75,7 +77,9 @@ export function mountCryptoPayment(container,initialInvoice,{refresh,onSubmitTra
   }
   busy=true;render();
   try{await onSubmitTransaction(invoice.invoiceId,hash);await refresh(invoice.invoiceId).then(x=>{
-   invoice=validatePublicInvoice(x);error.textContent='';
+   const checked=validatePublicInvoice(x);
+   if(checked.invoiceId!==invoice.invoiceId)throw Error('invoice_changed');
+   invoice=checked;error.textContent='';
   });}catch{error.textContent='Zahlung noch nicht bestätigt oder manuelle Prüfung notwendig.'}
   finally{busy=false;render();}
  });
