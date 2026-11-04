@@ -93,6 +93,7 @@ class FakeD1 {
 function environment(db){
  return {DB:db,MULTI_OPERATOR_APPROVED:'true',MULTI_LIVE_ENABLED:'true',
   MULTI_AUTO_SCAN_ENABLED:'true',MULTI_DELIVERY_ENABLED:'true',
+  MULTI_RECONCILE_ENABLED:'true',
   MULTI_WEBHOOK_MASTER_KEY:'m'.repeat(48),
   MULTI_STRICT_QUORUM:'true',
   MULTI_ADMIN_KEY:'k'.repeat(64),
