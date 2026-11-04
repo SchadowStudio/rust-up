@@ -55,7 +55,7 @@ async function main(){
  if(!snapshot||snapshot.sha256!==digest(admin))throw Error('original_admin_source_not_verified');
  if(!worker.includes('RUSTUP_PAYMENT_ADMIN_HOOK')||
     !bundle.includes('handleAdminPaymentPanelApi')||
-    !bundle.includes('RUSTUP_PAYMENT_MINI_APP'))
+    !bundle.includes('payments-set'))
   throw Error('missing_payments_panel_in_new_bundle');
  if(!config.includes('PAYMENT_PRODUCTION_ENABLED = "false"')||
     !config.includes('binding = "PAYMENTS_DB"')||
