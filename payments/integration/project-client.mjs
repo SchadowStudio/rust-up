@@ -57,4 +57,9 @@ export class ProjectPaymentsClient {
   const qs=new URLSearchParams({after:String(after),afterEventId,limit:String(limit)});
   return this.request('/v2/events?'+qs);
  }
+ // Fetch disputed receipts, including cases discovered after an earlier credit.
+ // The merchant must investigate and hold fulfillment, never blindly debit.
+ incidents(){
+  return this.request('/v2/incidents');
+ }
 }
