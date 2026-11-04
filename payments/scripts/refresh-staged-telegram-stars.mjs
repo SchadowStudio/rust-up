@@ -18,6 +18,10 @@ async function main(){
  const dir=await fs.realpath(path.resolve(arg));
  if(!dir.startsWith(path.join(root,'.private','rustup-bot-recovered')+path.sep))
   throw Error('outside_private_recovery_folder');
+ const refundModule=path.join(dir,'refunds.mjs');
+ try{await fs.access(refundModule);throw Error('refunds_module_already_staged');}
+ catch(e){if(e.code!=='ENOENT')throw e;}
+ await fs.access(path.join(src,'refunds.mjs'));
  const worker=await fs.readFile(path.join(dir,'worker.js'),'utf8');
  if(!worker.includes('RUSTUP_PAYMENT_ADMIN_HOOK'))
   throw Error('existing_pay_bot_worker_missing');
@@ -35,6 +39,7 @@ async function main(){
   await fs.copyFile(path.join(dir,name),path.join(dir,name+'.before-miniapp'),fs.constants.COPYFILE_EXCL);
   await fs.copyFile(path.join(src,name),path.join(dir,name));
  }
+ await fs.copyFile(path.join(src,'refunds.mjs'),refundModule,fs.constants.COPYFILE_EXCL);
  console.log('PASS: Telegram Stars worker modules refreshed for existing Mini App wallet.');
  console.log('PASS: Reversible backups .before-miniapp saved. Existing /pay and game source unchanged.');
  console.log('NOT DEPLOYED. Rebuild worker.stars-entry.mjs and check bundle before any release.');
