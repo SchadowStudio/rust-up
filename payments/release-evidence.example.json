@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "commitSha": "0000000000000000000000000000000000000000",
+  "tonEnabled": false,
+  "checks": {
+    "operator_access_mfa": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "trust_wallet_control_bitcoin": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "trust_wallet_control_ethereum": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "trust_wallet_control_tron": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "rpc_quorum_independent": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "bitcoin_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "ethereum_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "tron_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "usdt_erc20_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "usdt_trc20_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "merchant_ledger_exactly_once": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "merchant_webhook_end_to_end": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "market_rate_failover": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "restore_from_encrypted_backup": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "rpc_and_queue_failover": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "dispute_and_refund_runbook": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "reorg_manual_containment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "throughput_and_load_test": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "external_security_review": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "legal_and_platform_review": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "operational_monitoring": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "trust_wallet_control_ton": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "ton_mainnet_payment": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    },
+    "ton_independent_indexer_failover": {
+      "result": "pending",
+      "reviewer": "",
+      "reference": "",
+      "testedAt": null
+    }
+  }
+}
