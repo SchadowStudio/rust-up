@@ -16,6 +16,7 @@ import {readinessV2} from './readiness.js';
 import {consumeManualVerifyQuota,auditVerifiedInvoices} from './reconciliation.js';
 import {processPaymentPart,storedParts,reconcileDuePaymentParts} from './multi-transfer.js';
 import {getProjectMethodPolicy,getProjectPaymentConfig} from './project-config.js';
+import {projectPaymentIncidents} from './incidents.js';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store',
  'x-content-type-options':'nosniff','referrer-policy':'no-referrer'}});
@@ -243,6 +244,8 @@ async function projectRoute(req,env,url){
  }
  if(url.pathname==='/v2/events'&&req.method==='GET')
   return listEvents(env.DB,project.id,url);
+ if(url.pathname==='/v2/incidents'&&req.method==='GET')
+  return json(await projectPaymentIncidents(env.DB,project.id));
  const found=/^\/v2\/invoices\/([a-zA-Z0-9-]+)(\/verify)?$/.exec(url.pathname);
  if(!found)return fail('not_found',404);
  const invoice=await getInvoice(env.DB,project.id,found[1]);
