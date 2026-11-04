@@ -6,6 +6,7 @@ import {settleVerified} from './settlement.js';
 import {operatorRoute} from './operator.js';
 import {scanPendingPayments} from './monitor.js';
 import {drainOutbox} from './outbox.js';
+import {readiness} from './readiness.js';
 
 // Isolated API: it never writes to the original game Worker or its balance.
 const json=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
