@@ -57,4 +57,5 @@ jobs:
           node --check payments/integration/telegram-stars/refunds.mjs
           node --check payments/scripts/stage-stars-purchase-locks.mjs
           node --check payments/scripts/check-telegram-wallet-bundle.mjs
+          node --check payments/scripts/add-safe-stars-worker-vars.mjs
           node --check payments/integration/telegram-stars/stars-telegram-shop.mjs
