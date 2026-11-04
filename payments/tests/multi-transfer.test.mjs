@@ -153,3 +153,17 @@ test('overpayment settles invoice once and preserves manual excess-funds review'
   assert.equal(db.reviews[0].at(-1),'100');
  });
 });
+
+test('overpayment cannot be confirmed if durable review write is unavailable',async()=>{
+ const db=inMemory(),order={...invoice(),amount_atomic:'90'};
+ const original=db.prepare.bind(db);
+ db.prepare=sql=>sql.includes('INSERT OR IGNORE INTO v2_payment_reviews')?
+  {bind(){return {run:async()=>{throw Error('review_database_offline')}}}}:
+  original(sql);
+ await fakeEthRpc(async()=>{
+  await acceptVerifiedPaymentPart(db,order,proof(TX1,'30'),env,TIME+10000);
+  await assert.rejects(()=>acceptVerifiedPaymentPart(db,order,proof(TX2,'70'),env,TIME+12000),
+   /review_database_offline/);
+  assert.equal(db.events.length,0);
+ });
+});
