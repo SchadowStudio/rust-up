@@ -22,7 +22,7 @@ Nicht-Admins, Gruppenmitglieder und weitergeleitete Befehle können keinen Statu
 - `rustup_payment_settings_audit`: unveränderliche Einträge durch einen SQLite-Trigger.
 - `UPDATE` eines Schalters und zugehöriges Audit erfolgen atomar innerhalb von SQLite.
 
-Niemals die Staging-Migration unkontrolliert auf `rustup-stats` anwenden.
+Niemals die Staging-Migration unkontrolliert auf `rustup-stats` anwenden. Für den Hauptbot ist ein **zusätzliches** Cloudflare-D1-Binding `PAYMENTS_DB` auf die isolierte Payment-Datenbank vorgesehen; sein existierendes `DB`-Binding auf `rustup-stats` darf nicht geändert werden.
 
 ## Zwei voneinander unabhängige Schutzstufen
 
@@ -63,12 +63,13 @@ Stattdessen im vollständigen Quellcode des Hauptbots im bestehenden Handler
 Command-Verarbeitung aufrufen:
 
 ```js
-import {handlePaymentAdminCommand} from './integration/telegram-stars/payment-controls.mjs';
+import {handleExistingBotPaymentCommands} from './integration/telegram-stars/live-bot-hook.mjs';
 
-const paymentAdmin=await handlePaymentAdminCommand(upd,env,{
-  sendMessage:(chatId,text)=>tg(env,'sendMessage',{chat_id:chatId,text})
-});
-if(paymentAdmin.handled)return;
+// In onUpdate(upd, env) VOR der bisherigen Verarbeitung:
+if (await handleExistingBotPaymentCommands(upd, env, {
+  isAdmin,      // vorhandene, Telegram-verifizierte Adminfunktion
+  telegramApi: tg // vorhandener Telegram-API-Client des Hauptbots
+})) return;
 ```
 
 Pfad beim Bundling an das echte Repository anpassen; den bestehenden
@@ -98,3 +99,19 @@ CI-Prüfung ist keine produktive Freigabe.
 Die vorhandene `rustup-stars-staging`-Datenbank hat die drei Schalter
 mit dem Anfangswert 0. Keine echten Zahlungsmittel, keine Gutschrift
 von Case-/Upgrade-/auszahlbarem Spielguthaben und keine Auszahlung.
+
+### Status der Live-Aktivierung
+
+Der separate Test-Worker ist aktualisiert. **Der bisherige Live-Worker ist noch
+NICHT mit dem Hook neu bereitgestellt worden.** Seine Original-Quellen liegen
+nicht als editierbarer Quellcode im GitHub-Repository, sondern nur als gebauter
+Cloudflare-Worker vor. Ein direkter Live-Eingriff in diesen Build wurde
+abgebrochen, um vorhandene Secrets/Bindings und parallele Änderungen zu
+schützen. Der fertige GitHub-Code kann eingebaut werden, sobald die originale
+Hauptbot-Quelle und der normale Deploymentprozess vorliegen.
+
+Vor dem Deploy alle ursprünglichen Cloudflare-Bindings inklusive
+`BOT_TOKEN`, `WEBHOOK_SECRET`, `ADMIN_BOT_TOKEN`, `CLIPS_BOT_TOKEN`,
+`FIRST_ADMIN`, `DB` sowie weitere aktuelle Bindings bewahren. Alte und
+neue Versions-IDs festhalten, einen Preflight mit falschem Webhook-Secret
+(403) prüfen und erst danach über den privaten Admin-Chat testen.
