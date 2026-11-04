@@ -13,7 +13,7 @@ async function onUpdate(upd, env) {
   }
 }
 const isAdmin = async(env,u) => true;
-const url = "/tg";
+const url = "/tg";\nif (url.pathname === "/tg") console.log("webhook route");
 `;
 function multipart(overrides={}){
   const map={version:3,sources:names,
