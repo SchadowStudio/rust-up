@@ -44,11 +44,12 @@ you later transfer funds out of Trust Wallet.
 
 ### Important limitations
 
-- This is a **development foundation**, **not** a production-ready or
-  fully automated payment gateway. The customer currently supplies the
-  transaction hash manually. Automated chain indexing, reconciliation,
-  stale/late payments, refund handling, incident responses, exchange-rate
-  sourcing and reorganization monitoring remain to be implemented.
+- This remains a **development foundation**, not a production-ready gateway.
+  Scheduled Ethereum, Bitcoin Core and TRON scanners have been added as an
+  **opt-in** feature (default OFF), plus manual transaction-ID verification.
+  Live blockchain integration has NOT been deployed or tested with real coins.
+  Comprehensive reorganization recovery, refunds, partial/multi-payment
+  handling, risk controls, pricing and incident operations remain outstanding.
 - One receiver address per order is necessary here. A single shared
   BTC/ETH/TRON address for many users is **not sufficient for safe, automatic
   customer attribution**. If your Trust Wallet contains only one address
@@ -126,3 +127,87 @@ allowed frontend origins are supported.
 - Production security review, monitoring, anti-fraud, rates and audits.
 
 The existing `main` branch and deployed Worker are **not changed**.
+
+## Current development milestones
+
+- [x] Own Cloudflare Worker source in `payments/src/`
+- [x] BTC, ETH, TRX and both USDT networks supported as separate assets
+- [x] Watch-only receiver pool and strict address/checksum verification
+- [x] Protected owner receiver-management endpoints
+- [x] Standalone Trust Wallet management page in `payments/admin/`
+- [x] EIP-6963 Trust Wallet connection for ETH addresses; BTC/TRX manual import
+- [x] Blockchain proof checks and confirmed-block timestamps
+- [x] Atomic and replay-resistant D1 payment event queue
+- [x] Optional cron watchers for Ethereum, Bitcoin Core and TRON
+- [x] Signed, retry-safe outbox interface for a future game-ledger consumer
+- [x] GitHub tests for security rules and database uniqueness
+- [ ] Own Cloudflare account, D1, RPC endpoints and Bot Token configured
+- [ ] Multiple fresh owner-controlled receiving addresses provisioned per chain
+- [ ] Real Trust Wallet connected by owner, and actual receive addresses approved
+- [ ] Game Worker ledger consumer implemented and deployed with idempotent credits
+- [ ] End-to-end testnet and real-chain controlled small-amount test payments
+- [ ] Monitoring, support workflow, refunds and reorganization recovery verified
+- [ ] Separate hosting / platform policy approval for any checkout UI
+
+**Never switch the config flags to true until the unchecked items required
+for production have been addressed.**
+
+### Connecting your Trust Wallet (later, with your account)
+
+1. Deploy the **operator console** (`payments/admin/`) on your own HTTPS
+   origin, separate from the Telegram Mini App. Set that host as
+   `OPERATOR_ORIGIN` in the Worker.
+2. Generate a long operator key locally, set it as Cloudflare secret
+   `OPERATOR_API_KEY`, and paste it only into your own operator console.
+3. Install the **official Trust Wallet extension**. Click **Trust Wallet
+   verbinden** to authorize the console to read your ETH address.
+   The code discovers Trust Wallet using EIP-6963.
+4. For Bitcoin and TRON, copy their **public receiving addresses** from Trust
+   Wallet and enter them separately with the correct network.
+5. Add an address to the payment service: it is **disabled by default**.
+   Check the address, perform a test, then explicitly enable it. Never reuse
+   an address already assigned to an invoice.
+6. For Bitcoin, import every new public receive address into your separate
+   Bitcoin Core **watch-only descriptor wallet** before you enable it:
+   `node payments/scripts/register-bitcoin-address.mjs <BTC_ADDRESS> --confirm-watch-only`
+   (requires protected Bitcoin Core RPC environment variables).
+7. No recovery phrase, wallet password, private key or token-sending
+   permission is requested or needed.
+
+### Operating the chain scanner
+
+- `CRYPTO_AUTO_SCAN_ENABLED=false` by default.
+- Configure HTTPS `ETHEREUM_RPC_URL` and the deployment-start block
+  `ETHEREUM_START_BLOCK`. The scanner walks confirmed blocks and filters
+  Ethereum transfers and USDT Transfer logs for unused, unique invoice
+  addresses.
+- Configure `TRON_RPC_URL`, `TRON_INDEXER_URL`, and the TronGrid API key
+  for TRX and USDT TRC-20 scan candidates, subsequently verified on TRON.
+- Configure a private **Bitcoin Core watch-only wallet** behind a protected
+  HTTPS RPC endpoint, `BITCOIN_RPC_BASIC_B64` and
+  `BITCOIN_START_BLOCKHASH`. The scanner uses `listsinceblock` and
+  explicitly verifies each matching transaction before settling.
+- Scanning fails closed when a node or signature is unavailable. Check Worker
+  logs and manual review queues if progress stops.
+
+### Signed ledger delivery
+
+- `GAME_LEDGER_DELIVERY_ENABLED=false` until an actual game Worker exists.
+- Configure `GAME_LEDGER_WEBHOOK_URL` (trusted HTTPS URL) and
+  `GAME_LEDGER_SIGNING_KEY` as secrets. The game Worker must independently
+  verify HMAC-SHA256 over `timestamp.eventId.payload`, reject stale requests,
+  and credit each unique `eventId` **at most once** inside its own DB
+  transaction.
+- Sender retries with backoff until it receives a JSON acknowledgement
+  `{"ok":true,"eventId":"crypto:..."}`. A network timeout may mean the
+  game already processed a request; the consumer's uniqueness constraint
+  is mandatory.
+- **No sender-side acknowledgement by itself credits the game**: the
+  receiver's implementation is missing from this repository.
+
+### Database migrations
+
+Apply files in `payments/migrations/` in numeric order with Wrangler D1:
+`0001_crypto.sql`, `0002_operations.sql`,
+`0003_receivers_enabled.sql`, `0004_reliable_outbox.sql`.
+Never start against a partially migrated database.
