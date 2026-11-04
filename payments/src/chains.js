@@ -63,7 +63,11 @@ async function ethVerify(order,hash,env) {
   }
  }
  mustMatch(received,order);
- return {confirmations:Number(confirmations),actualAtomic:received.toString()};
+ const block=await jsonRpc(url,'eth_getBlockByNumber',[receipt.blockNumber,false]);
+ if(!block||block.number?.toLowerCase()!==receipt.blockNumber.toLowerCase())throw new Error('invalid_block_timestamp');
+ const paymentTimeMs=Number(BigInt(block.timestamp)*1000n);
+ if(!Number.isSafeInteger(paymentTimeMs)||paymentTimeMs<=0)throw new Error('invalid_block_timestamp');
+ return {confirmations:Number(confirmations),actualAtomic:received.toString(),paymentTimeMs};
 }
 async function btcVerify(order,hash,env) {
  // Own Bitcoin Core with txindex=1, or an explicitly trusted RPC node.
