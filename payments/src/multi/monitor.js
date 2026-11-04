@@ -4,6 +4,7 @@ import {ASSETS,ERC20_TRANSFER_TOPIC,evm} from '../assets.js';
 import {verifyChainPaymentQuorum as verifyChainPayment} from './quorum.js';
 import {settleV2,expireV2,reviewUnderpayment} from './settlement.js';
 import {notifyDeliveryQueue} from './delivery.js';
+import {processPaymentPart} from './multi-transfer.js';
 
 const at=s=>new Date(s).toISOString();
 const hex=x=>'0x'+BigInt(x).toString(16);
@@ -42,13 +43,15 @@ function record(map,key,order){
 }
 async function trySettle(db,order,hash,env,counter){
  try{
-  const proof=await verifyChainPayment(order,hash,env);
-  const result=await settleV2(db,order,proof);
+  const result=env.MULTI_PARTIAL_AGGREGATION_ENABLED==='true'?
+   await processPaymentPart(db,order,hash,env):
+   await settleV2(db,order,await verifyChainPayment(order,hash,env));
   await notifyDeliveryQueue(env,result);
   if(result.status==='verified')counter.verified++;
   else if(result.status==='manual_review')counter.review++;
+  else if(result.status==='partial')counter.partial=(counter.partial||0)+1;
  }catch(e){
-  if(e.message==='recipient_or_amount_mismatch'||e.message==='underpaid_or_wrong_recipient'){
+  if(e.message==='recipient_or_amount_mismatch'||e.message==='underpaid_or_wrong_recipient'||e.message==='invalid_or_late_payment_part'){
    try{
     const partial=await reviewUnderpayment(db,order,hash,env);
     if(partial.status==='manual_review'){counter.review++;return;}
