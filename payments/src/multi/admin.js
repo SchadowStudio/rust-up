@@ -186,6 +186,39 @@ export async function multiAdmin(request,env,url){
     availableReceivers:capacity,checkoutEnabled:readiness.ready,
     missingPrerequisites:readiness.missing});
   }
+  if(path==='/v2/admin/reviews'&&request.method==='GET'){
+   const includeClosed=url.searchParams.get('closed')==='true';
+   const limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit')||50)));
+   if(!Number.isSafeInteger(limit))return fail('invalid_limit');
+   const projectId=url.searchParams.get('projectId');
+   if(projectId&&!isUuid(projectId))return fail('invalid_project_id');
+   const filters=projectId?' AND i.project_id=?':'';
+   const query=`SELECT r.id,r.invoice_id,i.project_id,i.fiat,i.amount_minor,
+     i.asset,i.chain,r.tx_hash,r.reason,r.actual_amount_atomic,
+     r.created_at_ms,r.resolved_at_ms,r.resolution_code
+     FROM v2_payment_reviews r JOIN v2_invoices i ON i.id=r.invoice_id
+     WHERE (r.resolved_at_ms IS NULL OR ?=1)`+filters+
+     ' ORDER BY r.created_at_ms DESC LIMIT ?';
+   const args=projectId?[includeClosed?1:0,projectId,limit]:[includeClosed?1:0,limit];
+   const rows=await db.prepare(query).bind(...args).all();
+   return json({ok:true,reviews:rows.results||[]});
+  }
+  const reviewClose=/^\/v2\/admin\/reviews\/([0-9a-f-]{36})\/close$/i.exec(path);
+  if(reviewClose&&request.method==='POST'){
+   const b=await readBody(request);
+   if(b.confirmation!=='I_HAVE_REVIEWED_PAYMENT'||
+      !['operator_reviewed','external_refund_unverified','invalid_transfer'].includes(b.resolutionCode))
+    return fail('manual_review_confirmation_required');
+   const id=reviewClose[1].toLowerCase();
+   const changed=await db.prepare(`UPDATE v2_payment_reviews
+     SET resolved_at_ms=?,resolution_code=?,resolved_by='operator'
+     WHERE id=? AND resolved_at_ms IS NULL`)
+    .bind(Date.now(),b.resolutionCode,id).run();
+   if(!changed.meta?.changes)return fail('review_not_open',409);
+   await audit(db,'close_manual_review',null,{reviewId:id,resolutionCode:b.resolutionCode});
+   return json({ok:true,reviewId:id,resolutionCode:b.resolutionCode,
+    note:'This action never credits a wallet or submits a refund transaction.'});
+  }
   if(path==='/v2/admin/projects'&&request.method==='POST')return createProject(db,await readBody(request),env);
   if(path==='/v2/admin/products'&&request.method==='POST')return createProduct(db,await readBody(request));
   if(path==='/v2/admin/rates'&&request.method==='POST')return setRate(db,await readBody(request));
