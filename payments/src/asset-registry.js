@@ -57,15 +57,19 @@ export function requireCertifiedPaymentAsset(asset,env={}){
 }
 export function planCoinExtension({asset,chain,standard,decimals}={}){
  if(typeof asset!=='string'||!/^[A-Z][A-Z0-9_]{1,31}$/.test(asset)||
-    typeof chain!=='string'||!['bitcoin','ethereum','tron'].includes(chain)||
-    !['native','erc20','trc20'].includes(standard)||
+    typeof chain!=='string'||!/^[a-z][a-z0-9_-]{1,31}$/.test(chain)||
+    !['native','erc20','trc20','spl','bep20'].includes(standard)||
     !Number.isInteger(decimals)||decimals<0||decimals>18)
   throw Error('invalid_asset_extension');
- if(standard==='erc20'&&chain!=='ethereum'||standard==='trc20'&&chain!=='tron')
+ if(standard==='erc20'&&chain!=='ethereum'||
+    standard==='trc20'&&chain!=='tron'||
+    standard==='spl'&&chain!=='solana'||
+    standard==='bep20'&&chain!=='bsc')
   throw Error('invalid_token_chain');
  if(ASSET_CATALOG[asset])throw Error('asset_already_supported');
  return Object.freeze({
   asset,chain,standard,decimals,active:false,
+  newNetwork:!Object.hasOwn(RECEIVER_NETWORKS,chain),
   mandatoryChecks:[
    'independently_reviewed_mainnet_contract_or_native_asset_identity',
    'real_receive_address_validation_and_owner_wallet_support',
