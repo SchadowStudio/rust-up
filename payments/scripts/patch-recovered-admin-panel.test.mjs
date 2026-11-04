@@ -26,3 +26,23 @@ test('refuses replacing admin handlers without checks',()=>{
  assert.throws(()=>patchAdminSource(sample.replace('await h.isAdmin(env, user)','Promise.resolve(true)')),/auth/);
  assert.throws(()=>patchAdminSource('function adminApi(){return true;}'),/authenticated_admin_endpoint_missing/);
 });
+
+test('accepts CRLF and alternate default-error quotes without relaxing auth checks',()=>{
+ const variant=sample.replaceAll('\n','\r\n').replace(
+  '  return h.json({ ok: false, error: "path" }, 404);',
+  "  return h.json({ ok: false, error: 'path' }, 404);"
+ );
+ const result=patchAdminSource(variant);
+ assert.match(result,/case "payments-set"/);
+ assert.ok(result.indexOf('await h.isAdmin(env, user)')<result.indexOf('case "payments-set"'));
+});
+test('rejects missing denial returns despite matching authentication function names',()=>{
+ assert.throws(()=>patchAdminSource(sample.replace(
+  'if (!await h.isAdmin(env, user)) return h.json({ ok: false, error: "forbidden" }, 403);',
+  'if (!await h.isAdmin(env, user)) console.warn("unauthorized");'
+ )),/admin_endpoint_authentication_not_verified/);
+ assert.throws(()=>patchAdminSource(sample.replace(
+  'if (!user || !user.id) return h.json({ ok: false, error: "auth" }, 401);',
+  'if (!user || !user.id) console.warn("bad identity");'
+ )),/admin_endpoint_authentication_not_verified/);
+});
