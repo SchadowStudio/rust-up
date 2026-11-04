@@ -7,6 +7,12 @@ workers_dev = true
 [vars]
 # SAFETY: default is disabled. No client integration or real charges until launch review.
 CRYPTO_PAYMENTS_ENABLED = "false"
+CRYPTO_AUTO_SCAN_ENABLED = "false"
+# Set to the first Ethereum mainnet block you want to scan. Required before auto-scan.
+ETHEREUM_START_BLOCK = "0"
+TRON_INDEXER_URL = "https://api.trongrid.io"
+OPERATOR_ORIGIN = "https://example.invalid"
+
 ALLOWED_ORIGIN = "https://example.invalid"
 USDT_ERC20_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
 USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
@@ -23,3 +29,11 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 # wrangler secret put BITCOIN_RPC_URL
 # wrangler secret put BITCOIN_RPC_BASIC_B64
 # Optional: wrangler secret put TRON_RPC_API_KEY
+
+# Scheduled blockchain scanning is dormant until CRYPTO_AUTO_SCAN_ENABLED=true.
+[triggers]
+crons = ["*/2 * * * *"]
+
+# Operator secret: wrangler secret put OPERATOR_API_KEY
+# Generate a random 256-bit key locally. Never commit or send it in chat.
+# Optional: wrangler secret put BITCOIN_START_BLOCKHASH
