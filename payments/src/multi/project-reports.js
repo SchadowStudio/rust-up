@@ -37,17 +37,20 @@ export async function projectReport(request,env,url){
  const max=Number(url.searchParams.get('limit')||50);
  if(!Number.isInteger(max)||max<1||max>100)return error('invalid_page_size');
  const before=Number(url.searchParams.get('before')||Date.now()+60000);
- if(!Number.isSafeInteger(before)||before<=0)return error('invalid_page_cursor');
+ const beforeId=url.searchParams.get('beforeId')||'~';
+ if(!Number.isSafeInteger(before)||before<=0||
+    (beforeId!=='~'&&!isUuid(beforeId)))return error('invalid_page_cursor');
  const rows=await db.prepare(`SELECT i.id,i.project_order_ref,i.fiat,
     i.amount_minor,i.asset,i.chain,i.amount_atomic,i.status,
     i.tx_hash,i.created_at_ms,i.expires_at_ms,i.verified_at_ms,
     o.delivered_at_ms
    FROM v2_invoices i
    LEFT JOIN v2_delivery_outbox o ON o.invoice_id=i.id
-   WHERE i.project_id=? AND i.created_at_ms<?
+   WHERE i.project_id=? AND
+     (i.created_at_ms<? OR (i.created_at_ms=? AND i.id<?))
      AND (?='all' OR i.status=?)
    ORDER BY i.created_at_ms DESC,i.id DESC LIMIT ?`)
-  .bind(projectId,before,status,status,max).all();
+  .bind(projectId,before,before,beforeId,status,status,max).all();
  const payments=(rows.results||[]).map(row=>({
   invoiceId:row.id,projectOrderRef:row.project_order_ref,
   fiat:row.fiat,amountMinor:row.amount_minor,
@@ -58,5 +61,6 @@ export async function projectReport(request,env,url){
  }));
  return reply({ok:true,projectId,payments,
   nextBefore:payments.length?payments.at(-1).createdAt:null,
-  note:'Pagination uses createdAt; use smaller before value for older pages.'});
+  nextBeforeId:payments.length?payments.at(-1).invoiceId:null,
+  note:'Use nextBefore and nextBeforeId together for stable pagination.'});
 }
