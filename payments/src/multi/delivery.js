@@ -1,6 +1,6 @@
 import {projectWebhookKey} from './keys.js';
 import {safeWebhookUrl} from './identity.js';
-import {verifyChainPaymentQuorum} from './quorum.js';
+import {verifyRecordedInvoice} from './receipt-proof.js';
 const enc=new TextEncoder();
 async function sign(secret,text){
  const key=await crypto.subtle.importKey('raw',enc.encode(secret),
@@ -41,8 +41,9 @@ export async function deliverV2(env,now=Date.now(),onlyEventId=null){
      WHERE id=? AND project_id=? AND status='verified' AND tx_hash IS NOT NULL`)
     .bind(event.invoice_id,event.project_id).first();
    if(!invoice)throw Error('invoice_not_verified');
-   const current=await verifyChainPaymentQuorum(invoice,invoice.tx_hash,env);
-   const recorded=JSON.parse(event.event_body);
+   const {proof:current,recorded}=await verifyRecordedInvoice(db,invoice,env);
+   if(JSON.stringify(recorded)!==event.event_body)
+    throw Error('outbox_payload_changed');
    if(recorded.invoiceId!==invoice.id||
       recorded.projectId!==invoice.project_id||
       recorded.transactionHash!==current.txHash||
