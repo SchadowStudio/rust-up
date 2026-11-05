@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  validTestReceipt,validTestPrecheckout,safeTestStateTransition,
- validTestDeliveryAck,testRefundPayload,telegramTestApi,
+ validTestDeliveryAck,testRefundPayload,telegramTestApi,completeTelegramStarsTest,
  verifyTelegramTestBot
 } from './telegram-stars-test-env.mjs';
 const ID='53e41abc-7696-4da9-8f1d-95b5409e3841';
@@ -148,4 +148,59 @@ test('mock test-network refund and delivery calls never reach production API',as
  assert.equal(requests.every(x=>x.url.includes('/test/')),true);
  await assert.rejects(()=>telegramTestApi(TOKEN,'setWebhook',{},fake),
   /unapproved_test_bot_method/);
+});
+
+test('full TEST invoice-delivery-refund automation is one-use and strictly TEST-only',async()=>{
+ const token=TOKEN,seen=[],invoice='https://t.me/$RUSTUPtest_invoicelink_123';
+ const result=await completeTelegramStarsTest(token,'123456',7,{
+  create:async(t,user,stars)=>{
+   assert.equal(t,token);assert.equal(user,'123456');assert.equal(stars,7);
+   seen.push('invoice');
+   return {testOnly:true,orderId:ID,invoiceUrl:invoice};
+  },
+  poll:async(t,fetchImpl,seconds)=>{
+   assert.equal(t,token);assert.equal(seconds,0);
+   seen.push('poll');
+   return {testOnly:true,status:seen.filter(x=>x==='poll').length===2
+    ?'delivered':'precheckout_approved',
+    testReceiptDelivered:seen.filter(x=>x==='poll').length===2};
+  },
+  refundConfirmed:async(t,phrase)=>{
+   assert.equal(t,token);assert.equal(phrase,'REFUND TEST '+ID);
+   seen.push('refund');
+   return {testOnly:true,status:'refunded'};
+  },
+  announce:(message)=>{seen.push(message)},maxPolls:3,pollSeconds:0
+ });
+ assert.equal(result.testOnly,true);
+ assert.equal(result.refundVerified,true);
+ assert.equal(result.gameBalanceChanged,false);
+ assert.equal(seen.filter(x=>x==='refund').length,1);
+ assert.equal(seen.filter(x=>x==='poll').length,2);
+});
+test('no refund if test invoice is unverified or no payment arrived',async()=>{
+ let refunded=0;
+ const base={create:async()=>({testOnly:true,orderId:ID,
+  invoiceUrl:'https://t.me/$Safe_TEST_AAAAAA'}),
+  refundConfirmed:async()=>{refunded++;throw Error('should never refund');},
+  announce:()=>{},maxPolls:2,pollSeconds:0};
+ await assert.rejects(
+  ()=>completeTelegramStarsTest(TOKEN,'123456',7,{
+   ...base,poll:async()=>({testOnly:true,status:'pending',
+    testReceiptDelivered:false})}),
+  /test_payment_not_completed_no_refund_attempted/
+ );
+ await assert.rejects(
+  ()=>completeTelegramStarsTest(TOKEN,'123456',7,{
+   ...base,poll:async()=>({testOnly:true,status:'manual_review',
+    testReceiptDelivered:false})}),
+  /test_receipt_requires_manual_review/
+ );
+ await assert.rejects(
+  ()=>completeTelegramStarsTest(TOKEN,'123456',7,{
+   ...base,create:async()=>({testOnly:false,orderId:ID,
+    invoiceUrl:'https://t.me/$Safe_TEST_AAAAAA'})}),
+  /invalid_test_only_invoice/
+ );
+ assert.equal(refunded,0);
 });
