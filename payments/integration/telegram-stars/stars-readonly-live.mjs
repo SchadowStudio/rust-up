@@ -60,7 +60,9 @@ export async function handleStarsReadOnly(request,env){
   let body;
   try{body=JSON.parse(raw);}catch{return response({ok:false,error:'invalid_json'},400,trusted);}
   let user;
-  try {user=await verifiedTelegramInitData(body?.initData,env?.BOT_TOKEN);}
+  // Read-only catalogue/history permits a signed Telegram session up to 24h.
+  // Payment-sensitive callers still use the validator's 10-minute default.
+  try {user=await verifiedTelegramInitData(body?.initData,env?.BOT_TOKEN,Date.now(),86400);}
   catch {return response({ok:false,error:'telegram_auth_required'},401,trusted);}
   const db=env?.PAYMENTS_DB;
   if(!db||typeof db.prepare!=='function')
