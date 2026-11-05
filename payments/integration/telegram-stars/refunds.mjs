@@ -3,6 +3,7 @@
 // separate refund flag and an allowlisted finance admin; OFF by default.
 import {isPaymentAdmin} from './payment-controls.mjs';
 import {telegramApi} from './stars.mjs';
+import {SUPPORTER_BADGE_SKU,supporterRefundStatement} from './supporter-badge.mjs';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CMD=/^\/pay(?:@rustuper_bot)?\s+refundstars\s+([a-f0-9-]{36})\s+(CONFIRM)$/i;
 function isPrivate(m){return m?.chat?.type==='private'&&m.chat.id===m?.from?.id;}
@@ -15,7 +16,7 @@ export async function issueFixedStarsRefund(env,params){
  const db=env.PAYMENTS_DB;
  if(!db)throw Error('refund_database_unavailable');
  const order=await db.prepare(
-  'SELECT id,telegram_user_id,status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
+  'SELECT id,telegram_user_id,sku,status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
  ).bind(orderId).first();
  if(!order||order.status!=='paid'||!Number.isSafeInteger(order.telegram_user_id)||
    typeof order.telegram_charge_id!=='string'||!order.telegram_charge_id)
@@ -54,12 +55,19 @@ export async function issueFixedStarsRefund(env,params){
  // D1 batch is an atomic transaction: all three rows are updated or none.
  // In case of an error, the pending record prevents repeating the refund.
  const at=Date.now();
- await db.batch([
+ const statements=[
   db.prepare("UPDATE rustup_stars_orders SET status='refunded' WHERE id=? AND status='paid'").bind(orderId),
-  db.prepare('UPDATE rustup_stars_order_content SET unlocked_at_ms=NULL WHERE order_id=?').bind(orderId),
+  db.prepare('UPDATE rustup_stars_order_content SET unlocked_at_ms=NULL WHERE order_id=?').bind(orderId)
+ ];
+ // This changes NO game balances: only the specific profile badge is revoked.
+ // Include revocation in the SAME transaction as the Telegram refund record.
+ if(order.sku===SUPPORTER_BADGE_SKU)
+  statements.push(supporterRefundStatement(db,orderId,at));
+ statements.push(
   db.prepare("UPDATE rustup_stars_refund_intents SET state='completed',completed_at_ms=? WHERE order_id=? AND state='pending'")
     .bind(at,orderId)
- ]);
+ );
+ await db.batch(statements);
  return {ok:true,orderId,status:'refunded',gameBalanceChanged:false};
 }
 export async function handleRefundCommand(update,env,fetchImpl=fetch){
