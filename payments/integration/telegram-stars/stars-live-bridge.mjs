@@ -36,6 +36,11 @@ async function available(env){
  // No Stars charge without a viable support/refund operator path.
  const authorizedRefundOperator=typeof env.PAYMENT_ADMIN_IDS==='string'&&
   env.PAYMENT_ADMIN_IDS.split(',').some(id=>/^[1-9][0-9]{0,15}$/.test(id.trim()));
+ const terms=publishedStarsTerms(env);
+ if(!terms||!env?.PAYMENTS_DB)return false;
+ try{
+  await env.PAYMENTS_DB.prepare('SELECT 1 FROM rustup_stars_terms_acceptances LIMIT 1').first();
+ }catch{return false;}
  return env.STARS_FIXED_PRODUCTS_ENABLED==='true'&&
   env.STARS_REFUNDS_ENABLED==='true'&&
   authorizedRefundOperator&&
