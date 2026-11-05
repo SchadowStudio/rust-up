@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {createHmac} from 'node:crypto';
 import {variableStarsApi,variableStarsWebhook} from './stars-variable-bridge.mjs';
 import {quoteVariableStars} from './variable-stars.mjs';
@@ -85,4 +86,19 @@ test('forged or missing Telegram authentication fails closed',async()=>{
   body:JSON.stringify({initData:'invalid',amountMinor:10000})
  }),env);
  assert.equal(response.status,401);
+});
+
+test('signed Mini App quote uses the selected 1.87159 RUB/Star rate, without charging',async()=>{
+ const owner=JSON.parse(readFileSync(new URL('../../stars-owner-rate.json',import.meta.url),'utf8'));
+ const response=await variableStarsApi(req('quote',{amountMinor:100000}),{
+  ...env,...owner
+ });
+ assert.equal(response.status,200);
+ const q=await response.json();
+ assert.equal(q.requestedAmountMinor,100000);
+ assert.equal(q.priceStars,535);
+ assert.equal(q.rateNumerator,187159);
+ assert.equal(q.rateDenominator,1000);
+ assert.equal(q.checkoutEnabled,false);
+ assert.equal(q.creditedToGame,false);
 });
