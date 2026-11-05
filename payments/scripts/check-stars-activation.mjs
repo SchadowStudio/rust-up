@@ -57,6 +57,8 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   sourceNames.includes('worker.stars-variable-entry.mjs');
  const hasSchema=tables.includes('rustup_stars_variable_orders')&&
   tables.includes('rustup_payment_settings');
+ const badgeSchemaReady=tables.includes('rustup_stars_supporter_badges');
+ const badgeWorkerReady=sourceNames.includes('supporter-badge.mjs');
  const previewReady=secretReady&&databaseReady&&originReady&&hasBridge&&
   hasSchema&&validPriceConfiguration(bindings);
  // Even apparently ON flags do not demonstrate a trustworthy delivery to a
@@ -68,6 +70,10 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   success('miniapp_origin',originReady,'Expected existing Telegram Mini App origin'),
   success('variable_invoice_modules',hasBridge,'Source map must list three modules'),
   success('payment_tables',hasSchema,'Variable orders and payment controls exist'),
+  success('supporter_badge_table',badgeSchemaReady,
+    'Supporter entitlements exist only in isolated Stars payments D1'),
+  success('supporter_badge_worker_module',badgeWorkerReady,
+    'The live Worker must contain the verified supporter badge fulfillment module'),
   success('price_preview',validPriceConfiguration(bindings),
     'Owner-defined minimum, maximum and Stars ratio must be configured'),
   success('payment_flags_known',paymentSwitchesKnown,
@@ -111,7 +117,7 @@ export async function inspectLiveStars(token){
  const [settings,schema,deploy,sourceSnapshot]=await Promise.all([
   cloudflare(base+'/settings',token),
   cloudflare('/accounts/'+ACCOUNT+'/d1/database/'+PAYMENTS_DB+'/query',token,{
-   sql:"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('rustup_stars_variable_orders','rustup_payment_settings') ORDER BY name"
+   sql:"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('rustup_stars_variable_orders','rustup_payment_settings','rustup_stars_supporter_badges') ORDER BY name"
   }),
   cloudflare(base+'/deployments',token),
   recoverVariableSource(token)
