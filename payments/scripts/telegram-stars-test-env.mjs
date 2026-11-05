@@ -105,6 +105,19 @@ function fresh(userId,stars){
   deliveryMessageId:null,refundIntentAt:null,lastUpdateId:0
  };
 }
+async function identifyTestUser(token,fetchImpl=fetch){
+ await verifyTelegramTestBot(token,fetchImpl);
+ const updates=await telegram(token,'getUpdates',{
+  timeout:0,limit:100,allowed_updates:['message']
+ },fetchImpl);
+ if(!Array.isArray(updates))throw Error('invalid_test_updates');
+ const ids=[...new Set(updates
+  .filter(x=>x?.message?.chat?.type==='private'&&
+   Number.isSafeInteger(x.message.from?.id)&&
+   x.message.from.id>0)
+  .map(x=>x.message.from.id))];
+ return {ok:true,testOnly:true,testUserIds:ids};
+}
 async function invoice(token,userId,stars,fetchImpl=fetch){
  await verifyTelegramTestBot(token,fetchImpl);
  const existing=await readState();
@@ -219,8 +232,8 @@ async function refund(token,confirmation,fetchImpl=fetch){
 }
 async function main(){
  const action=process.argv[2],token=process.env.TELEGRAM_TEST_BOT_TOKEN;
- if(!['probe','invoice','listen','watch','refund','status'].includes(action))
-  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|invoice <TEST_USER_ID> <STARS>|listen|watch|refund "REFUND TEST <ORDER_UUID>"|status');
+ if(!['probe','identify','invoice','listen','watch','refund','status'].includes(action))
+  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|identify|invoice <TEST_USER_ID> <STARS>|listen|watch|refund "REFUND TEST <ORDER_UUID>"|status');
  if(action==='status'){
   const s=await readState();
   console.log(JSON.stringify({testOnly:true,status:s?.status||'not_started',
@@ -231,6 +244,7 @@ async function main(){
  if(!token)throw Error('TELEGRAM_TEST_BOT_TOKEN_missing');
  let outcome;
  if(action==='probe')outcome=await verifyTelegramTestBot(token);
+ else if(action==='identify')outcome=await identifyTestUser(token);
  else if(action==='invoice')outcome=await invoice(token,process.argv[3],Number(process.argv[4]));
  else if(action==='listen')outcome=await listen(token);
  else if(action==='watch'){
