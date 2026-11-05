@@ -63,7 +63,7 @@ function fixture(){
  pay.prepare('INSERT INTO rustup_stars_variable_orders '+
  '(id,telegram_user_id,client_request_id,requested_amount_minor,price_stars,'+
  'rate_num,rate_den,status,telegram_charge_id,created_at_ms,expires_at_ms,paid_at_ms) '+
- "VALUES(?,?,?,?,?,?,?,'refunded',?,?,?,?,?)")
+ "VALUES(?,?,?,?,?,?,?,'refunded',?,?,?,?)")
  .run(id,user,'client-refund-123',100000,535,187159,1000,tx.id,
   1793999000000,1794001000000,1794000000000);
  pay.prepare('INSERT INTO rustup_stars_variable_credit_quotes '+
