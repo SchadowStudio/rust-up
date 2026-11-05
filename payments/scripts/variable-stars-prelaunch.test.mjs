@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {evaluateVariableStarsPrelaunch,inspectVariableStarsPrelaunch}
  from './variable-stars-prelaunch.mjs';
 
@@ -41,8 +42,8 @@ function fixture(){
 }
 test('accepts price intentionally deferred; never converts a passing offline check to live money readiness',()=>{
  const result=evaluateVariableStarsPrelaunch(fixture());
- assert.equal(result.pricing,'DEFERRED_BY_OPERATOR');
- assert.equal(result.pricingConfigured,null);
+ assert.equal(result.pricing,'SELECTED_BY_OPERATOR');
+ assert.equal(result.pricingConfigured,false);
  assert.equal(result.paymentOrGameCreditActivated,false);
  assert.equal(result.readyToAcceptRealPayments,false);
  assert.equal(result.readyExceptPricing,false);
@@ -126,7 +127,7 @@ test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and use
   throw Error('unexpected_mock_endpoint');
  };
  const result=await inspectVariableStarsPrelaunch('private-read-token-000001',fakeFetch);
- assert.equal(result.pricing,'DEFERRED_BY_OPERATOR');
+ assert.equal(result.pricing,'SELECTED_BY_OPERATOR');
  assert.equal(result.sourceWorkerVersion,'mock-worker-version');
  assert.equal(result.counts.paid_orders,0);
  assert.equal(result.counts.gameAccounts,4);
@@ -161,4 +162,26 @@ test('pending variable Stars refunds are independently counted and block prelaun
  const missing=fixture();
  missing.paymentCounts=missing.paymentCounts.filter(x=>x.name!=='unresolved_variable_refunds');
  assert.throws(()=>evaluateVariableStarsPrelaunch(missing),/incomplete_payment_counts/);
+});
+
+test('the operator price is recorded but only an exact live Worker match counts as configured',()=>{
+ const owner=JSON.parse(readFileSync(new URL('../stars-owner-rate.json',import.meta.url),'utf8'));
+ const f=fixture();
+ let report=evaluateVariableStarsPrelaunch(f);
+ assert.equal(report.rateStoredInRepository,true);
+ assert.equal(report.rateRubPerStar,'1.87159');
+ assert.equal(report.pricingConfigured,false);
+ assert.ok(report.blockers.includes('live_worker_has_selected_stars_rate'));
+ for(const name of ['STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
+  'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN']){
+  f.bindings.push({name,type:'plain_text',text:owner[name]});
+ }
+ report=evaluateVariableStarsPrelaunch(f);
+ assert.equal(report.pricingConfigured,true);
+ assert.equal(report.blockers.includes('live_worker_has_selected_stars_rate'),false);
+ assert.equal(report.readyToAcceptRealPayments,false);
+ f.bindings.find(x=>x.name==='STARS_RUB_MINOR_PER_STAR_DEN').text='1';
+ report=evaluateVariableStarsPrelaunch(f);
+ assert.equal(report.pricingConfigured,false);
+ assert.ok(report.blockers.includes('live_worker_has_selected_stars_rate'));
 });
