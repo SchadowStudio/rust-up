@@ -173,6 +173,9 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
  if(!db||!await available(env))throw Error('stars_checkout_disabled');
  if(!Number.isSafeInteger(userId)||userId<=0||!SKU.test(sku||''))
   throw Error('bad_checkout_request');
+ const terms=publishedStarsTerms(env);
+ if(!terms||!await starsTermsAccepted(db,userId,terms))
+  throw Error('stars_terms_acceptance_required');
  const product=await db.prepare(
   'SELECT p.sku,p.title,p.description,p.kind,p.price_stars,p.enabled,c.delivery_text '+
   'FROM rustup_stars_products p JOIN rustup_stars_fixed_content c ON c.sku=p.sku '+
