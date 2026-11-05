@@ -191,9 +191,14 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
   const pay=msg?.successful_payment;
   if(pay&&typeof pay.invoice_payload==='string'&&pay.invoice_payload.startsWith('v:')){
     const id=fromPayload(pay.invoice_payload);
-    if(!id||!env.DB){
-      console.error('Unmatched Stars variable payment: invalid payload or DB unavailable');
+    if(!env.DB){
+      console.error('Variable Stars receipt cannot be recorded without D1');
       throw Error('variable_stars_receipt_unavailable');
+    }
+    if(!id){
+      // Telegram may have charged for an invalid/stale payload. Quarantine
+      // complete evidence rather than forever returning 503 for that charge.
+      return quarantineVariableReceipt(env.DB,msg,now);
     }
     const row=await env.DB.prepare(
       'SELECT * FROM rustup_stars_variable_orders WHERE id=?'
