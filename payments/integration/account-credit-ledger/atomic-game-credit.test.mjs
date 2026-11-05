@@ -70,3 +70,52 @@ test('invalid, negative and overflowing canonical balances abort without journal
   }finally{db.close();}
  }
 });
+
+function refund(db,{order=orderId,charge='tg-charge-12345678',
+ user=123456789,coinCents=150}={}){
+ return db.prepare('INSERT INTO rustup_game_paid_refunds '+
+  '(source,order_id,receipt_id,telegram_user_id,coin_cents,refunded_at_ms) '+
+  'VALUES (?,?,?,?,?,?)')
+  .run('stars_variable',order,charge,user,coinCents,1794000100000);
+}
+test('provider-verified refund event reverses exact credit and mirrored balance once',()=>{
+ const db=fixture();
+ try{
+  credit(db);
+  assert.equal(refund(db).changes,1);
+  const row=db.prepare('SELECT state,v FROM accounts').get();
+  assert.equal(JSON.parse(row.state).balance,10);
+  assert.equal(row.v,5);
+  assert.equal(db.prepare('SELECT balance FROM users').get().balance,10);
+  assert.throws(()=>refund(db),/UNIQUE/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,1);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,10);
+ }finally{db.close();}
+});
+test('wrong refunded charge, user or amount fails without balance movement',()=>{
+ const db=fixture();
+ try{
+  credit(db);
+  for(const bad of [
+   {charge:'wrong-charge-1234'}, {user:123456790}, {coinCents:151},
+   {order:'wrong-order-123456789'}
+  ]){
+   assert.throws(()=>refund(db,bad),/mismatch|FOREIGN KEY/);
+  }
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,11.5);
+ }finally{db.close();}
+});
+test('already-spent credit requires manual review, not an unrecorded reversal',()=>{
+ const db=fixture();
+ try{
+  credit(db);
+  const state={balance:0.25,inventory:['used']};
+  db.prepare('UPDATE accounts SET state=?').run(JSON.stringify(state));
+  db.prepare('UPDATE users SET balance=?').run(0.25);
+  assert.throws(()=>refund(db),/spent_manual_review/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,0.25);
+  assert.equal(db.prepare('SELECT balance FROM users').get().balance,0.25);
+ }finally{db.close();}
+});
