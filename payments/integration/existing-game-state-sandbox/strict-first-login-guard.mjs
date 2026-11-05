@@ -2,13 +2,13 @@
 // once the operator enables a real monetary wallet. Existing accounts remain
 // unchanged. The legacy virtual-only game behavior stays the default.
 // This file is a patcher/test helper, NOT a deployment or payment activation.
-const TARGET='       const s = await importState(body.local, user);';
+const TARGET='      const s = await importState(body.local, user);';
 const REPLACEMENT=[
-  '       // RUSTUP_STRICT_ACCOUNT_IMPORT_V1: client local storage is not a payment receipt.',
-  '       // Preserve cosmetic profile only; game value must come from server entries.',
-  "       const strictPaidAccount = env.PAYMENT_WALLET_STRICT_MODE === 'true';",
-  '       const safeLocal = strictPaidAccount ? { user: body.local?.user } : body.local;',
-  '       const s = await importState(safeLocal, user);'
+  '      // RUSTUP_STRICT_ACCOUNT_IMPORT_V1: client local storage is not a payment receipt.',
+  '      // Preserve cosmetic profile only; game value must come from server entries.',
+  "      const strictPaidAccount = env.PAYMENT_WALLET_STRICT_MODE === 'true';",
+  '      const safeLocal = strictPaidAccount ? { user: body.local?.user } : body.local;',
+  '      const s = await importState(safeLocal, user);'
 ].join('\n');
 export function patchGameInitialImport(source){
   if(typeof source!=='string'||source.length<5000||source.length>500000||
