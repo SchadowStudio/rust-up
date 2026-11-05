@@ -154,6 +154,14 @@ export async function recordUnexpectedVariableStarsReceipt(db,msg,now=Date.now()
   return {stored:true,duplicate:true};
 }
 
+// A second charge for an already paid invoice is not a harmless replay.
+// Preserve the evidence before acknowledging Telegram; never give it credit.
+async function quarantineVariableReceipt(db,msg,now){
+  const incident=await recordUnexpectedVariableStarsReceipt(db,msg,now);
+  return {handled:true,type:'variable_receipt',accepted:false,
+    incidentRecorded:incident.stored,creditedToGame:false};
+}
+
 export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=Date.now()){
   const q=update?.pre_checkout_query;
   if(q&&typeof q.invoice_payload==='string'&&q.invoice_payload.startsWith('v:')){
@@ -193,12 +201,18 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
     if(!validVariableStarsReceipt(row,msg)){
       // Do not lose an unexpected payment or loop on Telegram webhook retries.
       // Only acknowledge after an incident was saved in the isolated D1.
-      const incident=await recordUnexpectedVariableStarsReceipt(env.DB,msg,now);
       console.error('Unmatched Stars variable receipt recorded for operator review');
-      return {handled:true,type:'variable_receipt',accepted:false,
-        incidentRecorded:incident.stored};
+      return quarantineVariableReceipt(env.DB,msg,now);
     }
     const charge=pay.telegram_payment_charge_id;
+    if(row.status==='paid'){
+      if(row.telegram_charge_id===charge)
+        return {handled:true,type:'variable_receipt',accepted:true,
+          duplicate:true,creditedToGame:false};
+      // Telegram can send an additional actual charge against the same invoice.
+      // It requires human refund/reconciliation, not an endless HTTP 503 loop.
+      return quarantineVariableReceipt(env.DB,msg,now);
+    }
     try{
       const result=await env.DB.prepare(
         "UPDATE rustup_stars_variable_orders SET status='paid',telegram_charge_id=?,paid_at_ms=? "+
@@ -208,22 +222,31 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
         return {handled:true,type:'variable_receipt',accepted:true,
           duplicate:false,creditedToGame:false,
           requestedAmountMinor:row.requested_amount_minor,currency:'RUB'};
-    }catch{
-      // Duplicate charge ID is rejected by UNIQUE. Other DB errors get retried.
+    }catch(error){
+      // Only a proven uniqueness collision may be quarantined. Transient D1
+      // errors MUST propagate so Telegram retries rather than losing a charge.
       const existing=await env.DB.prepare(
         'SELECT status,telegram_charge_id FROM rustup_stars_variable_orders WHERE id=?'
       ).bind(row.id).first();
-      if(existing?.status==='paid'&&existing.telegram_charge_id===charge)
-        return {handled:true,type:'variable_receipt',accepted:true,
-          duplicate:true,creditedToGame:false};
-      throw Error('variable_stars_receipt_conflict');
+      if(existing?.status==='paid'){
+        if(existing.telegram_charge_id===charge)
+          return {handled:true,type:'variable_receipt',accepted:true,
+            duplicate:true,creditedToGame:false};
+        return quarantineVariableReceipt(env.DB,msg,now);
+      }
+      if(/UNIQUE constraint failed[^\n]*telegram_charge_id/i.test(String(error?.message||'')))
+        return quarantineVariableReceipt(env.DB,msg,now);
+      throw Error('variable_stars_receipt_database_retry');
     }
     const old=await env.DB.prepare(
       'SELECT status,telegram_charge_id FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(row.id).first();
-    if(old?.status==='paid'&&old.telegram_charge_id===charge)
-      return {handled:true,type:'variable_receipt',accepted:true,
-        duplicate:true,creditedToGame:false};
+    if(old?.status==='paid'){
+      if(old.telegram_charge_id===charge)
+        return {handled:true,type:'variable_receipt',accepted:true,
+          duplicate:true,creditedToGame:false};
+      return quarantineVariableReceipt(env.DB,msg,now);
+    }
     throw Error('variable_stars_receipt_state_conflict');
   }
   return {handled:false};

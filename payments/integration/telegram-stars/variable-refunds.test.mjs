@@ -118,3 +118,15 @@ test('failed Telegram refund is quarantined without writing a game credit',async
   assert.equal(tg.calls.length,1);
  }finally{f.close();}
 });
+
+test('refund is blocked if a game credit might already exist and has no reversal',async()=>{
+ const f=setup(),tg=mockTelegram();
+ try{
+  await assert.rejects(()=>issueVariableStarsRefund({
+   ...f.env,STARS_VARIABLE_CREDIT_LEDGER_READY:'true'
+  },{...f.args,fetchImpl:tg.fetchImpl}),/game_credit_reversal_unavailable/);
+  assert.equal(tg.calls.length,0);
+  assert.equal(f.raw.prepare('SELECT COUNT(*) AS n FROM rustup_stars_variable_refund_intents')
+   .get().n,0);
+ }finally{f.close();}
+});
