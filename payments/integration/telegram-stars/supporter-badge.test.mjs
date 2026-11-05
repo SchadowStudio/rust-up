@@ -51,8 +51,9 @@ function database(){
 }
 function fixture(){
  const {sql,db}=database();
- sql.prepare('UPDATE rustup_payment_settings SET enabled=1 WHERE channel IN (?,?)')
-  .run('master','stars');
+ sql.prepare('UPDATE rustup_payment_settings '+
+  'SET enabled=1,updated_by=?,updated_at_ms=? WHERE channel IN (?,?)')
+  .run(ADMIN,Date.now(),'master','stars');
  // 17 Stars is an EXAMPLE INSIDE A TEST. Never seed a production price.
  sql.prepare('INSERT INTO rustup_stars_products '+
   '(sku,title,description,kind,price_stars,enabled) VALUES (?,?,?,?,?,?)')
