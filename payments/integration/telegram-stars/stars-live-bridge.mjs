@@ -302,7 +302,9 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
     'JOIN rustup_stars_fixed_content c ON c.sku=p.sku '+
     "WHERE p.enabled=1 AND p.kind='fixed_nontransferable' ORDER BY p.sku LIMIT 50"
    ).all();
+   const terms=publishedStarsTerms(env);
    return data({ok:true,checkoutEnabled:await available(env),
+    termsAccepted:terms?await starsTermsAccepted(db,userId,terms):false,
     products:catalog.results||[]},200,origin);
   }
   if(path==='/api/stars/supporter-badge'){
