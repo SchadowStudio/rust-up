@@ -45,11 +45,11 @@ Run 'Check bridge JavaScript syntax'{
  node --check ".\payments\integration\telegram-stars\stars-variable-bridge.mjs"
 }
 Run 'Check recovery script syntax'{
- node --check ".\payments\scripts\recover-current-stars-commerce.mjs"
+ node --check ".\payments\scripts\recover-current-stars-variable.mjs"
 }
-Write-Host '`n[Recover EXACT current 16-module live Worker]' -ForegroundColor Cyan
+Write-Host '`n[Recover EXACT current 18-module live Worker]' -ForegroundColor Cyan
 $global:LASTEXITCODE=0
-$log=@(node ".\payments\scripts\recover-current-stars-commerce.mjs" 2>&1)
+$log=@(node ".\payments\scripts\recover-current-stars-variable.mjs" 2>&1)
 if($LASTEXITCODE -ne 0){
  $log|ForEach-Object{Write-Host $_}
  throw 'Live source recovery failed'
