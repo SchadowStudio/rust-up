@@ -18,7 +18,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 
 export function validTestReceipt(order,update){
  const msg=update?.message,paid=msg?.successful_payment;
- return !!order&&!!paid&&
+ return !!order&&order.testOnly===true&&!!paid&&
   (['precheckout_approved','paid','delivered'].includes(order.status))&&
   order.orderId===String(paid.invoice_payload||'').replace(/^test_rustup_/,'')&&
   paid.currency==='XTR'&&paid.total_amount===order.priceStars&&
@@ -30,7 +30,7 @@ export function validTestReceipt(order,update){
 }
 export function validTestPrecheckout(order,update){
  const q=update?.pre_checkout_query;
- return !!q&&!!order&&
+ return !!q&&!!order&&order.testOnly===true&&
   (order.status==='invoice_created'||order.status==='precheckout_approved')&&
   (order.status!=='precheckout_approved'||order.checkoutQueryId===q.id)&&
   q.invoice_payload==='test_rustup_'+order.orderId&&
@@ -38,7 +38,7 @@ export function validTestPrecheckout(order,update){
   q.from?.id===order.telegramUserId;
 }
 export function safeTestStateTransition(order,event){
- if(!order||!UUID.test(order.orderId))throw Error('invalid_test_order');
+ if(!order||order.testOnly!==true||!UUID.test(order.orderId))throw Error('invalid_test_order');
  if(event==='precheckout'){
   if(order.status==='invoice_created')return {...order,status:'precheckout_approved'};
   if(order.status==='precheckout_approved')return order;
@@ -138,7 +138,7 @@ async function invoice(token,userId,stars,fetchImpl=fetch){
  return {ok:true,testOnly:true,invoiceUrl:link,orderId:order.orderId};
 }
 export function validTestDeliveryAck(order,answer){
- return !!order&&order.status==='paid'&&
+ return !!order&&order.testOnly===true&&order.status==='paid'&&
   Number.isSafeInteger(answer?.message_id)&&answer.message_id>0&&
   answer.chat?.id===order.telegramUserId;
 }
