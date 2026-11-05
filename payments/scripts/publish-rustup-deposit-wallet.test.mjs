@@ -37,6 +37,7 @@ test('unexpected page versions or app scripts are never blindly overwritten',()=
 });
 test('clean wallet keeps arbitrary RUB amount, real invoice gates, and does not display Supporter',()=>{
  assert.equal(verifyDepositAssets(js,css),true);
+ assert.throws(()=>verifyDepositAssets(js,css+'\n'),/deposit_css_trailing_blank_line/);
  assert.doesNotMatch(js,/rustup-supporter-status|supporter-badge/);
  assert.doesNotMatch(css,/rustup-supporter-status/);
  assert.match(js,/payButton.disabled=data.checkoutEnabled!==true/);
