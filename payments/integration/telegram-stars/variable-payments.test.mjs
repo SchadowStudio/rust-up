@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {
   quoteVariableStars,createVariableStarsCheckout,
   validVariableStarsPrecheckout,validVariableStarsReceipt,
-  handleVariableStarsUpdate
+  handleVariableStarsUpdate,recordUnexpectedVariableStarsReceipt
 } from './variable-stars.mjs';
 import {createExternalVariableCryptoCheckout,recordExternalVariableReceipt}
   from './variable-crypto.mjs';
@@ -29,8 +29,10 @@ test('arbitrary RUB minor amount is quoted in whole Stars from owner rate, not f
 
 function makeStarsDb(){
   let row=null,updates=0;
+  const incidents=new Map();
   return {
     get row(){return row;},get updates(){return updates;},
+    get incidents(){return incidents;},
     prepare(sql){
       return {bind(...args){return {
         async first(){
@@ -38,9 +40,18 @@ function makeStarsDb(){
             ((sql.includes('telegram_user_id=?')&&(row.telegram_user_id!==args[0]||
               row.client_request_id!==args[1]))|| 
              (sql.includes('WHERE id=?')&&row.id!==args[0])?null:{...row});
+          if(sql.includes('FROM rustup_stars_receipt_incidents WHERE telegram_charge_id=?'))
+            return incidents.get(args[0])||null;
           return null;
         },
         async run(){
+          if(sql.includes('INSERT OR IGNORE INTO rustup_stars_receipt_incidents')){
+            const charge=args[0];
+            if(incidents.has(charge))return {meta:{changes:0}};
+            incidents.set(charge,{telegram_charge_id:charge,telegram_user_id:args[1],
+              invoice_payload:args[2],price_stars:args[3],reason:args[4],occurred_at_ms:args[5]});
+            return {meta:{changes:1}};
+          }
           if(sql.includes('INSERT INTO rustup_stars_variable_orders')){
             row={id:args[0],telegram_user_id:args[1],client_request_id:args[2],
               requested_amount_minor:args[3],price_stars:args[4],
@@ -139,9 +150,13 @@ test('variable Stars one-use checkout, delayed verified receipt, duplicate safe'
   const second=await handleVariableStarsUpdate({message:msg},env,bot,now+900001);
   assert.equal(second.duplicate,true);
   assert.equal(db.updates,2);
-  assert.equal((await handleVariableStarsUpdate({message:{
+  const mismatch=await handleVariableStarsUpdate({message:{
     ...msg,successful_payment:{...msg.successful_payment,total_amount:51}
-  }},env,bot,now)).accepted,false);
+  }},env,bot,now);
+  assert.equal(mismatch.accepted,false);
+  assert.equal(mismatch.incidentRecorded,true);
+  assert.equal(db.incidents.size,1);
+  assert.equal(db.incidents.get('unique-charge-1').reason,'variable_receipt_mismatch');
 });
 
 function makeCryptoDb(){
@@ -216,4 +231,26 @@ test('variable crypto refuses Telegram bot digital payment context',async()=>{
   ()=>createExternalVariableCryptoCheckout({}, {sourceChannel:'telegram-bot'}),
   /telegram_digital_goods_require_stars/
  );
+});
+
+test('incomplete variable Stars incident evidence fails closed and never credits',async()=>{
+  const db=makeStarsDb();
+  const msg={from:{id:12345},successful_payment:{
+    currency:'XTR',total_amount:20,invoice_payload:'v:not-an-order',
+    telegram_payment_charge_id:'bad-charge-test'
+  }};
+  const first=await recordUnexpectedVariableStarsReceipt(db,msg,now);
+  const replay=await recordUnexpectedVariableStarsReceipt(db,msg,now+1);
+  assert.equal(first.stored,true);
+  assert.equal(replay.duplicate,true);
+  assert.equal(db.incidents.size,1);
+  assert.equal(db.updates,0);
+  await assert.rejects(()=>recordUnexpectedVariableStarsReceipt(db,{
+    ...msg,successful_payment:{...msg.successful_payment,total_amount:21}
+  },now+2),/incident_conflict_retry/);
+  await assert.rejects(()=>recordUnexpectedVariableStarsReceipt(db,{
+    ...msg,successful_payment:{...msg.successful_payment,
+      telegram_payment_charge_id:''}
+  },now+3),/evidence_incomplete_retry/);
+  assert.equal(db.incidents.size,1);
 });
