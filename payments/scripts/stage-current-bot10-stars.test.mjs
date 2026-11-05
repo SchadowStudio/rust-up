@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readCurrentWorker10Map,currentWorker10Config}
+import {readCurrentWorker10Map,currentWorker10Config,stableWorkerDigest,verifySnapshotFingerprint}
  from './stage-current-bot10-stars.mjs';
 
 const GAME='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
@@ -72,4 +72,45 @@ test('staged fixed-commerce adapter includes consent, Telegram receipts, refunds
   'stars-terms.mjs','refunds.mjs','stars.mjs','supporter-badge.mjs'])
   assert.ok(c.includes("'"+file+"'"),file);
  assert.match(c,/live_worker_changed_since_private_snapshot/);
+});
+
+test('Cloudflare changing multipart boundaries never triggers false source drift',()=>{
+ const a=readCurrentWorker10Map(mockMap());
+ const b=readCurrentWorker10Map(mockMap().replaceAll(
+  '--rustupboundary1234567890','--otherboundary1234567890'));
+ assert.equal(stableWorkerDigest(a),stableWorkerDigest(b));
+ const modified=new Map(b);
+ modified.set('game.js',modified.get('game.js')+'\n// changed');
+ assert.notEqual(stableWorkerDigest(a),stableWorkerDigest(modified));
+ const reordered=new Map([...a].reverse());
+ assert.throws(()=>stableWorkerDigest(reordered),/untrusted_worker_source_set/);
+});
+test('new snapshot requires stable source fingerprint and metadata match',()=>{
+ const source=readCurrentWorker10Map(mockMap());
+ const digest=stableWorkerDigest(source);
+ const added=['worker.stars-commerce-entry.mjs','stars-existing-worker-wrapper.mjs',
+ 'stars-live-bridge.mjs','stars-terms.mjs','payment-controls.mjs',
+ 'refunds.mjs','stars.mjs','telegram-initdata.mjs','supporter-badge.mjs'];
+ const valid={version:2,workerDigest:digest,metadataDigest:'metadata',
+   sourceFiles:SOURCES,addedFiles:added};
+ assert.equal(verifySnapshotFingerprint(valid,{workerDigest:digest,metadataDigest:'metadata'}),true);
+ assert.throws(()=>verifySnapshotFingerprint({...valid,workerDigest:'wrong'},
+  {workerDigest:digest,metadataDigest:'metadata'}),/live_worker_changed/);
+ assert.throws(()=>verifySnapshotFingerprint(valid,{workerDigest:digest,metadataDigest:'changed'}),/live_worker_changed/);
+ assert.throws(()=>verifySnapshotFingerprint({...valid,sourceFiles:SOURCES.slice(1)},
+  {workerDigest:digest,metadataDigest:'metadata'}),/live_worker_changed/);
+});
+test('existing version 1 backups remain comparable with exact byte-by-byte file checks',()=>{
+ const source=readCurrentWorker10Map(mockMap());
+ const digest=stableWorkerDigest(source);
+ const added=['worker.stars-commerce-entry.mjs','stars-existing-worker-wrapper.mjs',
+ 'stars-live-bridge.mjs','stars-terms.mjs','payment-controls.mjs',
+ 'refunds.mjs','stars.mjs','telegram-initdata.mjs','supporter-badge.mjs'];
+ // Version 1 stored the hash of a random Cloudflare response envelope.
+ const legacy={version:1,workerDigest:'old-envelope-hash',metadataDigest:'metadata',
+  sourceFiles:SOURCES,addedFiles:added};
+ assert.equal(verifySnapshotFingerprint(legacy,{workerDigest:digest,metadataDigest:'metadata'}),true);
+ assert.throws(()=>verifySnapshotFingerprint({...legacy,addedFiles:[]},
+  {workerDigest:digest,metadataDigest:'metadata'}),/live_worker_changed/);
+ assert.throws(()=>verifySnapshotFingerprint(legacy,{workerDigest:digest,metadataDigest:'new-metadata'}),/live_worker_changed/);
 });
