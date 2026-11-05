@@ -15,7 +15,12 @@
   if(e?.code==='history_unavailable')return 'История сейчас недоступна. Повторите попытку.';
   if(e?.name==='AbortError'||e?.name==='TimeoutError')
    return 'Превышено время ожидания сервера. Повторите попытку.';
-  if(e?.status===401)return 'Не удалось подтвердить вход через Telegram. Полностью закройте мини-приложение и откройте его заново через @rustuper_bot.';
+  if(e?.status===401){
+   const initData=window.Telegram?.WebApp?.initData;
+   if(typeof initData!=='string'||initData.length<20)
+    return 'Telegram не передал данные авторизации. Напишите /start боту @rustuper_bot и откройте приложение кнопкой 🎮 Играть.';
+   return 'Сервер не подтвердил Telegram-сессию. Закройте мини-приложение и откройте снова кнопкой 🎮 Играть из /start у @rustuper_bot.';
+  }
   if(e?.status===403)return 'Доступ отклонён. Откройте приложение через @rustuper_bot.';
   if(e?.status===422)return 'Проверьте сумму пополнения и установленные ограничения.';
   if(e?.status===503)return 'Оплата пока отключена. Попробуйте позже.';
