@@ -40,6 +40,7 @@ async function available(env){
  if(!terms||!env?.PAYMENTS_DB)return false;
  try{
   await env.PAYMENTS_DB.prepare('SELECT 1 FROM rustup_stars_terms_acceptances LIMIT 1').first();
+  await env.PAYMENTS_DB.prepare('SELECT 1 FROM rustup_stars_order_terms LIMIT 1').first();
  }catch{return false;}
  return env.STARS_FIXED_PRODUCTS_ENABLED==='true'&&
   env.STARS_REFUNDS_ENABLED==='true'&&
