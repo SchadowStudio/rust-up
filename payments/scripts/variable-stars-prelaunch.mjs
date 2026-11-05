@@ -24,6 +24,7 @@ const ROWS_SQL=[
  "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='paid') AS paid_orders,",
  "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='manual_review') AS manual_review_orders,",
  "(SELECT COUNT(*) FROM rustup_stars_refund_intents WHERE state<>'completed') AS unresolved_refunds,",
+ "(SELECT COUNT(*) FROM rustup_stars_variable_refund_intents WHERE state<>'completed') AS unresolved_variable_refunds," ,
  "(SELECT COUNT(*) FROM rustup_stars_receipt_incidents) AS receipt_incidents,",
  "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='checkout_approved'",
  "AND expires_at_ms<(CAST(strftime('%s','now') AS INTEGER)*1000-3600000)) AS approved_over_1h"
@@ -50,7 +51,7 @@ function counts(rows){
   map.set(x.name,x.n);
  }
  for(const name of ['variable_orders','paid_orders','manual_review_orders',
-  'unresolved_refunds','receipt_incidents','approved_over_1h'])
+  'unresolved_refunds','unresolved_variable_refunds','receipt_incidents','approved_over_1h'])
   if(!map.has(name))throw Error('incomplete_payment_counts');
  return Object.fromEntries(map);
 }
@@ -93,6 +94,7 @@ export function evaluateVariableStarsPrelaunch(x){
  const metric=counts(x.paymentCounts);
  const noUnresolved=metric.manual_review_orders===0&&
   metric.receipt_incidents===0&&metric.unresolved_refunds===0&&
+  metric.unresolved_variable_refunds===0&&
   metric.approved_over_1h===0;
  const accountCount=x.gameCounts?.[0]?.n;
  if(!Number.isSafeInteger(accountCount)||accountCount<0)

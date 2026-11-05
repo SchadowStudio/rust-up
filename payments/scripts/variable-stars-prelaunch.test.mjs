@@ -29,6 +29,7 @@ function fixture(){
   paymentCounts:[
    {name:'variable_orders',n:0},{name:'paid_orders',n:0},
    {name:'manual_review_orders',n:0},{name:'unresolved_refunds',n:0},
+   {name:'unresolved_variable_refunds',n:0},
    {name:'receipt_incidents',n:0},{name:'approved_over_1h',n:0}
   ],
   gameCounts:[{name:'account_rows',n:4}],
@@ -99,7 +100,8 @@ test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and use
     assert.doesNotMatch(body.sql,/\bUNION\b/i);
     return okJson([{results:[{
      variable_orders:0,paid_orders:0,manual_review_orders:0,
-     unresolved_refunds:0,receipt_incidents:0,approved_over_1h:0
+     unresolved_refunds:0,unresolved_variable_refunds:0,
+     receipt_incidents:0,approved_over_1h:0
     }]}]);
    }
    if(body.sql.includes('sqlite_master')){
@@ -147,4 +149,16 @@ test('refund-readiness requires independent schema and explicit finance admin ID
  assert.ok(blocked.blockers.includes('variable_refund_intent_schema'));
  assert.ok(blocked.blockers.includes('verified_refund_operator_allowlist'));
  assert.equal(blocked.readyToAcceptRealPayments,false);
+});
+
+test('pending variable Stars refunds are independently counted and block prelaunch',()=>{
+ const f=fixture();
+ f.paymentCounts.find(x=>x.name==='unresolved_variable_refunds').n=1;
+ const report=evaluateVariableStarsPrelaunch(f);
+ assert.equal(report.counts.unresolved_variable_refunds,1);
+ assert.ok(report.blockers.includes('no_unresolved_payment_incidents'));
+ assert.equal(report.readyToAcceptRealPayments,false);
+ const missing=fixture();
+ missing.paymentCounts=missing.paymentCounts.filter(x=>x.name!=='unresolved_variable_refunds');
+ assert.throws(()=>evaluateVariableStarsPrelaunch(missing),/incomplete_payment_counts/);
 });
