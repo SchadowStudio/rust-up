@@ -122,6 +122,37 @@ export function validVariableStarsReceipt(row,msg){
     pay.telegram_payment_charge_id.length<=256;
 }
 
+// Persist unmatched or inconsistent XTR receipts for operator investigation.
+// An acknowledged incident must be durable, never a silently lost payment.
+export async function recordUnexpectedVariableStarsReceipt(db,msg,now=Date.now()){
+  const pay=msg?.successful_payment;
+  const charge=pay?.telegram_payment_charge_id;
+  if(!db?.prepare||!Number.isSafeInteger(now)||now<=0||
+     !Number.isSafeInteger(msg?.from?.id)||msg.from.id<=0||
+     typeof charge!=='string'||charge.length<1||charge.length>256||
+     pay.currency!=='XTR'||!Number.isSafeInteger(pay.total_amount)||
+     pay.total_amount<1||
+     typeof pay.invoice_payload!=='string'||!pay.invoice_payload.startsWith('v:'))
+    throw Error('variable_receipt_evidence_incomplete_retry');
+  const result=await db.prepare(
+    'INSERT OR IGNORE INTO rustup_stars_receipt_incidents '+
+    '(telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason,occurred_at_ms) '+
+    'VALUES(?,?,?,?,?,?)'
+  ).bind(charge,msg.from.id,pay.invoice_payload.slice(0,256),
+     pay.total_amount,'variable_receipt_mismatch',now).run();
+  // An ignored duplicate is safe: the prior incident must still be present.
+  if(result?.meta?.changes===1)return {stored:true,duplicate:false};
+  const existing=await db.prepare(
+    'SELECT telegram_charge_id,telegram_user_id,price_stars,reason '+
+    'FROM rustup_stars_receipt_incidents WHERE telegram_charge_id=?'
+  ).bind(charge).first();
+  if(!existing||existing.telegram_user_id!==msg.from.id||
+     existing.price_stars!==pay.total_amount||
+     existing.reason!=='variable_receipt_mismatch')
+    throw Error('variable_receipt_incident_conflict_retry');
+  return {stored:true,duplicate:true};
+}
+
 export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=Date.now()){
   const q=update?.pre_checkout_query;
   if(q&&typeof q.invoice_payload==='string'&&q.invoice_payload.startsWith('v:')){
@@ -159,8 +190,12 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
       'SELECT * FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(id).first();
     if(!validVariableStarsReceipt(row,msg)){
-      console.error('Unmatched Stars variable receipt; investigate payment manually');
-      return {handled:true,type:'variable_receipt',accepted:false};
+      // Do not lose an unexpected payment or loop on Telegram webhook retries.
+      // Only acknowledge after an incident was saved in the isolated D1.
+      const incident=await recordUnexpectedVariableStarsReceipt(env.DB,msg,now);
+      console.error('Unmatched Stars variable receipt recorded for operator review');
+      return {handled:true,type:'variable_receipt',accepted:false,
+        incidentRecorded:incident.stored};
     }
     const charge=pay.telegram_payment_charge_id;
     try{
