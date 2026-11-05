@@ -7,9 +7,13 @@ withdrawable skins, cryptocurrencies or the live game account. All production
 payment switches remain OFF. This is a test invoice for a non-wagerable,
 non-transferable, non-redeemable digital TEST receipt, not a game item.
 
-The real RUB-per-Star ratio has NOT been provided by the operator. It must never
-be guessed. The Mini App still accepts a freely entered RUB amount, not fixed
-payment packages. The minimum and maximum are technical validation limits only.
+The operator provided a screenshot reference on 05.11.2026:
+1,000 Telegram Stars correspond to 1,871.59 RUB (1 Star = 1.87159 RUB).
+This is the operator's chosen display/pricing reference, NOT a guaranteed
+Telegram cash-out or fiat settlement rate. The exact rational amount is
+187159 kopecks / 1000 Stars, with the invoice Star count rounded UP to the
+nearest integer. For example, 1,000.00 RUB is 535 whole Stars.
+The Mini App still accepts arbitrary RUB amounts within configured bounds.
 
 ## Owner-selected rate (preview without charging)
 
@@ -18,9 +22,11 @@ Run in Windows PowerShell from RUST-UP-Local:
     git pull --ff-only origin feature/rustup-payment-admin-controls
     powershell -NoProfile -ExecutionPolicy Bypass -File .\payments\scripts\setup-stars-operator-rate.ps1
 
-Enter your own choice for the number of RUB per Star. This validates price
-bounds, creates a private preview config and executes only a Cloudflare dry run.
-No real charge or game credit is enabled.
+By default this reads payments/stars-owner-rate.json, so no rate input is needed.
+You may override it with -RubPerStar for a later operator change; the parser
+preserves five decimal places rather than silently rounding to two. This
+validates bounds, prepares a private price preview and executes only a
+Cloudflare dry run. It does not create real invoices or game credits.
 
 A live but NONCHARGING price preview can optionally use
 -PublishReadOnlyPreview when the owner is ready to publish the quote only.
@@ -69,7 +75,7 @@ uncertain, manual review is required rather than a blind repeated refund.
 ## Production not yet ready
 
 A successful unit test and a generated test runner are NOT a completed payment.
-The operator must still choose a real exchange ratio, define a legitimate
+The operator rate is recorded, but the operator must still define a legitimate
 non-wagerable paid digital service, prove its permanent idempotent delivery,
 perform an actual Telegram TEST checkout and refund, and complete operational
 legal/support checks. Do not enable the production payment switches.

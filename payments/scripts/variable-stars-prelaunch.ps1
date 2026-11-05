@@ -1,5 +1,6 @@
 # RUST UP variable Telegram Stars PRELAUNCH (READ ONLY).
-# Price is intentionally not required or changed.
+# Owner-selected price is recorded in GitHub; the script audits the live Worker.
+# Does not deploy or modify it.
 # No invoices, charges, payment switches, D1 writes or game credits.
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
