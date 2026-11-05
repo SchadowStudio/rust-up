@@ -56,6 +56,25 @@
   if(!resp.ok||data?.ok!==true)throw {status:resp.status,code:data?.error};
   return data;
  }
+ async function supporterStatus(signal){
+  const initData=window.Telegram?.WebApp?.initData;
+  const base=window.RUSTUP_API;
+  if(typeof initData!=='string'||initData.length<20)throw {status:401};
+  if(typeof base!=='string'||!/^https:\/\/[a-z0-9.-]+\/?$/i.test(base))
+   throw {status:503};
+  const response=await fetch(base.replace(/\/$/,'')+'/api/stars/supporter-badge',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({initData}),cache:'no-store',credentials:'omit',signal
+  });
+  if(!response.ok)throw {status:response.status};
+  const payload=await response.json();
+  if(payload?.ok!==true||typeof payload.badge?.active!=='boolean'||
+     payload.badge.transferable!==false||
+     payload.badge.redeemable!==false||
+     payload.badge.usableForWagers!==false)
+   throw {status:503};
+  return payload.badge;
+ }
  function render(wallet){
   const panel=wallet?.querySelector('.w-glass.w-panel[role="status"]');
   if(!panel||panel.dataset.variableStarsV4)return;
@@ -78,6 +97,26 @@
   const historyButton=make('button','rustup-stars-tab','Мои пополнения');
   historyButton.type='button';panel.append(historyButton);
   const history=make('div','rustup-stars-results');panel.append(history);
+  const badgeBox=make('section','rustup-supporter-status');
+  badgeBox.append(make('h4','','⭐ RUST UP Supporter'));
+  const badgeText=make('p','w-note','Непередаваемый значок профиля без игровых преимуществ.');
+  badgeBox.append(badgeText);
+  const badgeButton=make('button','rustup-stars-tab','Проверить мой значок');
+  badgeButton.type='button';badgeBox.append(badgeButton);
+  badgeButton.addEventListener('click',async()=>{
+   if(badgeButton.disabled)return;
+   badgeButton.disabled=true;badgeText.textContent='Проверяем право владения…';
+   try{
+    const result=await supporterStatus(AbortSignal.timeout(12000));
+    if(!badgeBox.isConnected)return;
+    badgeText.textContent=result.active
+     ?'✅ Значок активен. Без игровых монет, ставок и вывода.'
+     :'Значок не приобретён. Покупка пока недоступна.';
+   }catch(e){
+    if(badgeBox.isConnected)badgeText.textContent=errorLabel(e);
+   }finally{if(badgeBox.isConnected)badgeButton.disabled=false;}
+  });
+  panel.append(badgeBox);
   panel.append(make('p','w-note',
    'Счёт создаёт Telegram. Зачисление возможно только после подтверждения платежа сервером.'));
   const help=make('a','rustup-stars-help','Поддержка: @rustuperhelp_bot');
