@@ -40,6 +40,7 @@ export function buildPlan(root=ROOT,{quick=false}={}){
  const frontend=from('frontend/telegram-miniapp');
  const stars=from('integration/telegram-stars');
  const game=from('integration/existing-game-state-sandbox');
+ const accountLink=from('integration/account-credit-ledger');
  const demo=from('integration/demo-game-wallet');
  for(const needed of [
   'scripts/telegram-stars-test-env.test.mjs',
@@ -60,7 +61,7 @@ export function buildPlan(root=ROOT,{quick=false}={}){
   {name:'telegram_stars_invoice_receipt_refund',command:process.execPath,
    args:['--test',...stars],cwd:root},
   {name:'game_state_integrity_without_real_money',command:process.execPath,
-   args:['--test',...game],cwd:root},
+   args:['--test',...game,...accountLink],cwd:root},
   {name:'isolated_nonredeemable_demo_wallet',command:process.execPath,
    args:['--test',...demo],cwd:root},
   {name:'miniapp_worker_recovery_release_and_test_bot',command:process.execPath,
