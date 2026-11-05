@@ -137,6 +137,21 @@ async function invoice(token,userId,stars,fetchImpl=fetch){
  await writeState({...order,invoiceUrl:link});
  return {ok:true,testOnly:true,invoiceUrl:link,orderId:order.orderId};
 }
+export function validTestDeliveryAck(order,answer){
+ return !!order&&order.status==='paid'&&
+  Number.isSafeInteger(answer?.message_id)&&answer.message_id>0&&
+  answer.chat?.id===order.telegramUserId;
+}
+export function testRefundPayload(order,confirmation){
+ if(!order||order.testOnly!==true||
+    order.status!=='delivered'||typeof order.chargeId!=='string'||
+    order.chargeId.length<8)
+  throw Error('no_verified_delivered_test_order');
+ if(confirmation!==('REFUND TEST '+order.orderId))
+  throw Error('explicit_refund_confirmation_required');
+ return {user_id:order.telegramUserId,
+  telegram_payment_charge_id:order.chargeId};
+}
 async function confirmDelivery(token,order,fetchImpl=fetch){
  if(order.status==='delivered')return order;
  if(order.status!=='paid')throw Error('delivery_requires_verified_test_receipt');
@@ -152,7 +167,7 @@ async function confirmDelivery(token,order,fetchImpl=fetch){
    text:'✅ RUST UP TEST: подтверждена оплата '+order.priceStars+
      ' ⭐. Доставлен тестовый цифровой чек. Игровой баланс не изменён.'
   },fetchImpl);
-  if(!Number.isSafeInteger(message?.message_id))
+  if(!validTestDeliveryAck(order,message))
    throw Error('unverified_delivery_ack');
   order=safeTestStateTransition({...order,deliveryMessageId:message.message_id},'delivery');
   await writeState(order);
@@ -208,19 +223,13 @@ async function listen(token,fetchImpl=fetch,pollSeconds=0){
 async function refund(token,confirmation,fetchImpl=fetch){
  await verifyTelegramTestBot(token,fetchImpl);
  let order=await readState();
- if(!order||order.status!=='delivered'||!order.chargeId)
-  throw Error('no_verified_delivered_test_order');
- if(confirmation!==('REFUND TEST '+order.orderId))
-  throw Error('explicit_refund_confirmation_required');
+ const refundArgs=testRefundPayload(order,confirmation);
  // Reservation must survive a crash or timeout. Never automatically resend.
  order=safeTestStateTransition(
   {...order,refundIntentAt:Date.now()},'refund_intent');
  await writeState(order);
  try{
-  const result=await telegram(token,'refundStarPayment',{
-   user_id:order.telegramUserId,
-   telegram_payment_charge_id:order.chargeId
-  },fetchImpl);
+  const result=await telegram(token,'refundStarPayment',refundArgs,fetchImpl);
   if(result!==true)throw Error('test_refund_not_confirmed');
  }catch(e){
   await writeState(safeTestStateTransition(order,'manual_review'));
