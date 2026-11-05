@@ -2,7 +2,7 @@
 # Never uses @rustuper_bot, Cloudflare production, game balances or real Stars.
 param(
  [Parameter(Mandatory=$true)]
- [ValidateSet('probe','identify','invoice','watch','listen','status','refund')]
+ [ValidateSet('probe','identify','invoice','watch','listen','status','refund','fulltest')]
  [string]$Action,
  [string]$TestUserId,
  [ValidateRange(1,1000000)][int]$Stars=1,
@@ -14,7 +14,7 @@ Set-Location $repo
 if(!(Test-Path '.\payments\scripts\telegram-stars-test-env.mjs')){
  throw 'Telegram TEST script missing. Pull the feature branch first.'
 }
-if($Action -eq 'invoice' -and [string]::IsNullOrWhiteSpace($TestUserId)){
+if($Action -in @('invoice','fulltest') -and [string]::IsNullOrWhiteSpace($TestUserId)){
  throw 'Invoice requires -TestUserId from a dedicated Telegram TEST account.'
 }
 if($Action -eq 'refund' -and $OrderId -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'){
@@ -36,7 +36,7 @@ if($Action -ne 'status' -and [string]::IsNullOrWhiteSpace($env:TELEGRAM_TEST_BOT
 }
 try{
  $args=@('.\payments\scripts\telegram-stars-test-env.mjs',$Action)
- if($Action -eq 'invoice'){$args+=@($TestUserId,[string]$Stars)}
+ if($Action -in @('invoice','fulltest')){$args+=@($TestUserId,[string]$Stars)}
  if($Action -eq 'refund'){$args+=@('REFUND TEST '+$OrderId)}
  & node @args
  if($LASTEXITCODE -ne 0){throw 'Telegram TEST-only operation failed. No production operation was attempted.'}
