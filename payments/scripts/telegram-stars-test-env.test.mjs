@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  validTestReceipt,validTestPrecheckout,safeTestStateTransition,
+ validTestDeliveryAck,testRefundPayload,
  verifyTelegramTestBot
 } from './telegram-stars-test-env.mjs';
 const ID='53e41abc-7696-4da9-8f1d-95b5409e3841';
@@ -97,4 +98,30 @@ test('test runner rejects webhook-bound bots and malformed identities',async()=>
  await assert.rejects(()=>verifyTelegramTestBot(TOKEN,fake),/must_not_have_webhook/);
  await assert.rejects(()=>verifyTelegramTestBot('production-secret',fake),
   /TELEGRAM_TEST_BOT_TOKEN_invalid/);
+});
+
+test('test delivery counts only with Telegram message ID for matching user',()=>{
+ const order={...basic,status:'paid'};
+ assert.equal(validTestDeliveryAck(order,{message_id:987,
+  chat:{id:order.telegramUserId}}),true);
+ assert.equal(validTestDeliveryAck(order,{message_id:987,
+  chat:{id:999999}}),false);
+ assert.equal(validTestDeliveryAck(order,{message_id:0,
+  chat:{id:order.telegramUserId}}),false);
+ assert.equal(validTestDeliveryAck({...order,status:'invoice_created'},{
+  message_id:987,chat:{id:order.telegramUserId}}),false);
+});
+test('test refund payload is bound to delivered receipt and exact confirmation',()=>{
+ const delivered={...basic,status:'delivered',
+  chargeId:'test-charge-abcdefghijklmnopqrstuvwxyz'};
+ const payload=testRefundPayload(delivered,'REFUND TEST '+ID);
+ assert.deepEqual(payload,{
+  user_id:123456,telegram_payment_charge_id:delivered.chargeId
+ });
+ assert.throws(()=>testRefundPayload({...delivered,status:'paid'},
+  'REFUND TEST '+ID),/no_verified_delivered_test_order/);
+ assert.throws(()=>testRefundPayload(delivered,'REFUND TEST incorrect'),
+  /explicit_refund_confirmation_required/);
+ assert.throws(()=>testRefundPayload({...delivered,testOnly:false},
+  'REFUND TEST '+ID),/no_verified_delivered_test_order/);
 });
