@@ -10,6 +10,9 @@ import {isPaymentEnabled} from './payment-controls.mjs';
 const ROOT='/api/stars/variable/';
 const ROUTES=new Set(['quote','checkout','history']);
 const MAX_BODY=4096;
+// Build-time safety lock: no production game-credit consumer exists in this
+// repository. Payment flags alone must NEVER authorize an XTR charge.
+const VERIFIED_GAME_CREDIT_CONSUMER_PRESENT=false;
 function json(payload,status=200,origin=null){
  return new Response(JSON.stringify(payload),{
   status,headers:{'content-type':'application/json; charset=utf-8',
@@ -32,6 +35,9 @@ function paymentEnv(env,enableCheckout=false){
  };
 }
 async function mayAcceptVariable(env){
+ // The current code records receipts but cannot deliver a balance credit.
+ // An operator setting all environment/D1 switches to ON cannot fix that.
+ if(!VERIFIED_GAME_CREDIT_CONSUMER_PRESENT)return false;
  // No paid invoice may be created before the existing game is protected and
  // the authenticated, idempotent credit consumer is explicitly wired.
  if(env?.STARS_VARIABLE_TOPUP_ENABLED!=='true'||
