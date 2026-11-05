@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {buildStarsQuotePreviewConfig} from './prepare-stars-quote-preview.mjs';
 import {variableStagingConfig} from './stage-current-variable-stars.mjs';
 import {quoteVariableStars} from '../integration/telegram-stars/variable-stars.mjs';
@@ -63,4 +64,33 @@ test('never silently overwrites a rate already present',()=>{
  const first=buildStarsQuotePreviewConfig(config,rate);
  assert.throws(()=>buildStarsQuotePreviewConfig(first,rate),
   /quote_rate_already_present/);
+});
+
+// The reference screenshot establishes the thousand-Star anchor; fractional
+// conversions shown in other cells are illustrative and are not invoice units.
+test('owner 05.11.2026 reference rate is exact, with whole-Star ceiling',()=>{
+ const owner=JSON.parse(readFileSync(new URL('../stars-owner-rate.json',import.meta.url),'utf8'));
+ assert.equal(owner.rubPerStarDecimal,'1.87159');
+ assert.equal(owner.rubMinorPerReferenceLot,187159);
+ assert.equal(owner.starsPerReferenceLot,1000);
+ assert.equal(owner.STARS_RUB_MINOR_PER_STAR_NUM,'187159');
+ assert.equal(owner.STARS_RUB_MINOR_PER_STAR_DEN,'1000');
+ assert.equal(quoteVariableStars(187159,owner).priceStars,1000);
+ assert.equal(quoteVariableStars(100000,owner).priceStars,535);
+ assert.equal(quoteVariableStars(5000,owner).priceStars,27);
+ assert.equal(quoteVariableStars(100,owner).priceStars,1);
+ assert.equal(quoteVariableStars(187160,owner).priceStars,1001);
+ const preview=buildStarsQuotePreviewConfig(config,owner);
+ assert.match(preview,/STARS_RUB_MINOR_PER_STAR_NUM = "187159"/);
+ assert.match(preview,/STARS_RUB_MINOR_PER_STAR_DEN = "1000"/);
+ assert.match(preview,/PAYMENT_PRODUCTION_ENABLED = "false"/);
+ assert.match(preview,/STARS_VARIABLE_CREDIT_LEDGER_READY = "false"/);
+});
+test('owner PowerShell setup uses exact rational rate, not a two-decimal rounded price',()=>{
+ const ps=readFileSync(new URL('./setup-stars-operator-rate.ps1',import.meta.url),'utf8');
+ assert.match(ps,/ParseRateNumerator/);
+ assert.match(ps,/100000/);
+ assert.match(ps,/\$den=1000/);
+ assert.match(ps,/stars-owner-rate\.json/);
+ assert.doesNotMatch(ps,/\$rate=ParseRubles\s+\$RubPerStar/);
 });
