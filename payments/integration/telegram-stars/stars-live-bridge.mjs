@@ -117,6 +117,9 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
      'SELECT 1 FROM rustup_stars_invoice_links WHERE order_id=?'
     ).bind(q.invoice_payload).first();
     if(!savedInvoice)throw Error('stars_missing_persisted_invoice');
+    const terms=publishedStarsTerms(env);
+    if(!terms||!await starsTermsAccepted(db,q.from?.id,terms))
+      throw Error('stars_terms_acceptance_not_confirmed');
    }else if(enabled){
     throw Error('stars_invalid_order_payload');
    }
