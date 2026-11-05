@@ -249,6 +249,9 @@ test('incomplete variable Stars incident evidence fails closed and never credits
     ...msg,successful_payment:{...msg.successful_payment,total_amount:21}
   },now+2),/incident_conflict_retry/);
   await assert.rejects(()=>recordUnexpectedVariableStarsReceipt(db,{
+    ...msg,successful_payment:{...msg.successful_payment,invoice_payload:'v:another-order'}
+  },now+2),/incident_conflict_retry/);
+  await assert.rejects(()=>recordUnexpectedVariableStarsReceipt(db,{
     ...msg,successful_payment:{...msg.successful_payment,
       telegram_payment_charge_id:''}
   },now+3),/evidence_incomplete_retry/);
