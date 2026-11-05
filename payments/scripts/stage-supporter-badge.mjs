@@ -65,7 +65,8 @@ export async function stageSupporterBadge(folder,token,check=false){
   await validateSource(name,newSource);
   planned.set(name,newSource);
   if(name==='supporter-badge.mjs')continue;
-  const original=await fs.readFile(path.join(dir,name),'utf8');
+  const original=await fs.readFile(
+   check?path.join(dir,BACKUP,name):path.join(dir,name),'utf8');
   const expected=originalMap.get(name);
   if(!expected||hash(original)!==expected.sha256||
      !live.source.has(name)||original!==live.source.get(name)&&norm(original)!==norm(live.source.get(name)))
