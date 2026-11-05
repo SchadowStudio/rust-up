@@ -54,3 +54,29 @@ bleiben privat auf dem lokalen PC und dürfen nicht in Chats kopiert werden.
 Case Battles oder auszahlbares Spielguthaben sind NICHT aktiviert.**
 Es gab keine Live-DB-Migration, kein Worker-Deployment und keine Echtgeldzahlung
 durch diese Vorbereitung.
+
+## Technische Ergänzung: Beleg- und Rückerstattungssicherheit (05.11.2026)
+- Abweichende variable Telegram-Stars-Belege werden jetzt im Entwicklungsbranch
+  in `rustup_stars_receipt_incidents` aufgezeichnet, **bevor** der Webhook
+  den Auftrag als erledigt bestätigt. Doppelte Belege erzeugen keine doppelte
+  Incident-Buchung. Unvollständige Beweise führen zu einem Fehler statt
+  stiller Anerkennung.
+- `variable-refunds.mjs` und `variable-refunds.test.mjs` enthalten eine
+  operatorautorisierte, explizit bestätigte Rückerstattungsroutine mit
+  einzigartiger Reservierung vor dem externen Telegram-Aufruf. Unklare
+  Telegram-Antworten werden für manuelle Klärung gesperrt und **nicht**
+  erneut automatisch refundiert.
+- Die additive Tabelle `rustup_stars_variable_refund_intents` und ihr
+  Prüfindex wurden in der isolierten Cloudflare-Zahlungs-D1 erstellt.
+  Kein Echtgeld wurde eingezogen oder erstattet; weder die Spiel-D1 noch
+  das Live-Worker-Bundle wurden hierbei geändert.
+- `variable-stars-prelaunch.mjs` prüft zusätzlich die
+  Refund-Datenbanktabelle und eine gesonderte Finance-Admin-Allowlist.
+  `PAYMENT_ADMIN_IDS` ist live noch nicht konfiguriert.
+- Die neue Refund-Routine und der neue Incident-Belegpfad sind **nicht
+  im Live-Worker veröffentlicht**. Ein erfolgreicher Offline-Test ist
+  kein funktionierendes Live-Refund-System.
+- Refunds verändern im Test keinen Spielsaldo. Falls Echtgeldguthaben
+  für irgendwelche erlaubten Produkte entwickelt wird, ist die
+  separate, nachvollziehbare Rücknahme der tatsächlichen Leistung
+  ausdrücklich noch offen.
