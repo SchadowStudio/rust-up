@@ -239,10 +239,46 @@ async function refund(token,confirmation,fetchImpl=fetch){
  await writeState(order);
  return {ok:true,testOnly:true,status:'refunded',gameBalanceChanged:false};
 }
+// One-operation test workflow. The human opens the TEST invoice in a TEST
+// Telegram account; polling, verified delivery and TEST refund are automatic.
+// If the payment does not happen, do not issue any refund.
+export async function completeTelegramStarsTest(token,userId,priceStars,{
+ create=invoice,poll=listen,refundConfirmed=refund,
+ announce=console.log,maxPolls=36,pollSeconds=4
+}={}){
+ if(!TOKEN.test(token||''))throw Error('TELEGRAM_TEST_BOT_TOKEN_invalid');
+ if(!ID.test(String(userId))||!Number.isSafeInteger(Number(userId))||
+    !Number.isSafeInteger(priceStars)||priceStars<1||priceStars>1000000)
+  throw Error('invalid_test_user_or_variable_amount');
+ if(!Number.isInteger(maxPolls)||maxPolls<1||maxPolls>36||
+    !Number.isInteger(pollSeconds)||pollSeconds<0||pollSeconds>4)
+  throw Error('invalid_test_poll_limit');
+ const created=await create(token,String(userId),priceStars);
+ if(created?.testOnly!==true||!UUID.test(created.orderId)||
+    typeof created.invoiceUrl!=='string'||
+    !/^https:\/\/t\.me\/\$[A-Za-z0-9_-]{8,256}$/.test(created.invoiceUrl))
+  throw Error('invalid_test_only_invoice');
+ announce('Open this TEST-only invoice in a Telegram TEST account:');
+ announce(created.invoiceUrl);
+ let last=null;
+ for(let index=0;index<maxPolls;index++){
+  last=await poll(token,fetch,pollSeconds);
+  if(last?.testReceiptDelivered===true)break;
+  if(last?.status==='manual_review')throw Error('test_receipt_requires_manual_review');
+ }
+ if(last?.testReceiptDelivered!==true)
+  throw Error('test_payment_not_completed_no_refund_attempted');
+ const refunded=await refundConfirmed(token,'REFUND TEST '+created.orderId);
+ if(refunded?.testOnly!==true||refunded?.status!=='refunded')
+  throw Error('test_refund_not_confirmed');
+ return {ok:true,testOnly:true,invoiceVerified:true,deliveryVerified:true,
+  refundVerified:true,gameBalanceChanged:false};
+}
+
 async function main(){
  const action=process.argv[2],token=process.env.TELEGRAM_TEST_BOT_TOKEN;
- if(!['probe','identify','invoice','listen','watch','refund','status'].includes(action))
-  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|identify|invoice <TEST_USER_ID> <STARS>|listen|watch|refund "REFUND TEST <ORDER_UUID>"|status');
+ if(!['probe','identify','invoice','listen','watch','fulltest','refund','status'].includes(action))
+  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|identify|invoice <TEST_USER_ID> <STARS>|listen|watch|fulltest <TEST_USER_ID> <STARS>|refund "REFUND TEST <ORDER_UUID>"|status');
  if(action==='status'){
   const s=await readState();
   console.log(JSON.stringify({testOnly:true,status:s?.status||'not_started',
@@ -265,6 +301,8 @@ async function main(){
   }
   if(!outcome.testReceiptDelivered)
    throw Error('test_payment_not_confirmed_run_watch_again');
+ }else if(action==='fulltest'){
+  outcome=await completeTelegramStarsTest(token,process.argv[3],Number(process.argv[4]));
  }else outcome=await refund(token,process.argv.slice(3).join(' '));
  console.log(JSON.stringify(outcome,null,2));
 }
