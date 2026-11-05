@@ -34,12 +34,13 @@ jobs:
           node --check payments/scripts/publish-stars-ui-refresh.mjs
           node --check payments/scripts/recover-current-stars-variable.mjs
           node --check payments/scripts/check-stars-activation.mjs
+          node --check payments/scripts/prepare-stars-quote-preview.mjs
       - name: Test amount entry and existing website integration
         run: |
           node --test payments/scripts/stars-variable-wallet-ui.test.mjs payments/scripts/publish-stars-ui-refresh.test.mjs payments/scripts/publish-variable-stars-wallet.test.mjs
       - name: Test isolated receipts, read-only audit, and fallback recovery
         run: |
-          node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs
+          node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs
       - name: Verify account import guard without enabling money
         run: |
           node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs
