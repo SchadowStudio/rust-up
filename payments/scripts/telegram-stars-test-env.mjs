@@ -96,7 +96,8 @@ async function writeState(value){
  await fs.rename(tmp,STATE_FILE);
 }
 function fresh(userId,stars){
- if(!ID.test(userId)||!Number.isSafeInteger(stars)||stars<1||stars>1000000)
+ if(!ID.test(userId)||!Number.isSafeInteger(Number(userId))||
+    !Number.isSafeInteger(stars)||stars<1||stars>1000000)
   throw Error('invalid_test_user_or_variable_amount');
  return {
   testOnly:true,orderId:randomUUID(),telegramUserId:Number(userId),
@@ -148,7 +149,7 @@ async function confirmDelivery(token,order,fetchImpl=fetch){
   throw Error('test_delivery_requires_manual_review');
  }
 }
-async function listen(token,fetchImpl=fetch){
+async function listen(token,fetchImpl=fetch,pollSeconds=0){
  await verifyTelegramTestBot(token,fetchImpl);
  let order=await readState();
  if(!order||!order.testOnly||!UUID.test(order.orderId))
@@ -156,7 +157,7 @@ async function listen(token,fetchImpl=fetch){
  if(['refunded','refund_pending','manual_review'].includes(order.status))
   throw Error('test_order_not_listenable');
  const updates=await telegram(token,'getUpdates',{
-  offset:order.lastUpdateId+1,timeout:0,allowed_updates:['message','pre_checkout_query'],
+  offset:order.lastUpdateId+1,timeout:pollSeconds,allowed_updates:['message','pre_checkout_query'],
   limit:100
  },fetchImpl);
  if(!Array.isArray(updates))throw Error('invalid_test_updates');
@@ -218,8 +219,8 @@ async function refund(token,confirmation,fetchImpl=fetch){
 }
 async function main(){
  const action=process.argv[2],token=process.env.TELEGRAM_TEST_BOT_TOKEN;
- if(!['probe','invoice','listen','refund','status'].includes(action))
-  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|invoice <TEST_USER_ID> <STARS>|listen|refund "REFUND TEST <ORDER_UUID>"|status');
+ if(!['probe','invoice','listen','watch','refund','status'].includes(action))
+  throw Error('Usage: node payments/scripts/telegram-stars-test-env.mjs probe|invoice <TEST_USER_ID> <STARS>|listen|watch|refund "REFUND TEST <ORDER_UUID>"|status');
  if(action==='status'){
   const s=await readState();
   console.log(JSON.stringify({testOnly:true,status:s?.status||'not_started',
@@ -232,7 +233,16 @@ async function main(){
  if(action==='probe')outcome=await verifyTelegramTestBot(token);
  else if(action==='invoice')outcome=await invoice(token,process.argv[3],Number(process.argv[4]));
  else if(action==='listen')outcome=await listen(token);
- else outcome=await refund(token,process.argv.slice(3).join(' '));
+ else if(action==='watch'){
+  // Keep handling precheckout updates promptly while the test user opens
+  // the invoice. This runs ONLY in the caller's local shell; no production bot.
+  for(let i=0;i<36;i++){
+   outcome=await listen(token,fetch,4);
+   if(outcome.testReceiptDelivered||outcome.status==='manual_review')break;
+  }
+  if(!outcome.testReceiptDelivered)
+   throw Error('test_payment_not_confirmed_run_watch_again');
+ }else outcome=await refund(token,process.argv.slice(3).join(' '));
  console.log(JSON.stringify(outcome,null,2));
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))
