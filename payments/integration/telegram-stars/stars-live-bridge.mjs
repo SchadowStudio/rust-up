@@ -5,6 +5,7 @@ import {permittedProduct,invoiceBody,telegramApi,handleStarsUpdate} from './star
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {isPaymentEnabled} from './payment-controls.mjs';
 import {grantSupporterBadge,readSupporterBadge} from './supporter-badge.mjs';
+import {publishedStarsTerms,starsTermsAccepted,recordStarsTermsAcceptance} from './stars-terms.mjs';
 
 const SKU=/^[a-z][a-z0-9_-]{2,39}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
