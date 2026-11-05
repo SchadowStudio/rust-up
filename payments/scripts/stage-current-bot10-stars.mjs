@@ -32,6 +32,33 @@ const FLAGS=[
 ];
 const digest=s=>createHash('sha256').update(s).digest('hex');
 const fail=s=>{throw Error(s);};
+// Cloudflare may generate a NEW multipart boundary on every read. Hash only
+// the exact, validated source modules in their original order, never the HTTP
+// response framing. Module names, source bytes, and ordering all matter.
+export function stableWorkerDigest(source){
+ if(!(source instanceof Map)||source.size!==ORIGINAL.length||
+    [...source.keys()].some((name,i)=>name!==ORIGINAL[i])||
+    [...source.values()].some(v=>typeof v!=='string'))
+  fail('untrusted_worker_source_set');
+ return digest(JSON.stringify([...source]));
+}
+export function verifySnapshotFingerprint(manifest,live){
+ if(!manifest||!([1,2].includes(manifest.version))||
+    manifest.metadataDigest!==live.metadataDigest||
+    !Array.isArray(manifest.sourceFiles)||
+    manifest.sourceFiles.length!==ORIGINAL.length||
+    manifest.sourceFiles.some((name,i)=>name!==ORIGINAL[i])||
+    !Array.isArray(manifest.addedFiles)||
+    manifest.addedFiles.length!==ADDON.length||
+    manifest.addedFiles.some((name,i)=>name!==ADDON[i]))
+  fail('live_worker_changed_since_private_snapshot');
+ // v1 stored a hash of Cloudflare's random multipart envelope, not source.
+ // Accept existing v1 backups ONLY after all original modules and add-ons
+ // are compared byte-for-byte to current Cloudflare/source checkout below.
+ if(manifest.version===2&&manifest.workerDigest!==live.workerDigest)
+  fail('live_worker_changed_since_private_snapshot');
+ return true;
+}
 
 export function readCurrentWorker10Map(body,contentType=''){
  if(typeof body!=='string'||body.length<500||body.length>20000000)
@@ -165,7 +192,7 @@ async function snapshot(token){
  ]);
  const source=readCurrentWorker10Map(script.body,script.type);
  const config=currentWorker10Config(settings,schedules);
- return {source,config,workerDigest:digest(script.body),
+ return {source,config,workerDigest:stableWorkerDigest(source),
   metadataDigest:bindingSignature(settings,schedules)};
 }
 export async function stageCurrentWorker10(token,verifyDir=null){
@@ -175,10 +202,7 @@ export async function stageCurrentWorker10(token,verifyDir=null){
   const dir=await fs.realpath(path.resolve(verifyDir));
   if(!dir.startsWith(PRIVATE+path.sep))fail('unsafe_private_snapshot_path');
   const manifest=JSON.parse(await fs.readFile(path.join(dir,'RUSTUP-WORKER10-MANIFEST.json'),'utf8'));
-  if(manifest.version!==1||
-     manifest.workerDigest!==live.workerDigest||
-     manifest.metadataDigest!==live.metadataDigest)
-    fail('live_worker_changed_since_private_snapshot');
+  verifySnapshotFingerprint(manifest,live);
   if(await fs.readFile(path.join(dir,'wrangler.stars-current10.toml'),'utf8')!==live.config)
     fail('private_wrangler_config_changed');
   for(const [name,source] of live.source){
@@ -205,7 +229,7 @@ export async function stageCurrentWorker10(token,verifyDir=null){
  await fs.writeFile(path.join(dir,'wrangler.stars-current10.toml'),live.config,
   {flag:'wx',mode:0o600});
  await fs.writeFile(path.join(dir,'RUSTUP-WORKER10-MANIFEST.json'),
-  JSON.stringify({version:1,workerDigest:live.workerDigest,
+  JSON.stringify({version:2,workerDigest:live.workerDigest,
    metadataDigest:live.metadataDigest,sourceFiles:ORIGINAL,addedFiles:ADDON},null,2)+'\n',
   {flag:'wx',mode:0o600});
  console.log('PASS: Original current live RUST UP bot privately recovered without changes.');
