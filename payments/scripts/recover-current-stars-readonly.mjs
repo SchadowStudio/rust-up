@@ -54,7 +54,9 @@ export function parseReadonlyWorkerSourceMap(body,contentType=''){
     !files.get('worker.stars-readonly-entry.mjs').includes('handleStarsReadOnly')||
     !files.get('stars-readonly-live.mjs').includes('rustup-stars-readonly')||
     !files.get('stars-readonly-live.mjs').includes('stars_checkout_disabled')||
-    !files.get('telegram-initdata.mjs').includes('authDate<current-600'))
+    !(files.get('telegram-initdata.mjs').includes('authDate<current-600')||
+      (files.get('telegram-initdata.mjs').includes('authDate<current-maxAgeSeconds')&&
+       files.get('stars-readonly-live.mjs').includes('Date.now(),86400'))))
    throw Error('not_exact_expected_readonly_worker');
  return files;
 }
