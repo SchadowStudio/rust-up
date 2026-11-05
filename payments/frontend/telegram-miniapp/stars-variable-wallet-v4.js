@@ -10,7 +10,11 @@
   return n;
  };
  const errorLabel=e=>{
-  if(e?.code==='conversion_not_configured')return 'Курс Telegram Stars пока не настроен.';
+  if(e?.code==='conversion_not_configured')return 'Курс Stars пока не настроен. Оплата недоступна.';
+  if(e?.code==='invalid_amount_or_range')return 'Сумма за пределами допустимого диапазона.';
+  if(e?.code==='history_unavailable')return 'История сейчас недоступна. Повторите попытку.';
+  if(e?.name==='AbortError'||e?.name==='TimeoutError')
+   return 'Превышено время ожидания сервера. Повторите попытку.';
   if(e?.status===401)return 'Сессия Telegram устарела. Откройте RUST UP через бота заново.';
   if(e?.status===403)return 'Доступ отклонён. Откройте приложение через @rustuper_bot.';
   if(e?.status===422)return 'Проверьте сумму пополнения и установленные ограничения.';
@@ -18,12 +22,24 @@
   return 'Не удалось связаться с платёжным сервером. Повторите попытку.';
  };
  function parseAmountMinor(text){
-  if(typeof text!=='string'||!/^([1-9]\d{0,6})([.,]\d{1,2})?$/.test(text.trim()))
-   return null;
-  const [major,minor='']=text.trim().replace(',','.').split('.');
+  // Accept Russian decimal comma but never round user-controlled money.
+  if(typeof text!=='string')return null;
+  const value=text.trim().replace(/\u00a0/g,' ');
+  if(!/^([1-9]\d{0,6})([.,]\d{1,2})?$/.test(value))return null;
+  const [major,minor='']=value.replace(',','.').split('.');
   const result=Number(major)*100+Number(minor.padEnd(2,'0'));
-  return Number.isSafeInteger(result)&&result>0?result:null;
+  return Number.isSafeInteger(result)&&result>=100&&result<=100000000?result:null;
  }
+ const orderStatus=Object.freeze({
+  pending:'Ожидает оплаты',
+  checkout_approved:'Ожидает подтверждения',
+  paid:'Оплата подтверждена',
+  refunded:'Возвращено',
+  manual_review:'Проверяется поддержкой'
+ });
+ const formatRub=minor=>(minor/100).toLocaleString('ru-RU',{
+  minimumFractionDigits:2,maximumFractionDigits:2
+ });
  async function request(action,body={},signal){
   const initData=window.Telegram?.WebApp?.initData;
   const base=window.RUSTUP_API;
@@ -85,7 +101,7 @@
     if(!panel.isConnected||turn!==seq)return;
     if(data.requestedAmountMinor!==minor||!Number.isSafeInteger(data.priceStars))
      throw {status:503};
-    const money=(minor/100).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const money=formatRub(minor);
     summary.textContent=money+' ₽ → '+data.priceStars+' ⭐'+
       (data.checkoutEnabled===true?'':' · Оплата пока недоступна');
     confirmed={minor,priceStars:data.priceStars};
@@ -118,7 +134,10 @@
    }catch(e){if(panel.isConnected)summary.textContent=errorLabel(e);}
    finally{loading=false;payButton.disabled=true;}
   });
+  let historyBusy=false;
   historyButton.addEventListener('click',async()=>{
+   if(historyBusy)return;
+   historyBusy=true;historyButton.disabled=true;
    history.replaceChildren(make('p','w-note','Загрузка…'));
    try{
     const data=await request('history',{},AbortSignal.timeout(12000));
@@ -131,12 +150,16 @@
      const item=make('div','rustup-stars-item');
      const minor=Number(order.requested_amount_minor);
      item.append(make('strong','',
-      Number.isSafeInteger(minor)?(minor/100).toFixed(2)+' ₽':'Заказ'));
-     item.append(make('p','w-note',
-      String(order.price_stars||0)+' ⭐ · '+String(order.status||'pending')));
+      Number.isSafeInteger(minor)&&minor>=0?formatRub(minor)+' ₽':'Заказ'));
+     const status=Object.hasOwn(orderStatus,order.status)
+       ?orderStatus[order.status]:'Статус уточняется';
+     const stars=Number.isSafeInteger(order.price_stars)&&order.price_stars>=0
+       ?order.price_stars:'—';
+     item.append(make('p','w-note',String(stars)+' ⭐ · '+status));
      history.append(item);
     }
    }catch(e){if(panel.isConnected)history.replaceChildren(make('p','w-note',errorLabel(e)));}
+   finally{historyBusy=false;if(panel.isConnected)historyButton.disabled=false;}
   });
  }
  window.RUSTUP_STARS_VARIABLE_V4=Object.freeze({render,parseAmountMinor});
