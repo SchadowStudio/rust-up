@@ -258,3 +258,55 @@ test('fixed Stars incident replay is verified, and conflicting evidence requires
   assert.equal(sql.prepare('SELECT price_stars FROM rustup_stars_receipt_incidents').get().price_stars,30);
  }finally{sql.close();}
 });
+
+test('fixed Stars checkout requires signed buyer consent for the current terms version',async()=>{
+ const {sql,env,telegram,request}=fixture();
+ try{
+  sql.prepare('DELETE FROM rustup_stars_terms_acceptances WHERE telegram_user_id=?').run(userId);
+  const terms=await request('terms');
+  assert.equal(terms.status,200);
+  assert.equal(terms.json.accepted,false);
+  assert.equal(terms.json.terms.version,'2026-11-v1');
+  assert.equal(terms.json.terms.url,'https://example.org/rustup/terms');
+  const catalog=await request('catalog');
+  assert.equal(catalog.json.termsAccepted,false);
+  assert.equal((await request('checkout',{sku:'fixed_badge'})).status,503);
+  assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM rustup_stars_orders').get().n,0);
+  assert.equal(telegram.calls.length,0);
+  const incorrect=await request('terms/accept',{accepted:true,version:'2025-invalid'});
+  assert.equal(incorrect.status,409);
+  const noConsent=await request('terms/accept',{accepted:false,version:'2026-11-v1'});
+  assert.equal(noConsent.status,409);
+  assert.equal((await request('terms')).json.accepted,false);
+  const accepted=await request('terms/accept',{accepted:true,version:'2026-11-v1'});
+  assert.equal(accepted.status,200);
+  assert.equal(accepted.json.accepted,true);
+  assert.equal(accepted.json.alreadyAccepted,false);
+  const replay=await request('terms/accept',{accepted:true,version:'2026-11-v1'});
+  assert.equal(replay.json.alreadyAccepted,true);
+  assert.equal((await request('terms',{},userId+1)).json.accepted,false);
+  const invoice=await request('checkout',{sku:'fixed_badge'});
+  assert.equal(invoice.status,200);
+  assert.equal(invoice.json.creditToGame,false);
+  assert.equal(telegram.calls.filter(x=>x.method==='createInvoiceLink').length,1);
+ }finally{sql.close();}
+});
+
+test('Telegram precheckout refuses an invoice after buyer consent has been revoked',async()=>{
+ const {sql,env,telegram,request}=fixture();
+ try{
+  const created=await request('checkout',{sku:'fixed_badge'});
+  assert.equal(created.status,200);
+  sql.prepare('DELETE FROM rustup_stars_terms_acceptances WHERE telegram_user_id=?')
+   .run(userId);
+  await receiveExistingBotStarsUpdate({pre_checkout_query:{
+   id:'q-revoked-consent',from:{id:userId},currency:'XTR',total_amount:30,
+   invoice_payload:created.json.orderId
+  }},env,telegram.api);
+  const answer=telegram.calls.at(-1);
+  assert.equal(answer.method,'answerPreCheckoutQuery');
+  assert.equal(answer.body.ok,false);
+  assert.equal(sql.prepare('SELECT status FROM rustup_stars_orders WHERE id=?')
+   .get(created.json.orderId).status,'pending');
+ }finally{sql.close();}
+});
