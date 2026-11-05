@@ -277,7 +277,7 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  let userId;
  // Payment checkout keeps the strict 10-minute Telegram authentication TTL.
  const readOnly=path==='/api/stars/catalog'||path==='/api/stars/purchases'||
-   path==='/api/stars/supporter-badge';
+   path==='/api/stars/supporter-badge'||path==='/api/stars/terms';
  try{userId=await userIdFromBody(body,env,readOnly?86400:600);}
  catch{return data({ok:false,error:'telegram_auth_required'},401,origin);}
  if(!env.PAYMENTS_DB)return data({ok:false,error:'payment_database_missing'},503,origin);
