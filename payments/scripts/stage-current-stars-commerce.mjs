@@ -98,7 +98,10 @@ async function main(){
  const token=process.env.CLOUDFLARE_API_TOKEN;
  if(typeof token!=='string'||token.length<15)throw Error('cloudflare_login_missing');
  const config=await inspect(dir,token);
- const liveGame=await fs.readFile(path.join(dir,'game.js'),'utf8');
+ // During final verification the local game.js is already guarded; always
+ // recompute expected changes from the original snapshot, never patch twice.
+ const liveGame=await fs.readFile(path.join(dir,check?
+   'game.before-payment-guard.js':'game.js'),'utf8');
  const guardedGame=patchGameInitialImport(liveGame);
  if(guardedGame===liveGame)throw Error('game_source_already_modified');
  for(const name of FILES){
