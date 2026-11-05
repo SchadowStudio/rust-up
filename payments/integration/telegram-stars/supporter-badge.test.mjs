@@ -21,7 +21,7 @@ function database(){
  const sql=new DatabaseSync(':memory:');
  for(const name of [
   'migration.sql','payment-controls-migration.sql','stars-ready-migration.sql',
-  'supporter-badge-migration.sql'
+  'supporter-badge-migration.sql','stars-terms-migration.sql'
  ])sql.exec(readFileSync(path.join(folder,name),'utf8'));
  const make=(statement,args=[])=>{
   const stmt=sql.prepare(statement);
@@ -61,10 +61,14 @@ function fixture(){
    SUPPORTER_BADGE_DESCRIPTION,'fixed_nontransferable',17,1);
  sql.prepare('INSERT INTO rustup_stars_fixed_content(sku,delivery_text) VALUES(?,?)')
   .run(SUPPORTER_BADGE_SKU,SUPPORTER_BADGE_CONTENT);
+ sql.prepare('INSERT INTO rustup_stars_terms_acceptances(telegram_user_id,terms_version,accepted_at_ms) VALUES(?,?,?)')
+  .run(USER,'2026-11-v1',Date.now());
  const env={BOT_TOKEN,PAYMENTS_DB:db,APP_URL:ORIGIN+'/rust-up/',
   STARS_FIXED_PRODUCTS_ENABLED:'true',STARS_PAYMENT_ENABLED:'true',
   STARS_REFUNDS_ENABLED:'true',PAYMENT_PRODUCTION_ENABLED:'true',
-  PAYMENT_ADMIN_IDS:String(ADMIN)};
+  PAYMENT_ADMIN_IDS:String(ADMIN),
+  STARS_TERMS_VERSION:'2026-11-v1',
+  STARS_TERMS_URL:'https://example.org/rustup/terms'};
  const calls=[],fetchTelegram=async(url,options)=>{
   const method=url.slice(url.lastIndexOf('/')+1);
   const body=JSON.parse(options.body);

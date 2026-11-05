@@ -5,6 +5,7 @@ import {permittedProduct,invoiceBody,telegramApi,handleStarsUpdate} from './star
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {isPaymentEnabled} from './payment-controls.mjs';
 import {grantSupporterBadge,readSupporterBadge} from './supporter-badge.mjs';
+import {publishedStarsTerms,starsTermsAccepted,recordStarsTermsAcceptance} from './stars-terms.mjs';
 
 const SKU=/^[a-z][a-z0-9_-]{2,39}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -35,6 +36,12 @@ async function available(env){
  // No Stars charge without a viable support/refund operator path.
  const authorizedRefundOperator=typeof env.PAYMENT_ADMIN_IDS==='string'&&
   env.PAYMENT_ADMIN_IDS.split(',').some(id=>/^[1-9][0-9]{0,15}$/.test(id.trim()));
+ const terms=publishedStarsTerms(env);
+ if(!terms||!env?.PAYMENTS_DB)return false;
+ try{
+  await env.PAYMENTS_DB.prepare('SELECT 1 FROM rustup_stars_terms_acceptances LIMIT 1').first();
+  await env.PAYMENTS_DB.prepare('SELECT 1 FROM rustup_stars_order_terms LIMIT 1').first();
+ }catch{return false;}
  return env.STARS_FIXED_PRODUCTS_ENABLED==='true'&&
   env.STARS_REFUNDS_ENABLED==='true'&&
   authorizedRefundOperator&&
@@ -111,6 +118,14 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
      'SELECT 1 FROM rustup_stars_invoice_links WHERE order_id=?'
     ).bind(q.invoice_payload).first();
     if(!savedInvoice)throw Error('stars_missing_persisted_invoice');
+    const terms=publishedStarsTerms(env);
+    if(!terms||!await starsTermsAccepted(db,q.from?.id,terms))
+      throw Error('stars_terms_acceptance_not_confirmed');
+    const termsSnapshot=await db.prepare(
+      'SELECT terms_version FROM rustup_stars_order_terms WHERE order_id=?'
+    ).bind(q.invoice_payload).first();
+    if(termsSnapshot?.terms_version!==terms.version)
+      throw Error('stars_order_terms_snapshot_mismatch');
    }else if(enabled){
     throw Error('stars_invalid_order_payload');
    }
@@ -167,6 +182,9 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
  if(!db||!await available(env))throw Error('stars_checkout_disabled');
  if(!Number.isSafeInteger(userId)||userId<=0||!SKU.test(sku||''))
   throw Error('bad_checkout_request');
+ const terms=publishedStarsTerms(env);
+ if(!terms||!await starsTermsAccepted(db,userId,terms))
+  throw Error('stars_terms_acceptance_required');
  const product=await db.prepare(
   'SELECT p.sku,p.title,p.description,p.kind,p.price_stars,p.enabled,c.delivery_text '+
   'FROM rustup_stars_products p JOIN rustup_stars_fixed_content c ON c.sku=p.sku '+
@@ -220,6 +238,14 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
   'WHERE rustup_stars_purchase_locks.expires_at_ms<=?'
  ).bind(userId,sku,id,now+TTL,now).run();
  if(lock?.meta?.changes!==1)throw Error('stars_invoice_already_active');
+ // Save the terms version this buyer actually accepted before issuing the invoice.
+ const consentSnapshot=await db.prepare(
+  'INSERT INTO rustup_stars_order_terms(order_id,terms_version,accepted_at_ms,recorded_at_ms) '+
+  'SELECT ?,terms_version,accepted_at_ms,? FROM rustup_stars_terms_acceptances '+
+  'WHERE telegram_user_id=? AND terms_version=? AND accepted_at_ms>0'
+ ).bind(id,now,userId,terms.version).run();
+ if(consentSnapshot?.meta?.changes!==1)
+  throw Error('stars_terms_snapshot_not_persisted');
  // Save and verify the exact content before issuing a payable Telegram invoice.
  await db.prepare(
   'INSERT INTO rustup_stars_order_content(order_id,delivery_text) VALUES (?,?)'
@@ -241,7 +267,8 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
 export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  const url=new URL(request.url),path=url.pathname;
  if(!['/api/stars/catalog','/api/stars/checkout','/api/stars/purchases',
-      '/api/stars/supporter-badge','/api/stars/health'].includes(path))
+      '/api/stars/supporter-badge','/api/stars/health',
+      '/api/stars/terms','/api/stars/terms/accept'].includes(path))
   return null;
  if(path==='/api/stars/health'&&request.method==='GET')
   return data({ok:true,service:'rustup-fixed-stars',
@@ -264,19 +291,34 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  let userId;
  // Payment checkout keeps the strict 10-minute Telegram authentication TTL.
  const readOnly=path==='/api/stars/catalog'||path==='/api/stars/purchases'||
-   path==='/api/stars/supporter-badge';
+   path==='/api/stars/supporter-badge'||path==='/api/stars/terms';
  try{userId=await userIdFromBody(body,env,readOnly?86400:600);}
  catch{return data({ok:false,error:'telegram_auth_required'},401,origin);}
  if(!env.PAYMENTS_DB)return data({ok:false,error:'payment_database_missing'},503,origin);
  const db=env.PAYMENTS_DB;
  try{
+  if(path==='/api/stars/terms'){
+   const terms=publishedStarsTerms(env);
+   return data({ok:true,terms,
+    accepted:terms?await starsTermsAccepted(db,userId,terms):false},200,origin);
+  }
+  if(path==='/api/stars/terms/accept'){
+   const terms=publishedStarsTerms(env);
+   if(!terms)return data({ok:false,error:'stars_terms_unconfigured'},503,origin);
+   if(body?.accepted!==true||body?.version!==terms.version)
+    return data({ok:false,error:'stars_terms_explicit_acceptance_required'},409,origin);
+   const receipt=await recordStarsTermsAcceptance(db,userId,terms);
+   return data({ok:true,...receipt},200,origin);
+  }
   if(path==='/api/stars/catalog'){
    const catalog=await db.prepare(
     'SELECT p.sku,p.title,p.description,p.price_stars FROM rustup_stars_products p '+
     'JOIN rustup_stars_fixed_content c ON c.sku=p.sku '+
     "WHERE p.enabled=1 AND p.kind='fixed_nontransferable' ORDER BY p.sku LIMIT 50"
    ).all();
+   const terms=publishedStarsTerms(env);
    return data({ok:true,checkoutEnabled:await available(env),
+    termsAccepted:terms?await starsTermsAccepted(db,userId,terms):false,
     products:catalog.results||[]},200,origin);
   }
   if(path==='/api/stars/supporter-badge'){

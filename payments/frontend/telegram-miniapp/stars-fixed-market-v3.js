@@ -20,7 +20,8 @@
     return 'Нет связи с Stars API. Проверьте подключение и повторите попытку.';
   }
   async function api(view,signal,sku) {
-    if(view!=='catalog'&&view!=='purchases'&&view!=='checkout')
+    if(view!=='catalog'&&view!=='purchases'&&view!=='checkout'&&
+       view!=='terms'&&view!=='terms/accept')
       throw Error('unsupported_stars_route');
     if(view==='checkout'&&(typeof sku!=='string'||!/^[a-z][a-z0-9_-]{2,39}$/.test(sku)))
       throw Error('invalid_product');
@@ -34,7 +35,8 @@
       throw {code:'invalid_api'};
     const response=await fetch(base.replace(/\/$/,'')+'/api/stars/'+view,{
       method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify(view==='checkout'?{initData,sku}:{initData}),
+      body:JSON.stringify(view==='checkout'?{initData,sku}:
+        view==='terms/accept'?{initData,accepted:true,version:sku}:{initData}),
       credentials:'omit',cache:'no-store',signal
     });
     let data;
@@ -64,6 +66,9 @@
     const status=el('p','w-note rustup-stars-status');
     status.setAttribute('role','status');
     panel.append(status);
+    const termsPanel=el('div','w-note rustup-stars-terms');
+    termsPanel.setAttribute('role','group');
+    panel.append(termsPanel);
     const results=el('div','rustup-stars-results');
     panel.append(results);
     const retry=el('button','rustup-stars-retry','Повторить');
@@ -77,6 +82,7 @@
     help.dataset.tgLink='';
     panel.append(help);
     let seq=0,active='catalog',controller,checkoutRunning=false;
+    let termsAccepted=false;
     const trustedInvoiceUrl=(value)=>{
       try{
         const url=new URL(value);
@@ -85,7 +91,68 @@
           /^\/\$[a-zA-Z0-9_-]{8,256}$/.test(url.pathname) && !url.hash;
       }catch{return false;}
     };
+    async function loadTerms(){
+      termsPanel.replaceChildren(el('p','w-note','Проверка условий оплаты…'));
+      termsAccepted=false;
+      try{
+        const data=await api('terms',AbortSignal.timeout(10000));
+        if(!panel.isConnected)return;
+        const terms=data?.terms;
+        if(!terms||typeof terms.version!=='string'||
+           typeof terms.url!=='string'||!/^https:\/\//.test(terms.url)){
+          termsPanel.replaceChildren(el('p','w-note',
+            'Условия оплаты пока не опубликованы. Покупки недоступны.'));
+          return;
+        }
+        const linkUrl=new URL(terms.url);
+        if(linkUrl.protocol!=='https:'||linkUrl.username||linkUrl.password)
+          throw Error('invalid_terms_url');
+        termsAccepted=data.accepted===true;
+        termsPanel.replaceChildren();
+        const link=el('a','rustup-stars-terms-link','Условия оплаты');
+        link.href=linkUrl.href;
+        link.target='_blank';
+        link.rel='noopener noreferrer';
+        termsPanel.append(link);
+        const label=el('label','rustup-stars-terms-agreement');
+        const input=el('input');
+        input.type='checkbox';
+        input.checked=termsAccepted;
+        input.disabled=termsAccepted;
+        label.append(input,document.createTextNode(
+          ' Я прочитал(а) и принимаю условия оплаты.'));
+        termsPanel.append(label);
+        if(termsAccepted){
+          termsPanel.append(el('p','w-note','Условия подтверждены.'));
+          return;
+        }
+        const confirm=el('button','rustup-stars-buy','Подтвердить согласие');
+        confirm.type='button';
+        confirm.disabled=true;
+        input.addEventListener('change',()=>{confirm.disabled=!input.checked;});
+        confirm.addEventListener('click',async()=>{
+          if(!input.checked||confirm.disabled)return;
+          confirm.disabled=true;
+          try{
+            await api('terms/accept',AbortSignal.timeout(12000),terms.version);
+            termsAccepted=true;
+            await loadTerms();
+            await load('catalog');
+          }catch(error){
+            termsPanel.append(el('p','w-note',errorText(error)));
+            confirm.disabled=false;
+          }
+        });
+        termsPanel.append(confirm);
+      }catch(error){
+        termsPanel.replaceChildren(el('p','w-note',errorText(error)));
+      }
+    }
     async function buy(sku,button){
+      if(!termsAccepted){
+        status.textContent='Сначала прочитайте и примите условия оплаты.';
+        return;
+      }
       if(checkoutRunning||!panel.isConnected||!window.Telegram?.WebApp?.initData)return;
       checkoutRunning=true;
       button.disabled=true;
@@ -132,6 +199,7 @@
         const data=await api(view,signal);
         if(!panel.isConnected||id!==seq)return;
         const canBuy=view==='catalog'&&data.checkoutEnabled===true&&
+          data.termsAccepted===true&&termsAccepted&&
           typeof window.Telegram?.WebApp?.openInvoice==='function';
         status.textContent=canBuy?'Оплата Stars доступна':'Покупки пока отключены';
         const items=view==='catalog'?data.products:data.purchases;
@@ -174,7 +242,7 @@
     shop.addEventListener('click',()=>{if(active!=='catalog')load('catalog');});
     mine.addEventListener('click',()=>{if(active!=='purchases')load('purchases');});
     retry.addEventListener('click',()=>load(active));
-    load('catalog');
+    loadTerms().then(()=>load('catalog'));
   }
   window.RUSTUP_STARS_FIXED_MARKET_V3=Object.freeze({render});
 })();
