@@ -50,6 +50,7 @@ test('receipt and delivery verified once; no game wallet changes',()=>{
  assert.equal(validTestReceipt(current,paid),true);
  current=safeTestStateTransition(current,'delivery');
  assert.equal(current.status,'delivered');
+ assert.equal(current.testBadgeActive,true);
  assert.equal(validTestReceipt(current,paid),true);
  assert.equal(validTestReceipt(current,{message:{...paid.message,successful_payment:{
   ...paid.message.successful_payment,telegram_payment_charge_id:'other-charge'
@@ -67,6 +68,7 @@ test('refund requires confirmed delivery and cannot execute twice',()=>{
   /invalid_test_state_transition/);
  const refunded=safeTestStateTransition(reserved,'refund_complete');
  assert.equal(refunded.status,'refunded');
+ assert.equal(refunded.testBadgeActive,false);
  assert.equal(safeTestStateTransition(refunded,'refund_complete'),refunded);
  assert.throws(()=>safeTestStateTransition(refunded,'refund_intent'),
   /invalid_test_state_transition/);
@@ -163,12 +165,13 @@ test('full TEST invoice-delivery-refund automation is one-use and strictly TEST-
    seen.push('poll');
    return {testOnly:true,status:seen.filter(x=>x==='poll').length===2
     ?'delivered':'precheckout_approved',
-    testReceiptDelivered:seen.filter(x=>x==='poll').length===2};
+    testReceiptDelivered:seen.filter(x=>x==='poll').length===2,
+    testBadgeActive:seen.filter(x=>x==='poll').length===2};
   },
   refundConfirmed:async(t,phrase)=>{
    assert.equal(t,token);assert.equal(phrase,'REFUND TEST '+ID);
    seen.push('refund');
-   return {testOnly:true,status:'refunded'};
+   return {testOnly:true,status:'refunded',testBadgeActive:false};
   },
   announce:(message)=>{seen.push(message)},maxPolls:3,pollSeconds:0
  });
