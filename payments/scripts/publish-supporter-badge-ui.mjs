@@ -53,7 +53,8 @@ export function verifySupporterAssets(js,css){
   "credentials:'omit'",
   "transferable!==false",
   "usableForWagers!==false",
-  "Не удалось подтвердить вход через Telegram",
+  "Telegram не передал данные авторизации",
+  "Сервер не подтвердил Telegram-сессию",
   "payButton.disabled=data.checkoutEnabled!==true"
  ])if(!js.includes(keyword))throw Error('supporter_asset_feature_missing');
  if(!css.includes('.rustup-supporter-status')||
