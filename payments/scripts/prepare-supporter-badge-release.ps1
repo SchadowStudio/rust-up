@@ -1,6 +1,8 @@
 # RUST UP Supporter badge: ONE COMMAND, exact current bot staging, NO PAYMENT.
 # Tests isolated badge delivery/replay/refund with SQLite, private bot recovery,
-# compile and Cloudflare --dry-run. NEVER deploys live code or toggles gates.
+# compile and Cloudflare --dry-run. Real-money gates always OFF.
+# -DeployReadOnly publishes only the tested, NONCHARGING badge status API.
+param([switch]$DeployReadOnly)
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location -LiteralPath $repo
@@ -70,5 +72,25 @@ Check 'Re-verify exact live bot and supporter stage without changes'{
 Check 'Cloudflare dry-run, NO deployment and all payment gates OFF'{
  npx --yes wrangler deploy --dry-run --config "$config"
 }
-Write-Host 'PASS: Full supporter badge backend staged and checked. NOT DEPLOYED.' -ForegroundColor Green
-Write-Host 'Telegram test user and operator Stars price still needed for paid E2E.'
+if(!$DeployReadOnly){
+ Write-Host 'PASS: Full supporter badge backend staged and checked. NOT DEPLOYED.' -ForegroundColor Green
+ Write-Host 'No real-money payments, no game-credit changes.'
+ exit 0
+}
+# This is an explicitly requested dark deploy on the EXISTING bot. Only the
+# isolated, read-only badge status route is new. Every Stars checkout remains OFF.
+# We do not attempt actual Stars invoices, games, or wallet credits.
+Check 'Final Cloudflare Worker integrity recheck immediately before deployment'{
+ node '.\payments\scripts\stage-supporter-badge.mjs' "$dir" --check
+}
+Check 'Deploy existing RUST UP Worker with badge status and ALL payment gates OFF'{
+ npx --yes wrangler deploy --config "$config"
+}
+Check 'Verify live Worker health after NONCHARGING deployment'{
+ $health=Invoke-RestMethod -Uri 'https://rustup-bot.ttzoomrust.workers.dev/api/stars/health' -TimeoutSec 20
+ if(!$health.ok -or $health.productionEnabled -or $health.gameBalanceCredit){
+  throw 'Live badge release health cannot confirm payment gates OFF'
+ }
+}
+Write-Host 'PASS: Existing @rustuper_bot has read-only supporter badge backend.' -ForegroundColor Green
+Write-Host 'NO real Stars payments, NO gambling credits, operator rate unchanged.'
