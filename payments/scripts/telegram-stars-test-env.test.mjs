@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  validTestReceipt,validTestPrecheckout,safeTestStateTransition,
- validTestDeliveryAck,testRefundPayload,
+ validTestDeliveryAck,testRefundPayload,telegramTestApi,
  verifyTelegramTestBot
 } from './telegram-stars-test-env.mjs';
 const ID='53e41abc-7696-4da9-8f1d-95b5409e3841';
@@ -124,4 +124,28 @@ test('test refund payload is bound to delivered receipt and exact confirmation',
   /explicit_refund_confirmation_required/);
  assert.throws(()=>testRefundPayload({...delivered,testOnly:false},
   'REFUND TEST '+ID),/no_verified_delivered_test_order/);
+});
+
+test('mock test-network refund and delivery calls never reach production API',async()=>{
+ const requests=[];
+ const fake=async(url,options)=>{
+  assert.match(url,/^https:\/\/api\.telegram\.org\/bot[0-9]+:[A-Za-z0-9_-]+\/test\/(?:sendMessage|refundStarPayment)$/);
+  assert.equal(options.method,'POST');
+  const body=JSON.parse(options.body);
+  requests.push({url,body});
+  return {ok:true,async json(){return {ok:true,result:url.endsWith('refundStarPayment')
+   ?true:{message_id:1234,chat:{id:123456}}};}};
+ };
+ const msg=await telegramTestApi(TOKEN,'sendMessage',{
+  chat_id:123456,text:'TEST ONLY RECEIPT'
+ },fake);
+ assert.equal(msg.message_id,1234);
+ const result=await telegramTestApi(TOKEN,'refundStarPayment',{
+  user_id:123456,telegram_payment_charge_id:'test-charge-abcdefghijklmnopqrstuvwxyz'
+ },fake);
+ assert.equal(result,true);
+ assert.equal(requests.length,2);
+ assert.equal(requests.every(x=>x.url.includes('/test/')),true);
+ await assert.rejects(()=>telegramTestApi(TOKEN,'setWebhook',{},fake),
+  /unapproved_test_bot_method/);
 });
