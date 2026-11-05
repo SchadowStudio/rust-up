@@ -20,7 +20,8 @@
     return 'Нет связи с Stars API. Проверьте подключение и повторите попытку.';
   }
   async function api(view,signal,sku) {
-    if(view!=='catalog'&&view!=='purchases'&&view!=='checkout')
+    if(view!=='catalog'&&view!=='purchases'&&view!=='checkout'&&
+       view!=='terms'&&view!=='terms/accept')
       throw Error('unsupported_stars_route');
     if(view==='checkout'&&(typeof sku!=='string'||!/^[a-z][a-z0-9_-]{2,39}$/.test(sku)))
       throw Error('invalid_product');
@@ -34,7 +35,8 @@
       throw {code:'invalid_api'};
     const response=await fetch(base.replace(/\/$/,'')+'/api/stars/'+view,{
       method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify(view==='checkout'?{initData,sku}:{initData}),
+      body:JSON.stringify(view==='checkout'?{initData,sku}:
+        view==='terms/accept'?{initData,accepted:true,version:sku}:{initData}),
       credentials:'omit',cache:'no-store',signal
     });
     let data;
