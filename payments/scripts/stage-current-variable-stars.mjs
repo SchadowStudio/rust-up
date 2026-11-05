@@ -1,10 +1,10 @@
-// Stage variable amount Stars routes against the EXACT CURRENT 16-module RUST UP bot.
+// Stage variable amount Stars routes against the EXACT CURRENT 18-module RUST UP bot.
 // No live changes, no incoming funds, no game balance credits, no secrets in GitHub.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {recoverCommerceSource,verifyCommerceSnapshot}
- from './recover-current-stars-commerce.mjs';
+import {recoverVariableSource,verifyVariableSnapshot}
+ from './recover-current-stars-variable.mjs';
 import {buildReadonlyHotfixConfig}
  from './prepare-stars-readonly-ttl.mjs';
 
@@ -47,8 +47,8 @@ async function cloudflareJson(route,token){
 }
 async function inspect(dir,token){
  const manifest=JSON.parse(await fs.readFile(path.join(dir,'RECOVERY-MANIFEST.json'),'utf8'));
- const now=await recoverCommerceSource(token);
- verifyCommerceSnapshot(now.source,manifest);
+ const now=await recoverVariableSource(token);
+ verifyVariableSnapshot(now.source,manifest);
  const base='/accounts/'+ACCOUNT+'/workers/scripts/rustup-bot';
  const [settings,schedules]=await Promise.all([
   cloudflareJson(base+'/settings',token),cloudflareJson(base+'/schedules',token)
@@ -89,12 +89,17 @@ async function main(){
     'rustup_stars_variable_orders','STARS_VARIABLE_CREDIT_LEDGER_READY']){
    if(!bundle.includes(marker))throw Error('bundle_missing_'+marker);
   }
-  console.log('PASS: Live 16-module bot unchanged and variable top-up bridge staged.');
+  console.log('PASS: Live 18-module bot unchanged and variable top-up bridge staged.');
   console.log('PASS: All payment flags remain FALSE. No game credits.');
   return;
  }
+ // Current 18-module bot already has the variable routes. Keep the exact
+ // recovered files; refuse modified sources instead of silently overwriting.
  for(const name of FILES){
-  await fs.copyFile(path.join(SRC,name),path.join(dir,name),fs.constants.COPYFILE_EXCL);
+  const src=await fs.readFile(path.join(SRC,name),'utf8');
+  const existing=await fs.readFile(path.join(dir,name),'utf8');
+  if(src.replace(/\\r\\n/g,'\\n')!==existing.replace(/\\r\\n/g,'\\n'))
+    throw Error('current_live_module_differs_'+name);
  }
  await fs.writeFile(path.join(dir,CONFIG),config,{flag:'wx',mode:0o600});
  console.log('PASS: User-selected RUB amount, signed Telegram quote/receipt routes staged.');
