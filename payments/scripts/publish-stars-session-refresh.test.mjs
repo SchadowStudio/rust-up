@@ -6,7 +6,9 @@ import {fileURLToPath} from 'node:url';
 import {patchSessionAsset,patchSessionIndex} from './publish-stars-session-refresh.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const current=fs.readFileSync(path.join(root,'frontend','telegram-miniapp','stars-readonly-v2.js'),'utf8');
+// Windows Git can check out CRLF; fixture replacements below use LF literals.
+const current=fs.readFileSync(path.join(root,'frontend','telegram-miniapp','stars-readonly-v2.js'),'utf8')
+ .replace(/\r\n/g,'\n');
 const fresh=[
  '    // Let the server validate auth_date and the Telegram HMAC signature.',
  '    // Browser clocks may be wrong and this Mini App can stay open for hours.',
