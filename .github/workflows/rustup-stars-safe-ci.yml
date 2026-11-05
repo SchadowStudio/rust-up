@@ -46,6 +46,7 @@ jobs:
           node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/variable-refunds.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/variable-stars-prelaunch.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs payments/scripts/telegram-stars-test-env.test.mjs
       - name: Test supporter badge delivery, owner-only visibility and refund revocation
         run: |
+          node --test payments/integration/telegram-stars/stars-sqlite-e2e.test.mjs
           node --test payments/integration/telegram-stars/supporter-badge.test.mjs
           node --test payments/frontend/telegram-miniapp/stars-supporter-ui.test.mjs
       - name: Verify account import guard without enabling money
