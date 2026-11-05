@@ -4,7 +4,7 @@
 // and a server-frozen coin quote are REQUIRED before any game DB write.
 // Keep disabled while wager/refund/age-control checks remain unverified.
 import {telegramApi} from '../telegram-stars/stars.mjs';
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ID=/^[A-Za-z0-9_-]{8,256}$/;
 const validUser=n=>Number.isSafeInteger(n)&&n>0;
 const money=n=>Number.isSafeInteger(n)&&n>=100&&n<=100000000;
