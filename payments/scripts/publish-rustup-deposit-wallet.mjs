@@ -67,6 +67,7 @@ export function verifyDepositAssets(js,css){
   js.includes('/api/stars/supporter-badge')||
   css.includes('rustup-supporter-status')||
   /innerHTML\s*=|eval\s*\(/.test(js))throw Error('unwanted_badge_or_insecure_js');
+ if(/\n[ \t]*\n$/.test(css))throw Error('deposit_css_trailing_blank_line');
  if(!css.includes('.rustup-amount-input'))throw Error('amount_input_style_missing');
  return true;
 }
@@ -118,7 +119,9 @@ function main(){
   const names=git(site,'diff','--cached','--name-only').split(/\r?\n/).sort();
   if(JSON.stringify(names)!==JSON.stringify(['index.html',JS,CSS].sort()))
    throw Error('unexpected_website_file_change');
-  git(site,'diff','--cached','--check');
+  try{git(site,'diff','--cached','--check');}
+  catch(e){throw Error('git_staged_whitespace_check_failed: '+
+    String(e?.stderr||e?.message||'unknown').slice(0,1200));}
   git(site,'commit','-m',
    'Show variable RUB Stars deposit without Supporter and initialize Telegram SDK');
   git(site,'push','origin','main');
