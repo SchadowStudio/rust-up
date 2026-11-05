@@ -121,6 +121,11 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
     const terms=publishedStarsTerms(env);
     if(!terms||!await starsTermsAccepted(db,q.from?.id,terms))
       throw Error('stars_terms_acceptance_not_confirmed');
+    const termsSnapshot=await db.prepare(
+      'SELECT terms_version FROM rustup_stars_order_terms WHERE order_id=?'
+    ).bind(q.invoice_payload).first();
+    if(termsSnapshot?.terms_version!==terms.version)
+      throw Error('stars_order_terms_snapshot_mismatch');
    }else if(enabled){
     throw Error('stars_invalid_order_payload');
    }
