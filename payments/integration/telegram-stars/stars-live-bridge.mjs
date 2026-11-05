@@ -44,16 +44,34 @@ async function available(env){
 async function recordUnexpectedReceipt(db,msg,reason){
  const pay=msg?.successful_payment;
  const charge=pay?.telegram_payment_charge_id;
- if(typeof charge!=='string'||charge.length<1||charge.length>256||
-    !Number.isSafeInteger(msg?.from?.id)||!Number.isSafeInteger(pay?.total_amount))
+ const userId=msg?.from?.id;
+ const amount=pay?.total_amount;
+ const invoicePayload=pay?.invoice_payload;
+ if(!db?.prepare||typeof charge!=='string'||charge.length<1||charge.length>256||
+    !Number.isSafeInteger(userId)||userId<1||
+    pay?.currency!=='XTR'||!Number.isSafeInteger(amount)||amount<1||
+    typeof invoicePayload!=='string'||invoicePayload.length<1||
+    invoicePayload.length>256||
+    typeof reason!=='string'||reason.length<1||reason.length>100)
    throw Error('unverifiable_stars_receipt_requires_manual_investigation');
- await db.prepare(
+ const saved=await db.prepare(
   'INSERT OR IGNORE INTO rustup_stars_receipt_incidents '+
   '(telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason,occurred_at_ms) '+
   'VALUES(?,?,?,?,?,?)'
- ).bind(charge,msg.from.id,String(pay.invoice_payload||'').slice(0,256),
-  pay.total_amount,reason,Date.now()).run();
+ ).bind(charge,userId,invoicePayload,amount,reason,Date.now()).run();
+ if(saved?.meta?.changes===1)return;
+ // A previous incident is only an idempotent replay when its evidence
+ // matches byte-for-byte. Never silently discard conflicting charge data.
+ const existing=await db.prepare(
+  'SELECT telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason '+
+  'FROM rustup_stars_receipt_incidents WHERE telegram_charge_id=?'
+ ).bind(charge).first();
+ if(!existing||existing.telegram_user_id!==userId||
+    existing.invoice_payload!==invoicePayload||existing.price_stars!==amount||
+    existing.reason!==reason)
+   throw Error('stars_receipt_incident_conflict_requires_review');
 }
+
 export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
  const q=update?.pre_checkout_query;
  const msg=update?.message;
