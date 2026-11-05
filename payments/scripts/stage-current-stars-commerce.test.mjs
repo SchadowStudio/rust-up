@@ -47,3 +47,12 @@ test('checkout source and exact webhook wrapper preserve payment safety guards',
  assert.match(bridge,/recordUnexpectedReceipt/);
  assert.match(bridge,/readOnly\?86400:600/);
 });
+
+test('private commerce staging copies the newly required buyer terms module',()=>{
+ const staging=fs.readFileSync(path.join(root,'scripts','stage-current-stars-commerce.mjs'),'utf8');
+ const terms=fs.readFileSync(path.join(root,'integration','telegram-stars','stars-terms.mjs'),'utf8');
+ assert.match(staging,/'stars-terms\.mjs'/);
+ assert.match(staging,/buyer_terms_adapter_missing/);
+ assert.match(terms,/recordStarsTermsAcceptance/);
+ assert.match(terms,/rustup_stars_terms_acceptances/);
+});

@@ -19,6 +19,7 @@ const FILES=[
  'worker.stars-commerce-entry.mjs',
  'stars-existing-worker-wrapper.mjs',
  'stars-live-bridge.mjs',
+ 'stars-terms.mjs',
  'payment-controls.mjs',
  'refunds.mjs',
  'stars.mjs'
@@ -65,6 +66,10 @@ function checkAdapter(name,source){
      !source.includes('prior_stars_payment_requires_reconciliation')||
      !source.includes('Date.now(),maxAgeSeconds')))
    throw Error('missing_stars_replay_protection');
+ if(name==='stars-terms.mjs'&&
+    (!source.includes('recordStarsTermsAcceptance')||
+     !source.includes('rustup_stars_terms_acceptances')))
+   throw Error('buyer_terms_adapter_missing');
  if(name==='refunds.mjs'&&!source.includes('refundStarPayment'))
    throw Error('refund_handler_missing');
 }

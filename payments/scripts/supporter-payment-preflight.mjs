@@ -2,11 +2,13 @@
 // by this script, and a unit test does not count as Telegram payment evidence.
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {publishedStarsTerms} from '../integration/telegram-stars/stars-terms.mjs';
 
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
 const DATABASE='06079270-a227-466a-9991-abd4201ec5f6';
 const SCRIPT='rustup-bot';
 const SKU='supporter_badge_v1';
+const SITE='https://ttzoomrust-hub.github.io/rust-up/';
 const FLAGS=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
  'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
@@ -23,7 +25,8 @@ export function evaluateSupporterReadiness(x){
  const flags=FLAGS.map(name=>bindings.get(name)?.text);
  const disabled=flags.every(v=>v==='false');
  const unknown=flags.some(v=>v!=='false'&&v!=='true');
- const supported=['rustup_stars_orders','rustup_stars_products',
+ const supported=['rustup_stars_terms_acceptances','rustup_stars_order_terms',
+  'rustup_stars_orders','rustup_stars_products',
   'rustup_stars_fixed_content','rustup_stars_order_content',
   'rustup_stars_supporter_badges','rustup_stars_refund_intents',
   'rustup_stars_receipt_incidents','rustup_payment_settings']
@@ -35,6 +38,13 @@ export function evaluateSupporterReadiness(x){
   products[0].price_stars>=1&&products[0].price_stars<=1000000&&
   products[0].hasDelivery===1;
  const noOtherSale=x.products.every(p=>p.enabled!==1||p.sku===SKU);
+ const payDb=bindings.get('PAYMENTS_DB');
+ const payDbReady=payDb?.type==='d1'&&
+  [payDb.id,payDb.database_id].includes(DATABASE);
+ const terms=publishedStarsTerms({
+  STARS_TERMS_VERSION:bindings.get('STARS_TERMS_VERSION')?.text,
+  STARS_TERMS_URL:bindings.get('STARS_TERMS_URL')?.text
+ });
  const admin=bindings.get('PAYMENT_ADMIN_IDS');
  const refundAdminReady=admin?.type==='plain_text'&&validIds(admin.text);
  const origin=bindings.get('APP_URL')?.text===
@@ -44,6 +54,7 @@ export function evaluateSupporterReadiness(x){
  const siteReady=x.siteHtml.includes(
   '<script src="https://telegram.org/js/telegram-web-app.js?64"></script>')&&
   x.siteHtml.includes('20261105telegramauth2')&&
+  x.siteHtml.includes('js/stars-fixed-market-v3.js')&&
   !x.siteHtml.includes("sessionStorage.setItem('rustup_tg'");
  const controlsOff=['master','stars','crypto'].every(c=>
   x.controls.some(row=>row.channel===c&&row.enabled===0))&&
@@ -52,6 +63,9 @@ export function evaluateSupporterReadiness(x){
   Number.isSafeInteger(r.value)&&r.value===0);
  const checks=[
   ['payment_schema_ready',supported],
+  ['correct_live_payment_database_binding',payDbReady],
+  ['operator_terms_version_and_https_url',!!terms],
+  ['authenticated_stars_terms_route_present',x.termsRouteAuthenticated===true],
   ['telegram_bot_secrets_and_origin',origin&&botReady],
   ['refund_operator_allowlist',refundAdminReady],
   ['supporter_product_has_price_delivery',approvedProduct],
@@ -98,10 +112,20 @@ export async function inspectSupporterReadiness(token,fetchImpl=fetch){
   api(token,d1,"SELECT p.sku,p.kind,p.price_stars,p.enabled,CASE WHEN EXISTS(SELECT 1 FROM rustup_stars_fixed_content c WHERE c.sku=p.sku AND length(c.delivery_text)>0) THEN 1 ELSE 0 END AS hasDelivery FROM rustup_stars_products p LIMIT 100",fetchImpl),
   api(token,d1,'SELECT channel,enabled FROM rustup_payment_settings',fetchImpl),
   api(token,d1,"SELECT COUNT(*) AS value FROM rustup_stars_receipt_incidents UNION ALL SELECT COUNT(*) AS value FROM rustup_stars_refund_intents WHERE state<>'completed'",fetchImpl),
-  fetchImpl('https://ttzoomrust-hub.github.io/rust-up/',{
+  fetchImpl(SITE,{
    method:'GET',redirect:'error',signal:AbortSignal.timeout(25000)})
  ];
  const [settings,tables,products,controls,incidents,site]=await Promise.all(requests);
+ const termsRoute=await fetchImpl('https://rustup-bot.ttzoomrust.workers.dev/api/stars/terms',{
+  method:'POST',redirect:'error',cache:'no-store',
+  headers:{origin:new URL(SITE).origin,'content-type':'application/json'},
+  body:JSON.stringify({initData:'invalid'}),
+  signal:AbortSignal.timeout(10000)
+ });
+ let termsRouteAuthenticated=false;
+ try{const body=await termsRoute.json();
+  termsRouteAuthenticated=termsRoute.status===401&&
+   body?.error==='telegram_auth_required';}catch{}
  if(!site.ok)throw Error('public_miniapp_unavailable');
  const rows=q=>{
   if(!Array.isArray(q)||!Array.isArray(q[0]?.results))
@@ -111,7 +135,7 @@ export async function inspectSupporterReadiness(token,fetchImpl=fetch){
  return evaluateSupporterReadiness({
   bindings:settings?.bindings,tables:rows(tables).map(x=>x.name),
   products:rows(products),controls:rows(controls),incidents:rows(incidents),
-  siteHtml:await site.text()
+  termsRouteAuthenticated,siteHtml:await site.text()
  });
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))
