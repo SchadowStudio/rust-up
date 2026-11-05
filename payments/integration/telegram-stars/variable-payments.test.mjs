@@ -118,6 +118,11 @@ test('variable Stars one-use checkout, delayed verified receipt, duplicate safe'
   const q={id:'q1',from:{id:12345},currency:'XTR',total_amount:50,
     invoice_payload:'v:'+ord.orderId};
   assert.equal(validVariableStarsPrecheckout(db.row,q,now),true);
+  // An invoice URL must be stored BEFORE Telegram may charge for it.
+  // A crash between createInvoiceLink and database save is fail-closed.
+  assert.equal(validVariableStarsPrecheckout({...db.row,invoice_url:null},q,now),false);
+  assert.equal(validVariableStarsPrecheckout({...db.row,invoice_url:'http://evil.test'},q,now),false);
+  assert.equal(validVariableStarsPrecheckout({...db.row,invoice_url:'x'.repeat(1025)},q,now),false);
   assert.equal(validVariableStarsPrecheckout(db.row,{...q,total_amount:500},now),false);
   assert.equal((await handleVariableStarsUpdate({pre_checkout_query:q},env,bot,now)).ok,true);
   assert.equal(db.row.status,'checkout_approved');
