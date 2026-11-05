@@ -39,7 +39,8 @@ test('reviewed badge JS validates, stays read-only, and never enables paid cases
  const js=readFileSync(new URL('../frontend/telegram-miniapp/stars-variable-wallet-v4.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../frontend/telegram-miniapp/stars-variable-wallet-v4.css',import.meta.url),'utf8');
  assert.equal(verifySupporterAssets(js,css),true);
- assert.match(js,/if\(e\?\.status===401\).*Не удалось подтвердить вход/);
+ assert.match(js,/Telegram не передал данные авторизации/);
+ assert.match(js,/Сервер не подтвердил Telegram-сессию/);
  assert.match(js,/payButton\.disabled=true/);
  assert.equal(js.includes('creditedToGame:true'),false);
  assert.equal(js.includes('enablePayments('),false);
