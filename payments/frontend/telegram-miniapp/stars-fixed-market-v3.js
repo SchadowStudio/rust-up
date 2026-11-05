@@ -66,6 +66,9 @@
     const status=el('p','w-note rustup-stars-status');
     status.setAttribute('role','status');
     panel.append(status);
+    const termsPanel=el('div','w-note rustup-stars-terms');
+    termsPanel.setAttribute('role','group');
+    panel.append(termsPanel);
     const results=el('div','rustup-stars-results');
     panel.append(results);
     const retry=el('button','rustup-stars-retry','Повторить');
@@ -79,6 +82,7 @@
     help.dataset.tgLink='';
     panel.append(help);
     let seq=0,active='catalog',controller,checkoutRunning=false;
+    let termsAccepted=false;
     const trustedInvoiceUrl=(value)=>{
       try{
         const url=new URL(value);
@@ -88,6 +92,10 @@
       }catch{return false;}
     };
     async function buy(sku,button){
+      if(!termsAccepted){
+        status.textContent='Сначала прочитайте и примите условия оплаты.';
+        return;
+      }
       if(checkoutRunning||!panel.isConnected||!window.Telegram?.WebApp?.initData)return;
       checkoutRunning=true;
       button.disabled=true;
@@ -134,6 +142,7 @@
         const data=await api(view,signal);
         if(!panel.isConnected||id!==seq)return;
         const canBuy=view==='catalog'&&data.checkoutEnabled===true&&
+          data.termsAccepted===true&&termsAccepted&&
           typeof window.Telegram?.WebApp?.openInvoice==='function';
         status.textContent=canBuy?'Оплата Stars доступна':'Покупки пока отключены';
         const items=view==='catalog'?data.products:data.purchases;
