@@ -58,7 +58,7 @@ export function safeTestStateTransition(order,event){
  }
  throw Error('invalid_test_state_transition_'+event);
 }
-async function telegram(token,method,body={},fetchImpl=fetch){
+export async function telegramTestApi(token,method,body={},fetchImpl=fetch){
  if(!TOKEN.test(token||''))throw Error('TELEGRAM_TEST_BOT_TOKEN_invalid');
  if(!/^(getMe|getWebhookInfo|createInvoiceLink|getUpdates|answerPreCheckoutQuery|sendMessage|refundStarPayment)$/.test(method))
   throw Error('unapproved_test_bot_method');
@@ -74,10 +74,10 @@ async function telegram(token,method,body={},fetchImpl=fetch){
  return obj.result;
 }
 export async function verifyTelegramTestBot(token,fetchImpl=fetch){
- const bot=await telegram(token,'getMe',{},fetchImpl);
+ const bot=await telegramTestApi(token,'getMe',{},fetchImpl);
  if(bot?.is_bot!==true||!Number.isSafeInteger(bot.id))
   throw Error('test_bot_identity_invalid');
- const info=await telegram(token,'getWebhookInfo',{},fetchImpl);
+ const info=await telegramTestApi(token,'getWebhookInfo',{},fetchImpl);
  if(typeof info?.url!=='string'||info.url.length)
   throw Error('test_bot_must_not_have_webhook');
  return {ok:true,testEnvironment:true,username:bot.username};
@@ -107,7 +107,7 @@ function fresh(userId,stars){
 }
 async function identifyTestUser(token,fetchImpl=fetch){
  await verifyTelegramTestBot(token,fetchImpl);
- const updates=await telegram(token,'getUpdates',{
+ const updates=await telegramTestApi(token,'getUpdates',{
   timeout:0,limit:100,allowed_updates:['message']
  },fetchImpl);
  if(!Array.isArray(updates))throw Error('invalid_test_updates');
@@ -124,7 +124,7 @@ async function invoice(token,userId,stars,fetchImpl=fetch){
  if(existing&&existing.status!=='refunded')
   throw Error('finish_existing_test_order_before_creating_another');
  const order=fresh(userId,stars);
- const link=await telegram(token,'createInvoiceLink',{
+ const link=await telegramTestApi(token,'createInvoiceLink',{
   title:'RUST UP — тестовая квитанция',
   description:'Только тестовая квитанция. Не игровая валюта, не кейсы, без вывода.',
   payload:'test_rustup_'+order.orderId,
@@ -162,7 +162,7 @@ async function confirmDelivery(token,order,fetchImpl=fetch){
  order={...order,deliveryIntentAt:Date.now()};
  await writeState(order);
  try{
-  const message=await telegram(token,'sendMessage',{
+  const message=await telegramTestApi(token,'sendMessage',{
    chat_id:order.telegramUserId,
    text:'✅ RUST UP TEST: подтверждена оплата '+order.priceStars+
      ' ⭐. Доставлен тестовый цифровой чек. Игровой баланс не изменён.'
@@ -184,7 +184,7 @@ async function listen(token,fetchImpl=fetch,pollSeconds=0){
   throw Error('no_test_invoice_created');
  if(['refunded','refund_pending','manual_review'].includes(order.status))
   throw Error('test_order_not_listenable');
- const updates=await telegram(token,'getUpdates',{
+ const updates=await telegramTestApi(token,'getUpdates',{
   offset:order.lastUpdateId+1,timeout:pollSeconds,allowed_updates:['message','pre_checkout_query'],
   limit:100
  },fetchImpl);
@@ -193,14 +193,14 @@ async function listen(token,fetchImpl=fetch,pollSeconds=0){
  for(const update of updates){
   if(!Number.isSafeInteger(update.update_id))continue;
   if(validTestPrecheckout(order,update)){
-   await telegram(token,'answerPreCheckoutQuery',{
+   await telegramTestApi(token,'answerPreCheckoutQuery',{
     pre_checkout_query_id:update.pre_checkout_query.id,ok:true
    },fetchImpl);
    order=safeTestStateTransition({...order,checkoutQueryId:update.pre_checkout_query.id},'precheckout');
    processed++;
   }else if(update.pre_checkout_query){
    // Refuse ANY unrecognized or altered test invoice.
-   await telegram(token,'answerPreCheckoutQuery',{
+   await telegramTestApi(token,'answerPreCheckoutQuery',{
     pre_checkout_query_id:update.pre_checkout_query.id,ok:false,
     error_message:'Unknown or changed test payment.'
    },fetchImpl);
@@ -229,7 +229,7 @@ async function refund(token,confirmation,fetchImpl=fetch){
   {...order,refundIntentAt:Date.now()},'refund_intent');
  await writeState(order);
  try{
-  const result=await telegram(token,'refundStarPayment',refundArgs,fetchImpl);
+  const result=await telegramTestApi(token,'refundStarPayment',refundArgs,fetchImpl);
   if(result!==true)throw Error('test_refund_not_confirmed');
  }catch(e){
   await writeState(safeTestStateTransition(order,'manual_review'));
