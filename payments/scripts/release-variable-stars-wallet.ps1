@@ -33,7 +33,7 @@ Run 'Test variable user amounts, quotes and payment callbacks'{
  node --test ".\payments\integration\telegram-stars\variable-payments.test.mjs" ".\payments\integration\telegram-stars\stars-variable-bridge.test.mjs"
 }
 Run 'Test current Worker config and payment gates'{
- node --test ".\payments\scripts\stage-current-variable-stars.test.mjs"
+ node --test ".\payments\scripts\stage-current-variable-stars.test.mjs" ".\payments\scripts\recover-current-stars-variable.test.mjs"
 }
 Run 'Test Mini App amount input and publisher'{
  node --test ".\payments\scripts\publish-variable-stars-wallet.test.mjs"
