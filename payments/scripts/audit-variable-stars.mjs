@@ -1,3 +1,5 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 // RUST UP: read-only aggregate audit of variable Telegram Stars orders.
 // NEVER writes DB, creates invoices, processes charges, or credits game balances.
 // Does not print Telegram IDs, payment charge IDs, orders or credentials.
@@ -44,11 +46,12 @@ export function buildVariableStarsAudit(counts,anomaly,duplicates,bindings){
  if(!Array.isArray(counts)||typeof anomaly!=='object'||!anomaly||
     typeof duplicates!=='object'||!duplicates||!Array.isArray(bindings))
   throw Error('audit_invalid_response');
- const summary=Object.create(null);
+ const summary=Object.create(null),seen=new Set();
  for(const name of EXPECTED_STATES)summary[name]=0;
  for(const row of counts){
-  if(!EXPECTED_STATES.has(row?.status)||summary[row.status]!==0)
+  if(!EXPECTED_STATES.has(row?.status)||seen.has(row.status))
    throw Error('audit_unknown_or_duplicate_status');
+  seen.add(row.status);
   summary[row.status]=safeCount(row.total);
  }
  const issues={
@@ -115,7 +118,7 @@ export async function auditVariableStars(token){
  return buildVariableStarsAudit(countRows,anomalyRows[0],replayRows[0],
   settings?.bindings);
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1].replace(/\\/g,'/')).href)
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))
  auditVariableStars(process.env.CLOUDFLARE_API_TOKEN)
   .then(report=>{
    console.log(JSON.stringify(report,null,2));
