@@ -8,6 +8,8 @@ import {recoverReadonlySource,verifyReadonlySnapshot}
  from './recover-current-stars-readonly.mjs';
 import {buildReadonlyHotfixConfig}
  from './prepare-stars-readonly-ttl.mjs';
+import {patchGameInitialImport}
+ from '../integration/existing-game-state-sandbox/strict-first-login-guard.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const PRIVATE=path.join(ROOT,'.private','rustup-bot-recovered')+path.sep;
@@ -36,11 +38,15 @@ export function commerceConfig(settings,schedules){
  if(old.split(name).length!==2)throw Error('unexpected_readonly_config');
  const output=old.replace(name,BUNDLE)
   .replace('PRIVATE RUST UP 24h read-only Stars auth hotfix',
-           'PRIVATE RUST UP fixed-goods checkout release STAGED IN OFF MODE');
+           'PRIVATE RUST UP fixed-goods checkout release STAGED IN OFF MODE')
+  .replace('PAYMENT_PRODUCTION_ENABLED = "false"',
+           'PAYMENT_PRODUCTION_ENABLED = "false"\nPAYMENT_WALLET_STRICT_MODE = "false"');
  if(PAY_FLAGS.some(flag=>!output.includes(flag+' = "false"')))
    throw Error('commerce_payment_gate_must_remain_off');
  if(!output.includes('keep_vars = true')||!output.includes('upload_source_maps = true'))
    throw Error('commerce_config_lacks_recovery');
+ if(!output.includes('PAYMENT_WALLET_STRICT_MODE = "false"'))
+   throw Error('commerce_strict_wallet_gate_must_start_off');
  return output;
 }
 function checkAdapter(name,source){
@@ -92,6 +98,9 @@ async function main(){
  const token=process.env.CLOUDFLARE_API_TOKEN;
  if(typeof token!=='string'||token.length<15)throw Error('cloudflare_login_missing');
  const config=await inspect(dir,token);
+ const liveGame=await fs.readFile(path.join(dir,'game.js'),'utf8');
+ const guardedGame=patchGameInitialImport(liveGame);
+ if(guardedGame===liveGame)throw Error('game_source_already_modified');
  for(const name of FILES){
   const content=await fs.readFile(path.join(SRC,name),'utf8');
   checkAdapter(name,content);
@@ -103,8 +112,13 @@ async function main(){
  const configPath=path.join(dir,CONFIG);
  if(check){
   if(await fs.readFile(configPath,'utf8')!==config)throw Error('commerce_config_changed');
+  const localGame=await fs.readFile(path.join(dir,'game.js'),'utf8');
+  const originalGame=await fs.readFile(path.join(dir,'game.before-payment-guard.js'),'utf8');
+  if(patchGameInitialImport(originalGame)!==localGame)
+    throw Error('strict_wallet_game_guard_changed');
   const bundle=await fs.readFile(path.join(dir,BUNDLE),'utf8');
-  for(const marker of ['wrapExistingWorker','stars_invoice_already_active','refundStarPayment','stars_checkout_disabled']){
+  for(const marker of ['wrapExistingWorker','stars_invoice_already_active','refundStarPayment',
+    'stars_checkout_disabled','RUSTUP_STRICT_ACCOUNT_IMPORT_V1']){
    if(!bundle.includes(marker))throw Error('commerce_bundle_missing_'+marker);
   }
   console.log('PASS: Exact current 12-module live bot unchanged.');
@@ -112,9 +126,12 @@ async function main(){
   return;
  }
  for(const name of FILES)await fs.copyFile(path.join(SRC,name),path.join(dir,name),fs.constants.COPYFILE_EXCL);
+ await fs.writeFile(path.join(dir,'game.before-payment-guard.js'),liveGame,{flag:'wx',mode:0o600});
+ await fs.writeFile(path.join(dir,'game.js'),guardedGame);
  await fs.writeFile(configPath,config,{flag:'wx',mode:0o600});
  console.log('PASS: Original live game, admin and bot source verified without modifications.');
  console.log('PASS: Stars invoice/precheckout/receipt/refund adapter staged in private directory.');
+ console.log('PASS: First-login paid-wallet integrity guard included but strict mode OFF by default.');
  console.log('PASS: All four payment gates remain OFF; NOTHING DEPLOYED.');
  console.log('Private entry: '+path.join(dir,'worker.stars-commerce-entry.mjs'));
  console.log('Private config: '+configPath);
