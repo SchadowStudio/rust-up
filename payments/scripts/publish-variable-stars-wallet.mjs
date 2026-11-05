@@ -41,6 +41,11 @@ export function patchVariableWalletHtml(src){
   NEW_STYLE);
  return html;
 }
+export function sameAssetContents(existing,expected){
+ if(typeof existing!=='string'||typeof expected!=='string')
+  throw Error('invalid_asset_type');
+ return existing.replace(/\r\n/g,'\n')===expected.replace(/\r\n/g,'\n');
+}
 function git(cwd,...args){
  return execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 }
@@ -66,10 +71,8 @@ function main(){
   throw Error('variable_wallet_source_validation_failed');
  for(const [rel,data] of [[SRC,source],[CSS,style]]){
   const out=path.join(dir,rel);
-  // Existing GitHub Pages asset may be CRLF on Windows while the
-  // development checkout is LF. Compare normalized text, not line endings.
-  const normalized=x=>x.replace(/\r\n/g,'\n');
-  if(fs.existsSync(out)&&normalized(fs.readFileSync(out,'utf8'))!==normalized(data))
+  // Existing GitHub Pages asset may be CRLF on Windows.
+  if(fs.existsSync(out)&&!sameAssetContents(fs.readFileSync(out,'utf8'),data))
    throw Error('existing_asset_conflict_'+rel);
  }
  console.log('PASS: User-selected deposit amount, current wallet and cache key verified.');
