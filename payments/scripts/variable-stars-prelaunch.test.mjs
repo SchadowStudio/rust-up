@@ -79,3 +79,56 @@ test('a real read is impossible without private read credentials; no inference f
  await assert.rejects(()=>inspectVariableStarsPrelaunch(''),
   /cloudflare_read_token_missing/);
 });
+
+test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and uses D1-safe scalar counts',async()=>{
+ const f=fixture();
+ const observed=[];
+ const okJson=result=>({ok:true,async json(){return {success:true,result};}});
+ const okText=value=>({ok:true,async text(){return value;}});
+ const fakeFetch=async(url,options)=>{
+  const u=String(url);
+  observed.push({url:u,method:options.method||'GET'});
+  if(u.includes('/d1/database/')){
+   assert.equal(options.method,'POST');
+   const body=JSON.parse(options.body);
+   assert.match(body.sql,/^SELECT /);
+   assert.doesNotMatch(body.sql,/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/i);
+   if(body.sql.includes('AS variable_orders')){
+    assert.doesNotMatch(body.sql,/\bUNION\b/i);
+    return okJson([{results:[{
+     variable_orders:0,paid_orders:0,manual_review_orders:0,
+     unresolved_refunds:0,receipt_incidents:0,approved_over_1h:0
+    }]}]);
+   }
+   if(body.sql.includes('sqlite_master')){
+    return okJson([{results:(
+     u.includes('06079270-')?f.paymentTables:f.gameTables).map(name=>({name}))
+    }]);
+   }
+   if(body.sql.includes('FROM rustup_payment_settings')){
+    return okJson([{results:f.controls}]);
+   }
+   if(body.sql.includes('FROM accounts')){
+    return okJson([{results:f.gameCounts}]);
+   }
+   throw Error('unexpected_mock_query');
+  }
+  if(u.endsWith('/settings'))return okJson({bindings:f.bindings});
+  if(u.endsWith('/deployments'))return okJson({
+   deployments:[{versions:[{version_id:'mock-worker-version'}]}]
+  });
+  if(u.endsWith('/workers/scripts/rustup-bot'))return okText(f.workerText);
+  if(u==='https://ttzoomrust-hub.github.io/rust-up/')return okText(f.siteHtml);
+  throw Error('unexpected_mock_endpoint');
+ };
+ const result=await inspectVariableStarsPrelaunch('private-read-token-000001',fakeFetch);
+ assert.equal(result.pricing,'DEFERRED_BY_OPERATOR');
+ assert.equal(result.sourceWorkerVersion,'mock-worker-version');
+ assert.equal(result.counts.paid_orders,0);
+ assert.equal(result.counts.gameAccounts,4);
+ assert.equal(result.readyToAcceptRealPayments,false);
+ assert.equal(observed.filter(x=>x.method==='POST').length,4);
+ assert.equal(observed.filter(x=>x.method==='GET').length,4);
+ assert.ok(observed.every(x=>x.url.startsWith('https://api.cloudflare.com/')||
+  x.url==='https://ttzoomrust-hub.github.io/rust-up/'));
+});
