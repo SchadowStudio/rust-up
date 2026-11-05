@@ -46,7 +46,7 @@ $entry = Join-Path $recovered 'worker.stars-readonly-entry.mjs'
 $bundle = Join-Path $recovered 'worker.stars-readonly.bundle.js'
 $config = Join-Path $recovered 'wrangler.stars-readonly.toml'
 Run 'Build EXACT live Worker + read-only Stars routes' {
-  npx --yes esbuild "$entry" --bundle --platform=browser --format=esm --target=es2022 "--outfile=$bundle"
+  npx --yes esbuild "$entry" --bundle --platform=browser --format=esm --target=es2022 --sourcemap=external "--outfile=$bundle"
 }
 Run 'Bundle JavaScript syntax' { node --check "$bundle" }
 Run 'Wrangler Cloudflare dry-run' {
