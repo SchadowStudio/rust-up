@@ -15,12 +15,14 @@ function fixture(){
    ...flags.map(name=>({name,type:'plain_text',text:'false'})),
    {name:'BOT_TOKEN',type:'secret_text'},
    {name:'WEBHOOK_SECRET',type:'secret_text'},
+   {name:'PAYMENT_ADMIN_IDS',type:'plain_text',text:'123456789'},
    {name:'DB',type:'d1',id:'9b0b533f-540a-4a25-a429-70ca8bd4e23d'},
    {name:'PAYMENTS_DB',type:'d1',id:'06079270-a227-466a-9991-abd4201ec5f6'},
    {name:'APP_URL',type:'plain_text',text:'https://ttzoomrust-hub.github.io/rust-up/'}
   ],
   paymentTables:['rustup_stars_variable_orders','rustup_payment_settings',
-   'rustup_stars_refund_intents','rustup_stars_receipt_incidents'],
+   'rustup_stars_refund_intents','rustup_stars_receipt_incidents',
+   'rustup_stars_variable_refund_intents'],
   gameTables:['accounts','grants'],
   controls:[{channel:'master',enabled:0},{channel:'stars',enabled:0},
    {channel:'crypto',enabled:0}],
@@ -131,4 +133,18 @@ test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and use
  assert.equal(observed.filter(x=>x.method==='GET').length,4);
  assert.ok(observed.every(x=>x.url.startsWith('https://api.cloudflare.com/')||
   x.url==='https://ttzoomrust-hub.github.io/rust-up/'));
+});
+
+test('refund-readiness requires independent schema and explicit finance admin ID',()=>{
+ const f=fixture();
+ assert.equal(evaluateVariableStarsPrelaunch(f).checks.find(x=>
+  x.id==='variable_refund_intent_schema').ok,true);
+ assert.equal(evaluateVariableStarsPrelaunch(f).checks.find(x=>
+  x.id==='verified_refund_operator_allowlist').ok,true);
+ f.paymentTables=f.paymentTables.filter(x=>x!=='rustup_stars_variable_refund_intents');
+ f.bindings=f.bindings.filter(x=>x.name!=='PAYMENT_ADMIN_IDS');
+ const blocked=evaluateVariableStarsPrelaunch(f);
+ assert.ok(blocked.blockers.includes('variable_refund_intent_schema'));
+ assert.ok(blocked.blockers.includes('verified_refund_operator_allowlist'));
+ assert.equal(blocked.readyToAcceptRealPayments,false);
 });
