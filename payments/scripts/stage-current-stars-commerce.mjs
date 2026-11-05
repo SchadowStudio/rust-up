@@ -121,7 +121,7 @@ async function main(){
     throw Error('strict_wallet_game_guard_changed');
   const bundle=await fs.readFile(path.join(dir,BUNDLE),'utf8');
   for(const marker of ['wrapExistingWorker','stars_invoice_already_active','refundStarPayment',
-    'stars_checkout_disabled','RUSTUP_STRICT_ACCOUNT_IMPORT_V1']){
+    'stars_checkout_disabled','PAYMENT_WALLET_STRICT_MODE']){
    if(!bundle.includes(marker))throw Error('commerce_bundle_missing_'+marker);
   }
   console.log('PASS: Exact current 12-module live bot unchanged.');
