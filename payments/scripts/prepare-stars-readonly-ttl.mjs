@@ -36,13 +36,20 @@ function once(source,find,replacement){
  return source.slice(0,at)+replacement+source.slice(at+find.length);
 }
 export function verifyAndPatchSources(originalValidator,originalApi,updatedValidator,updatedApi){
- if(originalValidator!==once(once(updatedValidator,NEW_HEAD,OLD_HEAD),NEW_EXP,OLD_EXP))
+ // Cloudflare's recovered source map carries original Windows CRLF, whereas
+ // the GitHub checkout may return LF. Compare canonical text, preserve CRLF.
+ const normalize=value=>value.replace(/\r\n/g,'\n');
+ const validator=normalize(originalValidator),api=normalize(originalApi);
+ const newValidator=normalize(updatedValidator),newApi=normalize(updatedApi);
+ if(validator!==once(once(newValidator,NEW_HEAD,OLD_HEAD),NEW_EXP,OLD_EXP))
    throw Error('deployed_validator_drift');
- if(originalApi!==once(updatedApi,NEW_CALL,OLD_CALL))
+ if(api!==once(newApi,NEW_CALL,OLD_CALL))
    throw Error('deployed_stars_api_drift');
- if(updatedValidator===originalValidator||updatedApi===originalApi)
+ if(newValidator===validator||newApi===api)
    throw Error('missing_required_ttl_fix');
- return {validator:updatedValidator,api:updatedApi};
+ const restore=(value,original)=>original.includes('\r\n')?
+   value.replace(/\n/g,'\r\n'):value;
+ return {validator:restore(newValidator,originalValidator),api:restore(newApi,originalApi)};
 }
 export function buildReadonlyHotfixConfig(settings,schedules){
  const b=settings?.bindings;
@@ -133,12 +140,13 @@ async function main(){
  const expectedApi=await fs.readFile(path.join(SRC,'stars-readonly-live.mjs'),'utf8');
  const configFile=path.join(dir,'wrangler.stars-readonly-ttl.toml');
  const validated=verifyAndPatchSources(
-   check?once(once(localValidator,NEW_HEAD,OLD_HEAD),NEW_EXP,OLD_EXP):localValidator,
-   check?once(localApi,NEW_CALL,OLD_CALL):localApi,
+   check?once(once(localValidator.replace(/\r\n/g,'\n'),NEW_HEAD,OLD_HEAD),NEW_EXP,OLD_EXP):localValidator,
+   check?once(localApi.replace(/\r\n/g,'\n'),NEW_CALL,OLD_CALL):localApi,
    expectedValidator,expectedApi
  );
  if(check){
-   if(localValidator!==validated.validator||localApi!==validated.api)
+   if(localValidator.replace(/\r\n/g,'\n')!==validated.validator.replace(/\r\n/g,'\n')||
+      localApi.replace(/\r\n/g,'\n')!==validated.api.replace(/\r\n/g,'\n'))
      throw Error('staged_source_mismatch');
    if(await fs.readFile(configFile,'utf8')!==config)throw Error('staged_wrangler_config_changed');
    const bundle=await fs.readFile(path.join(dir,'worker.stars-readonly.bundle.js'),'utf8');
