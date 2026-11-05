@@ -9,3 +9,13 @@ CREATE TABLE IF NOT EXISTS rustup_stars_terms_acceptances(
 );
 CREATE INDEX IF NOT EXISTS rustup_stars_terms_acceptance_recent
  ON rustup_stars_terms_acceptances(accepted_at_ms DESC);
+
+-- Immutable terms receipt tied to the exact checkout, not just the current user.
+CREATE TABLE IF NOT EXISTS rustup_stars_order_terms(
+ order_id TEXT PRIMARY KEY REFERENCES rustup_stars_orders(id),
+ terms_version TEXT NOT NULL CHECK(length(terms_version) BETWEEN 3 AND 40),
+ accepted_at_ms INTEGER NOT NULL CHECK(accepted_at_ms>0),
+ recorded_at_ms INTEGER NOT NULL CHECK(recorded_at_ms>0)
+);
+CREATE INDEX IF NOT EXISTS rustup_stars_order_terms_version
+ ON rustup_stars_order_terms(terms_version,recorded_at_ms DESC);
