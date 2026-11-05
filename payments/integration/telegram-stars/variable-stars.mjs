@@ -32,9 +32,24 @@ export function quoteVariableStars(amountMinor,env){
   };
 }
 
+async function ensureFrozenSettlementQuote(env,row,freezeQuote,now){
+ if(env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')return;
+ if(typeof freezeQuote!=='function')
+  throw Error('variable_stars_paid_quote_freezer_missing');
+ const quote=await freezeQuote({
+  orderId:row.id,verifiedTelegramUserId:row.telegram_user_id,
+  amountMinor:row.requested_amount_minor,now
+ });
+ if(quote?.orderId!==row.id||
+    quote?.amountMinor!==row.requested_amount_minor||
+    !Number.isSafeInteger(quote.coinCents)||quote.coinCents<=0)
+  throw Error('variable_stars_paid_quote_unconfirmed');
+}
+
 // verifiedTelegramUserId is produced only by server-authenticated initData.
 export async function createVariableStarsCheckout(env,{
-  verifiedTelegramUserId,amountMinor,requestId,now=Date.now(),fetchImpl=fetch
+  verifiedTelegramUserId,amountMinor,requestId,now=Date.now(),fetchImpl=fetch,
+  freezeQuote=null
 }){
   if(env.STARS_PAYMENT_ENABLED!=='true'||
      env.STARS_VARIABLE_TOPUP_ENABLED!=='true')
@@ -49,10 +64,12 @@ export async function createVariableStarsCheckout(env,{
     if(row.requested_amount_minor!==amountMinor||row.status!=='pending')
       throw Error('variable_stars_request_conflict');
     if(now>=row.expires_at_ms)throw Error('variable_stars_order_expired');
-    if(row.invoice_url)
+    if(row.invoice_url){
+      await ensureFrozenSettlementQuote(env,row,freezeQuote,now);
       return {orderId:row.id,invoiceUrl:row.invoice_url,
         requestedAmountMinor:row.requested_amount_minor,priceStars:row.price_stars,
         currency:'RUB',expiresAtMs:row.expires_at_ms,creditedToGame:false};
+    }
   }else{
     const id=crypto.randomUUID();
     try{
@@ -72,6 +89,9 @@ export async function createVariableStarsCheckout(env,{
     if(!row||row.status!=='pending'||row.requested_amount_minor!==amountMinor||
        now>=row.expires_at_ms)throw Error('variable_stars_concurrent_conflict');
   }
+  // Never request payment before an immutable, server-priced game credit quote
+  // is durable. D1 failures stop invoice creation instead of charging a user.
+  await ensureFrozenSettlementQuote(env,row,freezeQuote,now);
   // Persisted quote, not browser-controlled value, is the invoice authority.
   const link=await telegramApi(env,'createInvoiceLink',{
     title:'Цифровое пополнение',
@@ -171,6 +191,20 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
     ).bind(id).first():null;
     let ok=env.STARS_VARIABLE_TOPUP_ENABLED==='true'&&
       env.STARS_PAYMENT_ENABLED==='true'&&validVariableStarsPrecheckout(row,q,now);
+    if(ok&&env.STARS_VARIABLE_CREDIT_LEDGER_READY==='true'){
+      try{
+        const immutable=await env.DB.prepare(
+          'SELECT telegram_user_id,amount_minor,coin_cents,quoted_at_ms '+
+          'FROM rustup_stars_variable_credit_quotes WHERE order_id=?'
+        ).bind(row.id).first();
+        ok=!!immutable&&immutable.telegram_user_id===row.telegram_user_id&&
+          immutable.amount_minor===row.requested_amount_minor&&
+          Number.isSafeInteger(immutable.coin_cents)&&immutable.coin_cents>0&&
+          Number.isSafeInteger(immutable.quoted_at_ms)&&
+          immutable.quoted_at_ms>=row.created_at_ms&&
+          immutable.quoted_at_ms<=now;
+      }catch{ok=false;}
+    }
     if(ok&&row.status==='pending'){
       try{
         const reservation=await env.DB.prepare(
