@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {recoverVariableSource,verifyVariableSnapshot}
  from './recover-current-stars-variable.mjs';
+import {cloudflareReadOnly} from './cloudflare-readonly-recovery.mjs';
 import {buildReadonlyHotfixConfig}
  from './prepare-stars-readonly-ttl.mjs';
 
@@ -36,10 +37,9 @@ export function variableStagingConfig(settings,schedules){
  return config;
 }
 async function cloudflareJson(route,token){
- const res=await fetch('https://api.cloudflare.com/client/v4'+route,{
-  headers:{authorization:'Bearer '+token},redirect:'error',
-  signal:AbortSignal.timeout(25000)
- });
+ const res=await cloudflareReadOnly(
+  'https://api.cloudflare.com/client/v4'+route,token
+ );
  if(!res.ok)throw Error('cloudflare_metadata_http_'+res.status);
  const body=await res.json();
  if(body?.success!==true)throw Error('cloudflare_metadata_invalid');
