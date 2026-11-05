@@ -253,7 +253,8 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
 export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  const url=new URL(request.url),path=url.pathname;
  if(!['/api/stars/catalog','/api/stars/checkout','/api/stars/purchases',
-      '/api/stars/supporter-badge','/api/stars/health'].includes(path))
+      '/api/stars/supporter-badge','/api/stars/health',
+      '/api/stars/terms','/api/stars/terms/accept'].includes(path))
   return null;
  if(path==='/api/stars/health'&&request.method==='GET')
   return data({ok:true,service:'rustup-fixed-stars',
