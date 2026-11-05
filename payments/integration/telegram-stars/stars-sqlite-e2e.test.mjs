@@ -25,7 +25,7 @@ function initData(user=userId){
 }
 function database(){
  const sql=new DatabaseSync(':memory:');
- for(const name of ['migration.sql','payment-controls-migration.sql','stars-ready-migration.sql'])
+ for(const name of ['migration.sql','payment-controls-migration.sql','stars-ready-migration.sql','stars-terms-migration.sql'])
   sql.exec(fs.readFileSync(path.join(here,name),'utf8'));
  sql.prepare('UPDATE rustup_payment_settings SET enabled=1,updated_by=?,updated_at_ms=? WHERE channel IN (?,?)')
   .run(adminId,Date.now(),'master','stars');
@@ -72,10 +72,15 @@ function telegramStub(){
 }
 function fixture(){
  const {sql,db}=database();
+ sql.prepare('INSERT INTO rustup_stars_terms_acceptances ' +
+  '(telegram_user_id,terms_version,accepted_at_ms) VALUES(?,?,?)')
+  .run(userId,'2026-11-v1',Date.now());
  const env={PAYMENTS_DB:db,BOT_TOKEN:token,
   APP_URL:origin+'/rust-up/',STARS_FIXED_PRODUCTS_ENABLED:'true',
   STARS_PAYMENT_ENABLED:'true',PAYMENT_PRODUCTION_ENABLED:'true',
-  STARS_REFUNDS_ENABLED:'true',PAYMENT_ADMIN_IDS:String(adminId)};
+  STARS_REFUNDS_ENABLED:'true',PAYMENT_ADMIN_IDS:String(adminId),
+  STARS_TERMS_VERSION:'2026-11-v1',
+  STARS_TERMS_URL:'https://example.org/rustup/terms'};
  const telegram=telegramStub();
  const request=async(path,payload={},who=userId)=>{
   const req=new Request('https://rustup-bot.example.test/api/stars/'+path,{
