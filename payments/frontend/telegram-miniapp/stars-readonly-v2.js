@@ -22,11 +22,9 @@
     if(view!=='catalog'&&view!=='purchases')throw Error('unsupported_stars_route');
     const initData=window.Telegram?.WebApp?.initData;
     if(typeof initData!=='string'||initData.length<20)throw {code:'no_telegram'};
-    const authDate=Number(new URLSearchParams(initData).get('auth_date'));
-    const now=Math.floor(Date.now()/1000);
-    // Server accepts at most 600 seconds and up to 60 seconds future skew.
-    if(!Number.isSafeInteger(authDate)||authDate<now-600||authDate>now+60)
-      throw {code:'expired'};
+    // Let the server validate auth_date and the Telegram HMAC signature.
+    // Browser clocks may be wrong and this Mini App can stay open for hours.
+    // Read-only server endpoints enforce a bounded TTL; payment gates stay OFF.
     const base=window.RUSTUP_API;
     if(typeof base!=='string'||!/^https:\/\/[a-z0-9.-]+\/?$/i.test(base))
       throw {code:'invalid_api'};
