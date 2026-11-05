@@ -51,7 +51,7 @@ jobs:
           node --test payments/frontend/telegram-miniapp/stars-supporter-ui.test.mjs payments/frontend/telegram-miniapp/stars-fixed-market-terms.test.mjs
       - name: Test isolated atomic Stars settlement journal and independent Telegram receipt checks
         run: |
-          node --test payments/integration/account-credit-ledger/atomic-game-credit.test.mjs payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs
+          node --test payments/integration/account-credit-ledger/atomic-game-credit.test.mjs payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs payments/integration/account-credit-ledger/frozen-game-coin-quote.test.mjs
       - name: Verify account import guard without enabling money
         run: |
           node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs
