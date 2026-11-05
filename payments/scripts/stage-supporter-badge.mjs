@@ -37,6 +37,7 @@ async function validateSource(name,content){
 }
 export function verifySupporterReleaseConfig(config){
  if(typeof config!=='string'||config.length<200||
+    !config.includes('name = "rustup-bot"')||
     !config.includes('main = "./worker.stars-variable.bundle.js"')||
     !config.includes('keep_vars = true')||
     !config.includes('binding = "DB"')||
