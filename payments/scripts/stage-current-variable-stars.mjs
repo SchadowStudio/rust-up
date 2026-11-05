@@ -98,7 +98,7 @@ async function main(){
  for(const name of FILES){
   const src=await fs.readFile(path.join(SRC,name),'utf8');
   const existing=await fs.readFile(path.join(dir,name),'utf8');
-  if(src.replace(/\\r\\n/g,'\\n')!==existing.replace(/\\r\\n/g,'\\n'))
+  if(src.replace(/\r\n/g,'\n')!==existing.replace(/\r\n/g,'\n'))
     throw Error('current_live_module_differs_'+name);
  }
  await fs.writeFile(path.join(dir,CONFIG),config,{flag:'wx',mode:0o600});
