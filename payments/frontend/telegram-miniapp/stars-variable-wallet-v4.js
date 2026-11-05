@@ -10,6 +10,7 @@
   return n;
  };
  const errorLabel=e=>{
+  if(e?.code==='conversion_not_configured')return 'Курс Telegram Stars пока не настроен.';
   if(e?.status===401)return 'Сессия Telegram устарела. Откройте RUST UP через бота заново.';
   if(e?.status===403)return 'Доступ отклонён. Откройте приложение через @rustuper_bot.';
   if(e?.status===422)return 'Проверьте сумму пополнения и установленные ограничения.';
