@@ -228,3 +228,28 @@ test('production checkout is blocked until authorized refund handling is enabled
   assert.equal(telegram.calls.length,0);
  }finally{sql.close();}
 });
+
+test('fixed Stars incident replay is verified, and conflicting evidence requires investigation',async()=>{
+ const {sql,env,telegram}=fixture();
+ try{
+  const payload=randomUUID();
+  const msg=amount=>({message:{from:{id:userId},successful_payment:{
+   currency:'XTR',total_amount:amount,invoice_payload:payload,
+   telegram_payment_charge_id:'unexpected-charge-fixed-1'
+  }}});
+  assert.equal(await receiveExistingBotStarsUpdate(msg(30),env,telegram.api),true);
+  assert.equal(await receiveExistingBotStarsUpdate(msg(30),env,telegram.api),true);
+  assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM rustup_stars_receipt_incidents').get().n,1);
+  const evidence=sql.prepare(
+   'SELECT invoice_payload,price_stars,reason FROM rustup_stars_receipt_incidents'
+  ).get();
+  assert.equal(evidence.invoice_payload,payload);
+  assert.equal(evidence.price_stars,30);
+  assert.equal(evidence.reason,'unmatched_or_mismatched_receipt');
+  await assert.rejects(
+   ()=>receiveExistingBotStarsUpdate(msg(31),env,telegram.api),
+   /stars_receipt_incident_conflict_requires_review/
+  );
+  assert.equal(sql.prepare('SELECT price_stars FROM rustup_stars_receipt_incidents').get().price_stars,30);
+ }finally{sql.close();}
+});
