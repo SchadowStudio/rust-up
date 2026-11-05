@@ -12,7 +12,12 @@ function constantEqual(a,b) {
   for(let i=0;i<a.length;i++)mismatch |= a.charCodeAt(i)^b.charCodeAt(i);
   return mismatch===0;
 }
-export async function verifiedTelegramInitData(raw,botToken,now=Date.now()) {
+export async function verifiedTelegramInitData(raw,botToken,now=Date.now(),maxAgeSeconds=600) {
+  // Short-lived by default for payment-sensitive callers. Explicit 24h maximum
+  // is allowed ONLY for a separate read-only endpoint with checkout disabled.
+  if(!Number.isSafeInteger(maxAgeSeconds)||maxAgeSeconds<60||
+     maxAgeSeconds>86400)
+    throw Error('invalid_telegram_auth_max_age');
   if(typeof raw!=='string'||raw.length>4096||raw.length<20||
      typeof botToken!=='string'||botToken.length<25)
     throw Error('invalid_telegram_auth');
@@ -26,7 +31,7 @@ export async function verifiedTelegramInitData(raw,botToken,now=Date.now()) {
   const authDate=Number(pairs.get('auth_date'));
   const current=Math.floor(now/1000);
   if(!Number.isSafeInteger(authDate)||authDate>current+60||
-    authDate<current-600) throw Error('expired_telegram_auth');
+    authDate<current-maxAgeSeconds) throw Error('expired_telegram_auth');
   const check=entries.filter(([key])=>key!=='hash'&&key!=='signature')
     .sort(([a],[b])=>a.localeCompare(b))
     .map(([key,value])=>key+'='+value).join('\n');
