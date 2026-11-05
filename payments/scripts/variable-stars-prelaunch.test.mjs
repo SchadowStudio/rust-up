@@ -127,7 +127,7 @@ test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and use
  assert.equal(result.counts.paid_orders,0);
  assert.equal(result.counts.gameAccounts,4);
  assert.equal(result.readyToAcceptRealPayments,false);
- assert.equal(observed.filter(x=>x.method==='POST').length,4);
+ assert.equal(observed.filter(x=>x.method==='POST').length,5);
  assert.equal(observed.filter(x=>x.method==='GET').length,4);
  assert.ok(observed.every(x=>x.url.startsWith('https://api.cloudflare.com/')||
   x.url==='https://ttzoomrust-hub.github.io/rust-up/'));
