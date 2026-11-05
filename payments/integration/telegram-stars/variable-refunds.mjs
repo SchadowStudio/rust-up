@@ -62,8 +62,10 @@ export async function issueVariableStarsRefund(env,{
     .bind(orderId,order.telegram_charge_id),
    db.prepare("UPDATE rustup_stars_variable_refund_intents "+
     "SET state='completed',completed_at_ms=? "+
-    "WHERE order_id=? AND state='pending' AND telegram_charge_id=?")
-    .bind(now,orderId,order.telegram_charge_id)
+    "WHERE order_id=? AND state='pending' AND telegram_charge_id=? "+
+    "AND EXISTS(SELECT 1 FROM rustup_stars_variable_orders "+
+    "WHERE id=? AND status='refunded' AND telegram_charge_id=?)")
+    .bind(now,orderId,order.telegram_charge_id,orderId,order.telegram_charge_id)
   ]);
   if(results?.length!==2||results.some(v=>v?.meta?.changes!==1))
    throw Error('variable_refund_db_inconsistent');
