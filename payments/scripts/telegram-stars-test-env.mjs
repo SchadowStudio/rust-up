@@ -19,7 +19,7 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 export function validTestReceipt(order,update){
  const msg=update?.message,paid=msg?.successful_payment;
  return !!order&&!!paid&&
-  (order.status==='precheckout_approved'||order.status==='paid')&&
+  (['precheckout_approved','paid','delivered'].includes(order.status))&&
   order.orderId===String(paid.invoice_payload||'').replace(/^test_rustup_/,'')&&
   paid.currency==='XTR'&&paid.total_amount===order.priceStars&&
   msg.from?.id===order.telegramUserId&&
@@ -32,6 +32,7 @@ export function validTestPrecheckout(order,update){
  const q=update?.pre_checkout_query;
  return !!q&&!!order&&
   (order.status==='invoice_created'||order.status==='precheckout_approved')&&
+  (order.status!=='precheckout_approved'||order.checkoutQueryId===q.id)&&
   q.invoice_payload==='test_rustup_'+order.orderId&&
   q.currency==='XTR'&&q.total_amount===order.priceStars&&
   q.from?.id===order.telegramUserId;
@@ -166,7 +167,7 @@ async function listen(token,fetchImpl=fetch){
    await telegram(token,'answerPreCheckoutQuery',{
     pre_checkout_query_id:update.pre_checkout_query.id,ok:true
    },fetchImpl);
-   order=safeTestStateTransition(order,'precheckout');
+   order=safeTestStateTransition({...order,checkoutQueryId:update.pre_checkout_query.id},'precheckout');
    processed++;
   }else if(update.pre_checkout_query){
    // Refuse ANY unrecognized or altered test invoice.
