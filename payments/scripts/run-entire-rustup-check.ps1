@@ -8,9 +8,15 @@ param(
 $ErrorActionPreference='Stop'
 $branch='feature/rustup-payment-admin-controls'
 $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$root=Split-Path -Parent $root
-Set-Location $root
-if((git branch --show-current).Trim() -ne $branch){
+if(!(Test-Path -LiteralPath (Join-Path $root '.git'))){
+ throw "RUST-UP-Local git repository not found at $root"
+}
+Set-Location -LiteralPath $root
+$currentBranch=git branch --show-current
+if($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)){
+ throw 'Git branch lookup failed. Verify RUST-UP-Local checkout.'
+}
+if($currentBranch.Trim() -ne $branch){
  throw "Wrong Git branch. Expected $branch"
 }
 Write-Host '[1/4] Synchronizing already reviewed code...' -ForegroundColor Cyan
