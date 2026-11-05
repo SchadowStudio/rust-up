@@ -122,7 +122,9 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
   update,paymentEnv(env,enabled),fetchImpl
  );
  if(!outcome.handled)throw Error('variable_stars_event_not_handled');
- if(outcome.type==='variable_receipt'&&!outcome.accepted)
+ // Incident must be durably recorded before we stop Telegram redelivery.
+ if(outcome.type==='variable_receipt'&&!outcome.accepted&&
+    outcome.incidentRecorded!==true)
   throw Error('variable_stars_receipt_requires_review');
  return true;
 }
