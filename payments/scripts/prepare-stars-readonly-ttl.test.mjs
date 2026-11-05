@@ -6,8 +6,11 @@ import {fileURLToPath} from 'node:url';
 import {buildReadonlyHotfixConfig,verifyAndPatchSources} from './prepare-stars-readonly-ttl.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','integration','telegram-stars');
-const updatedValidator=fs.readFileSync(path.join(root,'telegram-initdata.mjs'),'utf8');
-const updatedApi=fs.readFileSync(path.join(root,'stars-readonly-live.mjs'),'utf8');
+// On Windows, Git may check out CRLF; keep test fixtures canonical LF.
+// The actual production patcher separately preserves the recovered CRLF.
+const normalizeNewlines=value=>value.replace(/\r\n/g,'\n');
+const updatedValidator=normalizeNewlines(fs.readFileSync(path.join(root,'telegram-initdata.mjs'),'utf8'));
+const updatedApi=normalizeNewlines(fs.readFileSync(path.join(root,'stars-readonly-live.mjs'),'utf8'));
 const oldValidator=updatedValidator
  .replace(
  `export async function verifiedTelegramInitData(raw,botToken,now=Date.now(),maxAgeSeconds=600) {
@@ -24,6 +27,8 @@ const oldApi=updatedApi.replace(
   try {user=await verifiedTelegramInitData(body?.initData,env?.BOT_TOKEN,Date.now(),86400);`,
  `  try {user=await verifiedTelegramInitData(body?.initData,env?.BOT_TOKEN);`
 );
+if(oldValidator===updatedValidator||oldApi===updatedApi)
+ throw Error('test_fixture_failed_to_reconstruct_pre_hotfix_code');
 const STATS='9b0b533f-540a-4a25-a429-70ca8bd4e23d',STARS='06079270-a227-466a-9991-abd4201ec5f6';
 const settings={compatibility_date:'2025-06-01',compatibility_flags:[],bindings:[
  ...['BOT_TOKEN','WEBHOOK_SECRET','ADMIN_BOT_TOKEN','CLIPS_BOT_TOKEN'].map(name=>({name,type:'secret_text'})),
