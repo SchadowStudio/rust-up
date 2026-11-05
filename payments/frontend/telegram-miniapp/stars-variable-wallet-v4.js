@@ -67,6 +67,8 @@
   help.href='https://t.me/rustuperhelp_bot';panel.append(help);
   let confirmed=null,loading=false,seq=0;
   function reset(){
+   // Invalidate any quote still in flight when the player changes the amount.
+   seq++;
    confirmed=null;payButton.disabled=true;
    summary.textContent='Стоимость будет рассчитана сервером.';
   }
