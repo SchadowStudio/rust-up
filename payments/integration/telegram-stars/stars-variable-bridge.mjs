@@ -46,7 +46,7 @@ async function mayAcceptVariable(env){
   return false;
  return isPaymentEnabled(env,'stars');
 }
-export async function variableStarsApi(request,env,fetchImpl=fetch){
+export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=null){
  const url=new URL(request.url);
  if(!url.pathname.startsWith(ROOT))return null;
  const action=url.pathname.slice(ROOT.length);
@@ -94,7 +94,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch){
    const invoice=await createVariableStarsCheckout(
     paymentEnv(env,true),{
      verifiedTelegramUserId:identity.userId,
-     amountMinor:body.amountMinor,requestId:body.requestId,fetchImpl
+     amountMinor:body.amountMinor,requestId:body.requestId,fetchImpl,
+     freezeQuote
     });
    return json({ok:true,...invoice},200,allowed);
   }catch(e){
