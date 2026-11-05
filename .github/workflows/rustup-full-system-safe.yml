@@ -1,0 +1,65 @@
+name: RUST UP all-system offline regression
+
+on:
+  push:
+    branches:
+      - feature/rustup-payment-admin-controls
+    paths:
+      - 'payments/**'
+      - '.github/workflows/rustup-full-system-safe.yml'
+  pull_request:
+    paths:
+      - 'payments/**'
+      - '.github/workflows/rustup-full-system-safe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  entire-system:
+    name: All payments, bot, Stars and wallet tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure all PowerShell release scripts have valid syntax
+        shell: pwsh
+        run: |
+          $errorsFound = @()
+          Get-ChildItem -Path payments/scripts -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $issues = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName, [ref]$tokens, [ref]$issues
+            ) | Out-Null
+            foreach ($issue in $issues) {
+              $errorsFound += ('{0}:{1}: {2}' -f $_.Name, $issue.Extent.StartLineNumber, $issue.Message)
+            }
+          }
+          if ($errorsFound.Count -gt 0) {
+            $errorsFound | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host 'PASS: All Windows release scripts parse without execution.'
+      - name: Test complete system in offline-only mode
+        shell: bash
+        run: node payments/scripts/full-system-selftest.mjs
+      - name: Upload only sanitized offline test summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustup-system-offline-${{ matrix.os }}
+          path: payments/.local-test-results/system-last-run.json
+          if-no-files-found: ignore
+          retention-days: 14
