@@ -312,3 +312,27 @@ test('incomplete variable Stars incident evidence fails closed and never credits
   },now+3),/evidence_incomplete_retry/);
   assert.equal(db.incidents.size,1);
 });
+
+test('malformed paid Stars invoice payload is durably quarantined before webhook ACK',async()=>{
+ const db=makeStarsDb();
+ const env={...rate,DB:db,STARS_PAYMENT_ENABLED:'false',
+  STARS_VARIABLE_TOPUP_ENABLED:'false',TG_STARS_BOT_TOKEN:token};
+ const msg={message:{from:{id:12345},successful_payment:{
+  currency:'XTR',total_amount:30,invoice_payload:'v:malformed-order-id',
+  telegram_payment_charge_id:'charge-invalid-payload'
+ }}};
+ const first=await handleVariableStarsUpdate(msg,env,undefined,now);
+ assert.equal(first.handled,true);
+ assert.equal(first.accepted,false);
+ assert.equal(first.incidentRecorded,true);
+ assert.equal(db.incidents.size,1);
+ const replay=await handleVariableStarsUpdate(msg,env,undefined,now+1);
+ assert.equal(replay.incidentRecorded,true);
+ assert.equal(db.incidents.size,1);
+ assert.equal(db.updates,0);
+ await assert.rejects(()=>handleVariableStarsUpdate({message:{
+  ...msg.message,successful_payment:{
+   ...msg.message.successful_payment,telegram_payment_charge_id:''
+  }
+ }},env,undefined,now+2),/evidence_incomplete_retry/);
+});
