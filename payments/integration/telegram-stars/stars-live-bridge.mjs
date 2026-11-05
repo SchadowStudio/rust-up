@@ -233,6 +233,14 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
   'WHERE rustup_stars_purchase_locks.expires_at_ms<=?'
  ).bind(userId,sku,id,now+TTL,now).run();
  if(lock?.meta?.changes!==1)throw Error('stars_invoice_already_active');
+ // Save the terms version this buyer actually accepted before issuing the invoice.
+ const consentSnapshot=await db.prepare(
+  'INSERT INTO rustup_stars_order_terms(order_id,terms_version,accepted_at_ms,recorded_at_ms) '+
+  'SELECT ?,terms_version,accepted_at_ms,? FROM rustup_stars_terms_acceptances '+
+  'WHERE telegram_user_id=? AND terms_version=? AND accepted_at_ms>0'
+ ).bind(id,now,userId,terms.version).run();
+ if(consentSnapshot?.meta?.changes!==1)
+  throw Error('stars_terms_snapshot_not_persisted');
  // Save and verify the exact content before issuing a payable Telegram invoice.
  await db.prepare(
   'INSERT INTO rustup_stars_order_content(order_id,delivery_text) VALUES (?,?)'
