@@ -17,14 +17,16 @@ const HARD_FLAGS=[
  'PAYMENT_WALLET_STRICT_MODE'
 ];
 const SETTINGS=['master','stars','crypto'];
+// D1 may enforce a small compound-SELECT limit. Use one SELECT instead.
 const ROWS_SQL=[
- "SELECT 'variable_orders' AS name,COUNT(*) AS n FROM rustup_stars_variable_orders",
- "UNION ALL SELECT 'paid_orders',COUNT(*) FROM rustup_stars_variable_orders WHERE status='paid'",
- "UNION ALL SELECT 'manual_review_orders',COUNT(*) FROM rustup_stars_variable_orders WHERE status='manual_review'",
- "UNION ALL SELECT 'unresolved_refunds',COUNT(*) FROM rustup_stars_refund_intents WHERE state<>'completed'",
- "UNION ALL SELECT 'receipt_incidents',COUNT(*) FROM rustup_stars_receipt_incidents",
- "UNION ALL SELECT 'approved_over_1h',COUNT(*) FROM rustup_stars_variable_orders",
- "WHERE status='checkout_approved' AND expires_at_ms<(CAST(strftime('%s','now') AS INTEGER)*1000-3600000)"
+ "SELECT",
+ "(SELECT COUNT(*) FROM rustup_stars_variable_orders) AS variable_orders,",
+ "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='paid') AS paid_orders,",
+ "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='manual_review') AS manual_review_orders,",
+ "(SELECT COUNT(*) FROM rustup_stars_refund_intents WHERE state<>'completed') AS unresolved_refunds,",
+ "(SELECT COUNT(*) FROM rustup_stars_receipt_incidents) AS receipt_incidents,",
+ "(SELECT COUNT(*) FROM rustup_stars_variable_orders WHERE status='checkout_approved'",
+ "AND expires_at_ms<(CAST(strftime('%s','now') AS INTEGER)*1000-3600000)) AS approved_over_1h"
 ].join(' ');
 const PAYMENTS_SCHEMA_SQL=[
  "SELECT name FROM sqlite_master WHERE type='table'",
@@ -175,7 +177,8 @@ export async function inspectVariableStarsPrelaunch(token,fetchImpl=fetch){
   bindings:settings?.bindings,
   paymentTables:payTables.map(x=>x.name),
   gameTables:gameTables.map(x=>x.name),
-  paymentCounts,gameCounts,controls,workerText,siteHtml,
+  paymentCounts:Object.entries(paymentCounts[0]||{}).map(([name,n])=>({name,n})),
+  gameCounts,controls,workerText,siteHtml,
   workerVersion:deploy?.deployments?.[0]?.versions?.[0]?.version_id
  });
 }
