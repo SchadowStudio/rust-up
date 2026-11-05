@@ -143,10 +143,11 @@ export async function recordUnexpectedVariableStarsReceipt(db,msg,now=Date.now()
   // An ignored duplicate is safe: the prior incident must still be present.
   if(result?.meta?.changes===1)return {stored:true,duplicate:false};
   const existing=await db.prepare(
-    'SELECT telegram_charge_id,telegram_user_id,price_stars,reason '+
+    'SELECT telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason '+
     'FROM rustup_stars_receipt_incidents WHERE telegram_charge_id=?'
   ).bind(charge).first();
   if(!existing||existing.telegram_user_id!==msg.from.id||
+     existing.invoice_payload!==pay.invoice_payload.slice(0,256)||
      existing.price_stars!==pay.total_amount||
      existing.reason!=='variable_receipt_mismatch')
     throw Error('variable_receipt_incident_conflict_retry');
