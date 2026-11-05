@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {cloudflareReadOnly} from './cloudflare-readonly-recovery.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
@@ -67,10 +68,7 @@ export function parseVariableWorkerSourceMap(body,contentType=''){
 export async function recoverVariableSource(token){
  const url='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+
    '/workers/scripts/rustup-bot/content/v2';
- const response=await fetch(url,{
-   headers:{authorization:'Bearer '+token},redirect:'error',
-   signal:AbortSignal.timeout(25000)
- });
+ const response=await cloudflareReadOnly(url,token);
  if(!response.ok)throw Error('cloudflare_source_read_http_'+response.status);
  const raw=await response.text();
  return {source:parseVariableWorkerSourceMap(raw,response.headers.get('content-type')||''),
