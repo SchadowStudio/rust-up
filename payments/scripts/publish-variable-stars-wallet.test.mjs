@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {patchVariableWalletApp,patchVariableWalletHtml}
+import {patchVariableWalletApp,patchVariableWalletHtml,sameAssetContents}
  from './publish-variable-stars-wallet.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','frontend','telegram-miniapp');
@@ -43,4 +43,11 @@ test('accepts arbitrary human-entered RUB amount, not selectable products',()=>{
  assert.doesNotMatch(script,/data\.products|sku|fixed_nontransferable/);
  assert.match(script,/request\('quote'/);
  assert.match(script,/request\('checkout'/);
+});
+
+test('repeated asset publication ignores Windows CRLF but rejects changed JS',()=>{
+ const js="const value = 1;\nconst safe = true;\n";
+ assert.equal(sameAssetContents(js,js.replace(/\n/g,'\r\n')),true);
+ assert.equal(sameAssetContents(js,js.replace('true','false')),false);
+ assert.throws(()=>sameAssetContents(null,js),/invalid_asset_type/);
 });
