@@ -43,7 +43,7 @@ jobs:
           node --test payments/scripts/stars-variable-wallet-ui.test.mjs payments/scripts/publish-stars-ui-refresh.test.mjs payments/scripts/publish-variable-stars-wallet.test.mjs
       - name: Test isolated receipts, read-only audit, and fallback recovery
         run: |
-          node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs payments/scripts/telegram-stars-test-env.test.mjs
+          node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/variable-refunds.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs payments/scripts/telegram-stars-test-env.test.mjs
       - name: Test supporter badge delivery, owner-only visibility and refund revocation
         run: |
           node --test payments/integration/telegram-stars/supporter-badge.test.mjs
