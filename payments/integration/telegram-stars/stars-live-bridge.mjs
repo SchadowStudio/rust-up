@@ -4,6 +4,7 @@
 import {permittedProduct,invoiceBody,telegramApi,handleStarsUpdate} from './stars.mjs';
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {isPaymentEnabled} from './payment-controls.mjs';
+import {grantSupporterBadge,readSupporterBadge} from './supporter-badge.mjs';
 
 const SKU=/^[a-z][a-z0-9_-]{2,39}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -127,11 +128,20 @@ export async function receiveExistingBotStarsUpdate(update,env,fetchImpl=fetch){
     "WHERE c.order_id=? AND o.telegram_user_id=? AND o.status='paid'"
   ).bind(String(receipt.invoice_payload),msg.from.id).first();
   if(existing?.unlocked_at_ms&&
-     existing.telegram_charge_id===receipt.telegram_payment_charge_id)
+     existing.telegram_charge_id===receipt.telegram_payment_charge_id){
+    await grantSupporterBadge(db,{
+      orderId:String(receipt.invoice_payload),userId:msg.from.id,
+      chargeId:receipt.telegram_payment_charge_id
+    });
     return true;
+  }
   await recordUnexpectedReceipt(db,msg,'paid_but_content_not_unlocked');
   throw Error('payment_content_unlock_failed_retry');
  }
+ await grantSupporterBadge(db,{
+  orderId:String(receipt.invoice_payload),userId:msg.from.id,
+  chargeId:receipt.telegram_payment_charge_id
+ });
  return true;
 }
 export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
@@ -212,7 +222,8 @@ export async function createFixedStarsOrder(env,userId,sku,fetchImpl=fetch){
 }
 export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  const url=new URL(request.url),path=url.pathname;
- if(!['/api/stars/catalog','/api/stars/checkout','/api/stars/purchases','/api/stars/health'].includes(path))
+ if(!['/api/stars/catalog','/api/stars/checkout','/api/stars/purchases',
+      '/api/stars/supporter-badge','/api/stars/health'].includes(path))
   return null;
  if(path==='/api/stars/health'&&request.method==='GET')
   return data({ok:true,service:'rustup-fixed-stars',
@@ -234,7 +245,8 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  try{body=JSON.parse(raw);}catch{return data({ok:false,error:'invalid_json'},400,origin);}
  let userId;
  // Payment checkout keeps the strict 10-minute Telegram authentication TTL.
- const readOnly=path==='/api/stars/catalog'||path==='/api/stars/purchases';
+ const readOnly=path==='/api/stars/catalog'||path==='/api/stars/purchases'||
+   path==='/api/stars/supporter-badge';
  try{userId=await userIdFromBody(body,env,readOnly?86400:600);}
  catch{return data({ok:false,error:'telegram_auth_required'},401,origin);}
  if(!env.PAYMENTS_DB)return data({ok:false,error:'payment_database_missing'},503,origin);
@@ -248,6 +260,10 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
    ).all();
    return data({ok:true,checkoutEnabled:await available(env),
     products:catalog.results||[]},200,origin);
+  }
+  if(path==='/api/stars/supporter-badge'){
+   const badge=await readSupporterBadge(db,userId);
+   return data({ok:true,badge},200,origin);
   }
   if(path==='/api/stars/purchases'){
    const result=await db.prepare(
