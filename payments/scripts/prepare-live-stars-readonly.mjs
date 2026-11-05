@@ -22,6 +22,8 @@ function safeConfig(s,c){
   const old='main = "./worker.payment-admin.bundle.js"';
   if(!raw.includes(old))throw Error('wrangler_config_template_changed');
   raw=raw.replace(old,'main = "./worker.stars-readonly.bundle.js"');
+  // Require Cloudflare to store a recoverable source map with each upload.
+  raw=raw.replace('keep_vars = true','keep_vars = true\nupload_source_maps = true');
   const gate='PAYMENT_PRODUCTION_ENABLED = "false"';
   if(!raw.includes(gate))throw Error('production_gate_missing');
   raw=raw.replace(gate,gate+'\nSTARS_PAYMENT_ENABLED = "false"'+
