@@ -1,0 +1,90 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {evaluateStarsActivation} from './check-stars-activation.mjs';
+const STATS='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
+const PAYMENTS='06079270-a227-466a-9991-abd4201ec5f6';
+const flags=[
+ 'PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
+ 'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
+ 'PAYMENT_WALLET_STRICT_MODE'
+];
+const variables=[
+ 'STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
+ 'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN'
+];
+const knownSources=[
+ 'stars-variable-bridge.mjs','variable-stars.mjs',
+ 'worker.stars-variable-entry.mjs'
+];
+const tables=['rustup_stars_variable_orders','rustup_payment_settings'];
+function settings(withQuote=false){
+ const bindings=[
+  {name:'DB',type:'d1',id:STATS},
+  {name:'PAYMENTS_DB',type:'d1',id:PAYMENTS},
+  {name:'APP_URL',type:'plain_text',
+   text:'https://ttzoomrust-hub.github.io/rust-up/'},
+  {name:'BOT_TOKEN',type:'secret_text'},
+  {name:'WEBHOOK_SECRET',type:'secret_text'},
+  ...flags.map(name=>({name,type:'plain_text',text:'false'}))
+ ];
+ if(withQuote){
+  const nums=['100','100000000','300','1'];
+  for(let i=0;i<4;i++)
+   bindings.push({name:variables[i],type:'plain_text',text:nums[i]});
+ }
+ return {bindings};
+}
+function audit(override={}){
+ return evaluateStarsActivation({
+  settings:settings(),tables,sourceNames:knownSources,
+  liveVersion:'test-version',...override
+ });
+}
+test('audit reports live payments disabled and missing operator pricing',()=>{
+ const result=audit();
+ assert.equal(result.safeCurrentMode,true);
+ assert.equal(result.realPaymentActivationReady,false);
+ assert.equal(result.pricePreviewReady,false);
+ assert.equal(result.gameCreditConnected,false);
+ assert.ok(result.blockers.includes('price_preview'));
+ assert.ok(result.blockers.includes(
+  'non_wagerable_digital_entitlement_delivery_not_verified'));
+ assert.ok(!JSON.stringify(result).includes('BOT_TOKEN'));
+ assert.equal(result.liveVersion,'test-version');
+ assert.deepEqual(result.actionsPerformed,[
+  'READ_CONFIGURATION','READ_SCHEMA','READ_SOURCE_MODULE_NAMES'
+ ]);
+});
+test('price preview can be configured without enabling transactions',()=>{
+ const result=audit({settings:settings(true)});
+ assert.equal(result.pricePreviewReady,true);
+ assert.equal(result.realPaymentActivationReady,false);
+ assert.equal(result.safeCurrentMode,true);
+});
+test('untrusted payment toggles or missing databases force unsafe status',()=>{
+ const enabled=settings(true);
+ enabled.bindings.find(x=>x.name==='STARS_PAYMENT_ENABLED').text='true';
+ const a=audit({settings:enabled});
+ assert.equal(a.safeCurrentMode,false);
+ assert.equal(a.realPaymentActivationReady,false);
+ assert.ok(a.blockers.includes('payments_safely_disabled'));
+ const noDb=settings();
+ noDb.bindings=noDb.bindings.filter(x=>x.name!=='PAYMENTS_DB');
+ assert.equal(audit({settings:noDb}).safeCurrentMode,false);
+});
+test('tampered pricing or missing source module never enables quotes',()=>{
+ const wrong=settings(true);
+ wrong.bindings.find(x=>x.name==='STARS_RUB_MINOR_PER_STAR_NUM').text='0';
+ assert.equal(audit({settings:wrong}).pricePreviewReady,false);
+ assert.equal(audit({sourceNames:knownSources.slice(0,2)}).pricePreviewReady,false);
+ const missingSchema=audit({tables:['rustup_payment_settings']});
+ assert.equal(missingSchema.pricePreviewReady,false);
+});
+test('missing or incorrectly shaped data always fails closed',()=>{
+ assert.throws(()=>evaluateStarsActivation({}),/activation_unknown_live_state/);
+ const bad=settings();
+ bad.bindings.find(x=>x.name==='PAYMENT_PRODUCTION_ENABLED').text='maybe';
+ const result=audit({settings:bad});
+ assert.equal(result.safeCurrentMode,false);
+ assert.ok(result.blockers.includes('payment_flags_known'));
+});
