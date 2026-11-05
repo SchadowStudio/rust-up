@@ -23,9 +23,10 @@ function allowedOrigin(request,env){
  const origin=request.headers.get('origin');
  return origin===allowed&&origin.startsWith('https://')?allowed:null;
 }
-async function userIdFromBody(body,env){
+async function userIdFromBody(body,env,maxAgeSeconds=600){
  if(typeof body?.initData!=='string')throw Error('invalid_auth');
- const user=await verifiedTelegramInitData(body.initData,env.BOT_TOKEN);
+ // Only the read-only API may accept older signed Telegram sessions.
+ const user=await verifiedTelegramInitData(body.initData,env.BOT_TOKEN,Date.now(),maxAgeSeconds);
  return user.userId;
 }
 async function available(env){
@@ -232,7 +233,9 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  let body;
  try{body=JSON.parse(raw);}catch{return data({ok:false,error:'invalid_json'},400,origin);}
  let userId;
- try{userId=await userIdFromBody(body,env);}
+ // Payment checkout keeps the strict 10-minute Telegram authentication TTL.
+ const readOnly=path==='/api/stars/catalog'||path==='/api/stars/purchases';
+ try{userId=await userIdFromBody(body,env,readOnly?86400:600);}
  catch{return data({ok:false,error:'telegram_auth_required'},401,origin);}
  if(!env.PAYMENTS_DB)return data({ok:false,error:'payment_database_missing'},503,origin);
  const db=env.PAYMENTS_DB;
