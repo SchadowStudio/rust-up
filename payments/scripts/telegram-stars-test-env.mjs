@@ -46,12 +46,12 @@ export function safeTestStateTransition(order,event){
   if(order.status==='precheckout_approved')return {...order,status:'paid'};
   if(order.status==='paid'||order.status==='delivered')return order;
  }else if(event==='delivery'){
-  if(order.status==='paid')return {...order,status:'delivered'};
+  if(order.status==='paid')return {...order,status:'delivered',testBadgeActive:true};
   if(order.status==='delivered')return order;
  }else if(event==='refund_intent'){
   if(order.status==='delivered')return {...order,status:'refund_pending'};
  }else if(event==='refund_complete'){
-  if(order.status==='refund_pending')return {...order,status:'refunded'};
+  if(order.status==='refund_pending')return {...order,status:'refunded',testBadgeActive:false};
   if(order.status==='refunded')return order;
  }else if(event==='manual_review'){
   if(order.status==='refund_pending')return {...order,status:'manual_review'};
@@ -125,11 +125,11 @@ async function invoice(token,userId,stars,fetchImpl=fetch){
   throw Error('finish_existing_test_order_before_creating_another');
  const order=fresh(userId,stars);
  const link=await telegramTestApi(token,'createInvoiceLink',{
-  title:'RUST UP — тестовая квитанция',
-  description:'Только тестовая квитанция. Не игровая валюта, не кейсы, без вывода.',
+  title:'RUST UP Supporter TEST',
+  description:'Тестовый непередаваемый значок. Без игровой валюты, кейсов и вывода.',
   payload:'test_rustup_'+order.orderId,
   currency:'XTR',
-  prices:[{label:'Тестовый цифровой чек',amount:stars}]
+  prices:[{label:'Supporter TEST badge',amount:stars}]
  },fetchImpl);
  if(typeof link!=='string'||!/^https:\/\/t\.me\/\$[A-Za-z0-9_-]{8,256}$/.test(link))
   throw Error('unexpected_test_invoice_link');
@@ -164,8 +164,8 @@ async function confirmDelivery(token,order,fetchImpl=fetch){
  try{
   const message=await telegramTestApi(token,'sendMessage',{
    chat_id:order.telegramUserId,
-   text:'✅ RUST UP TEST: подтверждена оплата '+order.priceStars+
-     ' ⭐. Доставлен тестовый цифровой чек. Игровой баланс не изменён.'
+   text:'✅ RUST UP Supporter TEST: подтверждено '+order.priceStars+
+     ' ⭐. Тестовый значок доставлен. Игровой баланс не изменён.'
   },fetchImpl);
   if(!validTestDeliveryAck(order,message))
    throw Error('unverified_delivery_ack');
@@ -217,7 +217,9 @@ async function listen(token,fetchImpl=fetch,pollSeconds=0){
  if(order.status==='paid')order=await confirmDelivery(token,order,fetchImpl);
  return {
   ok:true,testOnly:true,status:order.status,processed,
-  testReceiptDelivered:order.status==='delivered',gameBalanceChanged:false
+  testReceiptDelivered:order.status==='delivered',
+  testBadgeActive:order.status==='delivered'&&order.testBadgeActive===true,
+  gameBalanceChanged:false
  };
 }
 async function refund(token,confirmation,fetchImpl=fetch){
@@ -237,7 +239,8 @@ async function refund(token,confirmation,fetchImpl=fetch){
  }
  order=safeTestStateTransition(order,'refund_complete');
  await writeState(order);
- return {ok:true,testOnly:true,status:'refunded',gameBalanceChanged:false};
+ return {ok:true,testOnly:true,status:'refunded',testBadgeActive:false,
+  gameBalanceChanged:false};
 }
 // One-operation test workflow. The human opens the TEST invoice in a TEST
 // Telegram account; polling, verified delivery and TEST refund are automatic.
@@ -266,10 +269,11 @@ export async function completeTelegramStarsTest(token,userId,priceStars,{
   if(last?.testReceiptDelivered===true)break;
   if(last?.status==='manual_review')throw Error('test_receipt_requires_manual_review');
  }
- if(last?.testReceiptDelivered!==true)
+ if(last?.testReceiptDelivered!==true||last?.testBadgeActive!==true)
   throw Error('test_payment_not_completed_no_refund_attempted');
  const refunded=await refundConfirmed(token,'REFUND TEST '+created.orderId);
- if(refunded?.testOnly!==true||refunded?.status!=='refunded')
+ if(refunded?.testOnly!==true||refunded?.status!=='refunded'||
+    refunded?.testBadgeActive!==false)
   throw Error('test_refund_not_confirmed');
  return {ok:true,testOnly:true,invoiceVerified:true,deliveryVerified:true,
   refundVerified:true,gameBalanceChanged:false};
@@ -283,7 +287,8 @@ async function main(){
   const s=await readState();
   console.log(JSON.stringify({testOnly:true,status:s?.status||'not_started',
    orderId:s?.orderId||null,priceStars:s?.priceStars||null,
-   delivered:s?.status==='delivered',gameBalanceChanged:false},null,2));
+   delivered:s?.status==='delivered',testBadgeActive:s?.testBadgeActive===true,
+   gameBalanceChanged:false},null,2));
   return;
  }
  if(!token)throw Error('TELEGRAM_TEST_BOT_TOKEN_missing');
