@@ -159,6 +159,61 @@ test('variable Stars one-use checkout, delayed verified receipt, duplicate safe'
   assert.equal(db.incidents.get('unique-charge-1').reason,'variable_receipt_mismatch');
 });
 
+test('a second real Stars charge is quarantined instead of endlessly retried or double-credited',async()=>{
+  const db=makeStarsDb(),requestId=randomUUID();
+  const env={...rate,STARS_PAYMENT_ENABLED:'true',
+    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:db};
+  const bot=async(url)=>({ok:true,async json(){return {ok:true,
+    result:url.endsWith('/createInvoiceLink')?'https://t.me/$receipt-test':true}}});
+  const order=await createVariableStarsCheckout(env,{
+    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot
+  });
+  const invoice_payload='v:'+order.orderId;
+  await handleVariableStarsUpdate({pre_checkout_query:{id:'query-1',from:{id:12345},
+    currency:'XTR',total_amount:50,invoice_payload}},env,bot,now);
+  const msg=charge=>({from:{id:12345},successful_payment:{
+    currency:'XTR',total_amount:50,invoice_payload,
+    telegram_payment_charge_id:charge}});
+  const first=await handleVariableStarsUpdate({message:msg('charge-original')},env,bot,now+1);
+  assert.equal(first.accepted,true);
+  const second=await handleVariableStarsUpdate({message:msg('charge-second')},env,bot,now+2);
+  assert.equal(second.accepted,false);
+  assert.equal(second.incidentRecorded,true);
+  assert.equal(second.creditedToGame,false);
+  const again=await handleVariableStarsUpdate({message:msg('charge-second')},env,bot,now+3);
+  assert.equal(again.incidentRecorded,true);
+  assert.equal(db.incidents.size,1);
+  assert.equal(db.row.telegram_charge_id,'charge-original');
+  assert.equal(db.updates,2);
+  assert.equal(db.incidents.get('charge-second').reason,'variable_receipt_mismatch');
+});
+
+test('transient database failure cannot be acknowledged as a paid receipt',async()=>{
+  const base=makeStarsDb(),requestId=randomUUID();
+  const env={...rate,STARS_PAYMENT_ENABLED:'true',
+    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:base};
+  const bot=async(url)=>({ok:true,async json(){return {ok:true,
+    result:url.endsWith('/createInvoiceLink')?'https://t.me/$db-retry':true}}});
+  const order=await createVariableStarsCheckout(env,{
+    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot
+  });
+  const invoice_payload='v:'+order.orderId;
+  await handleVariableStarsUpdate({pre_checkout_query:{id:'query-retry',from:{id:12345},
+    currency:'XTR',total_amount:50,invoice_payload}},env,bot,now);
+  const broken={prepare(sql){
+    if(sql.includes("SET status='paid'"))return {bind(){return {
+      async run(){throw Error('D1 database timeout');}
+    }}};
+    return base.prepare(sql);
+  }};
+  await assert.rejects(()=>handleVariableStarsUpdate({message:{
+    from:{id:12345},successful_payment:{currency:'XTR',total_amount:50,
+      invoice_payload,telegram_payment_charge_id:'charge-retry'}
+  }},{...env,DB:broken},bot,now+1),/receipt_database_retry/);
+  assert.equal(base.row.status,'checkout_approved');
+  assert.equal(base.incidents.size,0);
+});
+
 function makeCryptoDb(){
   let row=null;
   return {get row(){return row},prepare(query){
