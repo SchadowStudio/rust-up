@@ -43,7 +43,7 @@ export async function independentlyVerifyStarsCharge(env,credit,priceStars,
  fetchImpl=fetch){
  if(!env?.BOT_TOKEN||!stars(priceStars))throw Error('stars_verifier_unconfigured');
  const match='v:'+credit.order_id;
- let found=false;
+ let found=false,complete=false;
  for(let offset=0;offset<2000;offset+=100){
   const data=await telegramApi({TG_STARS_BOT_TOKEN:env.BOT_TOKEN},
    'getStarTransactions',{offset,limit:100},fetchImpl);
@@ -59,8 +59,10 @@ export async function independentlyVerifyStarsCharge(env,credit,priceStars,
     throw Error('stars_transaction_amount_owner_or_invoice_mismatch');
    found=true;
   }
-  if(data.transactions.length<100)break;
+  if(data.transactions.length<100){complete=true;break;}
  }
+ // A truncated history can hide a later refund of the same charge ID.
+ if(!complete)throw Error('stars_transaction_history_incomplete_manual_review');
  if(!found)throw Error('stars_charge_unconfirmed_manual_reconciliation');
  return true;
 }
