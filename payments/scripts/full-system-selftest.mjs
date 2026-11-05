@@ -27,15 +27,15 @@ export function sandboxEnvironment(env=process.env){
  }
  return output;
 }
-function relativePaths(dir){
+function relativePaths(root,dir){
  if(!fs.existsSync(dir))throw Error('missing_required_test_directory_'+dir);
  const out=fs.readdirSync(dir).filter(name=>name.endsWith('.test.mjs'))
-  .sort().map(name=>path.relative(ROOT,path.join(dir,name)));
+  .sort().map(name=>path.relative(root,path.join(dir,name)).split(path.sep).join('/'));
  if(!out.length)throw Error('no_tests_found_'+dir);
  return out;
 }
 export function buildPlan(root=ROOT,{quick=false}={}){
- const from=(folder)=>relativePaths(path.join(root,folder));
+ const from=(folder)=>relativePaths(root,path.join(root,folder));
  const scripts=from('scripts');
  const stars=from('integration/telegram-stars');
  const game=from('integration/existing-game-state-sandbox');
@@ -76,7 +76,13 @@ export function compactResult(step,proc,started){
  };
 }
 export function assessFullSystem(results){
- if(!Array.isArray(results)||results.length!==5)
+ const names=['crypto_provider_and_multi_project',
+  'telegram_stars_invoice_receipt_refund',
+  'game_state_integrity_without_real_money',
+  'isolated_nonredeemable_demo_wallet',
+  'miniapp_worker_recovery_release_and_test_bot'];
+ if(!Array.isArray(results)||results.length!==names.length||
+    results.some((x,i)=>x?.name!==names[i]))
   throw Error('incomplete_system_test_plan');
  const failed=results.filter(x=>x.passed!==true).map(x=>x.name);
  return {
