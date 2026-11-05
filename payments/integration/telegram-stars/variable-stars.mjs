@@ -105,7 +105,10 @@ export function validVariableStarsPrecheckout(row,q,now=Date.now()){
      (row.status==='checkout_approved'&&row.checkout_query_id===q.id))&&
     isPositiveSafe(q.from?.id)&&q.from.id===row.telegram_user_id&&
     q.currency==='XTR'&&q.total_amount===row.price_stars&&
-    q.invoice_payload===payload(row.id)&&row.expires_at_ms>now;
+    q.invoice_payload===payload(row.id)&&row.expires_at_ms>now&&
+    // A payment must never be approved without a durable invoice record.
+    typeof row.invoice_url==='string'&&
+    /^https:\/\/\S+$/.test(row.invoice_url)&&row.invoice_url.length<=1024;
 }
 export function validVariableStarsReceipt(row,msg){
   const pay=msg?.successful_payment;
