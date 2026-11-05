@@ -48,7 +48,7 @@ export function evaluateSupporterReadiness(x){
  const controlsOff=['master','stars','crypto'].every(c=>
   x.controls.some(row=>row.channel===c&&row.enabled===0))&&
   x.controls.length===3;
- const noIncidents=x.incidents.every(r=>
+ const noIncidents=x.incidents.length===2&&x.incidents.every(r=>
   Number.isSafeInteger(r.value)&&r.value===0);
  const checks=[
   ['payment_schema_ready',supported],
