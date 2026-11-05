@@ -310,3 +310,23 @@ test('Telegram precheckout refuses an invoice after buyer consent has been revok
    .get(created.json.orderId).status,'pending');
  }finally{sql.close();}
 });
+
+test('precheckout requires an immutable terms receipt tied to the specific order',async()=>{
+ const {sql,env,telegram,request}=fixture();
+ try{
+  const created=await request('checkout',{sku:'fixed_badge'});
+  assert.equal(created.status,200);
+  const receipt=sql.prepare('SELECT terms_version,accepted_at_ms FROM rustup_stars_order_terms WHERE order_id=?')
+   .get(created.json.orderId);
+  assert.equal(receipt.terms_version,'2026-11-v1');
+  assert.ok(receipt.accepted_at_ms>0);
+  sql.prepare('DELETE FROM rustup_stars_order_terms WHERE order_id=?').run(created.json.orderId);
+  await receiveExistingBotStarsUpdate({pre_checkout_query:{
+   id:'q-terms-missing',from:{id:userId},currency:'XTR',total_amount:30,
+   invoice_payload:created.json.orderId
+  }},env,telegram.api);
+  assert.equal(telegram.calls.at(-1).body.ok,false);
+  assert.equal(sql.prepare('SELECT status FROM rustup_stars_orders WHERE id=?')
+   .get(created.json.orderId).status,'pending');
+ }finally{sql.close();}
+});
