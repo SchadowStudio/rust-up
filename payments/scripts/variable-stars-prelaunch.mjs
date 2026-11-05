@@ -1,8 +1,13 @@
-// RUST UP Stars-to-RUB prelaunch gate. READ ONLY; price deliberately deferred.
+// RUST UP Stars-to-RUB prelaunch gate. READ ONLY; owner rate selected, live sync checked.
 // Does not create invoices, change Cloudflare settings, add funds, or allow wagers.
 // Public output: aggregate counts and booleans, NEVER player IDs or secrets.
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import {readFileSync} from 'node:fs';
+const OWNER_RATE=Object.freeze(JSON.parse(readFileSync(
+ new URL('../stars-owner-rate.json',import.meta.url),'utf8')));
+const PRICE_VARS=['STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
+ 'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN'];
 
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
 const WORKER='rustup-bot';
@@ -69,6 +74,12 @@ export function evaluateVariableStarsPrelaunch(x){
  const flags=HARD_FLAGS.map(name=>b.get(name)?.text);
  if(flags.some(v=>!['true','false'].includes(v)))throw Error('unknown_payment_hard_gate');
  const off=flags.every(v=>v==='false');
+ // The saved owner rate does not prove that the deployed Worker uses it.
+ const livePriceMatchesOwner=PRICE_VARS.every(name=>{
+  const binding=b.get(name);
+  return binding?.type==='plain_text'&&
+   binding.text===OWNER_RATE[name];
+ });
  const hasDb=(name,id)=>b.get(name)?.type==='d1'&&
   [b.get(name)?.id,b.get(name)?.database_id].includes(id);
  const secrets=['BOT_TOKEN','WEBHOOK_SECRET'].every(n=>b.get(n)?.type==='secret_text');
@@ -112,6 +123,7 @@ export function evaluateVariableStarsPrelaunch(x){
   check('variable_refund_intent_schema',variableRefundSchema),
   check('verified_refund_operator_allowlist',refundAdminReady),
   check('legacy_game_accounts_present',gs),
+  check('live_worker_has_selected_stars_rate',livePriceMatchesOwner),
   check('all_hard_payment_flags_off',off),
   check('all_database_payment_switches_off',
    SETTINGS.every(k=>controls.get(k)===0)),
@@ -131,8 +143,10 @@ export function evaluateVariableStarsPrelaunch(x){
  ];
  return {
   mode:'READ_ONLY_PRELAUNCH_DIAGNOSTIC',
-  pricing:'DEFERRED_BY_OPERATOR',
-  pricingConfigured:null,
+  pricing:'SELECTED_BY_OPERATOR',
+  rateRubPerStar:OWNER_RATE.rubPerStarDecimal,
+  rateStoredInRepository:true,
+  pricingConfigured:livePriceMatchesOwner,
   sourceWorkerVersion:x.workerVersion||null,
   checks,
   blockers:checks.filter(c=>!c.ok).map(c=>c.id),
