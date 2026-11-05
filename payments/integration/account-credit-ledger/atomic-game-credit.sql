@@ -36,4 +36,12 @@ BEGIN
          (1000000.0 - NEW.coin_cents/100.0);
   SELECT RAISE(ABORT,'rustup_paid_credit_account_or_balance_unavailable')
    WHERE changes()<>1;
+  -- Keep the existing users.balance materialized view in sync with the
+  -- canonical accounts.state.balance, exactly like game.storeAccount().
+  UPDATE users SET balance=(
+    SELECT json_extract(state,'$.balance') FROM accounts
+    WHERE id=NEW.telegram_user_id
+  ) WHERE id=NEW.telegram_user_id;
+  SELECT RAISE(ABORT,'rustup_paid_credit_user_mirror_missing')
+   WHERE changes()<>1;
 END;
