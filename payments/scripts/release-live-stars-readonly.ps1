@@ -18,7 +18,27 @@ if ((git branch --show-current).Trim() -ne 'feature/rustup-payment-admin-control
   throw 'Use the feature/rustup-payment-admin-controls branch in RUST-UP-Local.'
 }
 if ([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)) {
-  throw 'Set CLOUDFLARE_API_TOKEN privately in your local PowerShell. Do not paste it in chat.'
+  # Wrangler 4.119+ can provide the EXISTING OAuth/API token in JSON form.
+  # Capture privately into a child-process environment variable; never print it.
+  $oldProgress = $ProgressPreference
+  $ProgressPreference = 'SilentlyContinue'
+  try {
+    $authJson = & npx --yes wrangler auth token --json 2>$null
+    if ($LASTEXITCODE -ne 0) { throw 'Wrangler authentication is unavailable' }
+    $auth = ($authJson | Out-String | ConvertFrom-Json)
+    if ($auth.type -notin @('oauth','api_token') -or
+        [string]::IsNullOrWhiteSpace([string]$auth.token)) {
+      throw 'Wrangler returned no usable OAuth/API token'
+    }
+    $env:CLOUDFLARE_API_TOKEN = [string]$auth.token
+    Write-Host 'PASS: Existing Wrangler authorization loaded privately.' -ForegroundColor Green
+  } catch {
+    throw 'Cloudflare login missing. Run: npx wrangler login; then rerun this release script. Never share your token.'
+  } finally {
+    $authJson = $null
+    $auth = $null
+    $ProgressPreference = $oldProgress
+  }
 }
 Run 'Update code' { git pull --ff-only origin feature/rustup-payment-admin-controls }
 Run 'Offline read-only API tests' { node --test ".\payments\integration\telegram-stars\stars-readonly-live.test.mjs" }
