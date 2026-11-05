@@ -20,6 +20,10 @@ if($Action -eq 'invoice' -and [string]::IsNullOrWhiteSpace($TestUserId)){
 if($Action -eq 'refund' -and $OrderId -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'){
  throw 'Refund requires -OrderId from the TEST invoice, never a real payment.'
 }
+if($Action -ne 'status'){
+ & node --test '.\payments\scripts\telegram-stars-test-env.test.mjs'
+ if($LASTEXITCODE -ne 0){throw 'TEST environment regression tests failed. Test invoice blocked.'}
+}
 if($Action -ne 'status' -and [string]::IsNullOrWhiteSpace($env:TELEGRAM_TEST_BOT_TOKEN)){
  $secret=Read-Host 'Telegram TEST bot token (not @rustuper_bot)' -AsSecureString
  $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
