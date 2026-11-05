@@ -73,8 +73,8 @@ export async function issueVariableStarsRefund(env,{
  }
  return {
   ok:true,orderId,status:'refunded',
-  nonWagerable:false,gameBalanceChanged:false,
+  gameBalanceChanged:false,
   // A refund does not reverse game-credit postings: none are supported here.
-  settlementNotConnected:true
+  settlementNotConnected:true,gameCreditReversalNotImplemented:true
  };
 }
