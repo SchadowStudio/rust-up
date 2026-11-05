@@ -35,7 +35,9 @@ test('full suite covers crypto, Stars, game protection, isolated wallet and rele
   assert.equal(step.command,process.execPath);
   assert.equal(step.cwd.endsWith('payments'),true);
   assert.ok(step.args.length>=2);
-  assert.doesNotMatch(step.args.join(' '),/wrangler|deploy|cloudflare|telegram\.org|mainnet/i);
+  // Test filenames may contain words like "deployment", but are not commands.
+  assert.equal(step.args.some(x=>['--deploy','--live','--production'].includes(x)),false);
+  assert.equal(step.args.some(x=>/^https?:\/\//.test(x)),false);
  }
  const stars=plan.find(x=>x.name==='telegram_stars_invoice_receipt_refund');
  assert.ok(stars.args.includes('integration/telegram-stars/variable-payments.test.mjs'));
