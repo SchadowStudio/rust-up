@@ -57,7 +57,8 @@ function main(){
  validateNewStarsUi(updated);
  const normalize=x=>x.replace(/\r\n/g,'\n');
  const isCurrent=normalize(before)===normalize(updated);
- const sha=git(dir,'hash-object',FILE);
+ // Git object SHA ignores Windows checkout CRLF transformations.
+ const sha=git(dir,'rev-parse','HEAD:'+FILE);
  if(!isCurrent&&sha!==BEFORE_SHA)throw Error('unexpected_live_stars_asset_sha');
  const nextHtml=patchStarsHtml(html);
  if(isCurrent&&nextHtml===html){
