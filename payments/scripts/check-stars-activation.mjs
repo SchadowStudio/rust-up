@@ -3,6 +3,7 @@
 // The report contains only booleans/counts; secrets and player data never leave Cloudflare.
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {recoverVariableSource} from './recover-current-stars-variable.mjs';
 
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
 const SCRIPT='rustup-bot';
@@ -106,18 +107,18 @@ export async function inspectLiveStars(token){
  if(typeof token!=='string'||token.length<15)
   throw Error('private_cloudflare_login_required');
  const base='/accounts/'+ACCOUNT+'/workers/scripts/'+SCRIPT;
- const [settings,schema,deploy]=await Promise.all([
+ const [settings,schema,deploy,sourceSnapshot]=await Promise.all([
   cloudflare(base+'/settings',token),
   cloudflare('/accounts/'+ACCOUNT+'/d1/database/'+PAYMENTS_DB+'/query',token,{
    sql:"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('rustup_stars_variable_orders','rustup_payment_settings') ORDER BY name"
   }),
-  cloudflare(base+'/deployments',token)
+  cloudflare(base+'/deployments',token),
+  recoverVariableSource(token)
  ]);
- // Source-map names are checked separately via exact recovery before release.
- // Avoid fetching private bot source into public output or GitHub.
+ // Recover the exact current source map privately, but report only names
+ // and booleans, never the recovered code or Telegram credentials.
  const tables=schema?.[0]?.results?.map(x=>x.name);
- const sources=['stars-variable-bridge.mjs','variable-stars.mjs',
-  'worker.stars-variable-entry.mjs'];
+ const sources=[...sourceSnapshot.source.keys()];
  return evaluateStarsActivation({
   settings,tables,sourceNames:sources,
   liveVersion:deploy?.deployments?.[0]?.versions?.[0]?.version_id
