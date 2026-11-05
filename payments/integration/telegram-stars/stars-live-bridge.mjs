@@ -283,6 +283,19 @@ export async function existingBotStarsApi(request,env,fetchImpl=fetch){
  if(!env.PAYMENTS_DB)return data({ok:false,error:'payment_database_missing'},503,origin);
  const db=env.PAYMENTS_DB;
  try{
+  if(path==='/api/stars/terms'){
+   const terms=publishedStarsTerms(env);
+   return data({ok:true,terms,
+    accepted:terms?await starsTermsAccepted(db,userId,terms):false},200,origin);
+  }
+  if(path==='/api/stars/terms/accept'){
+   const terms=publishedStarsTerms(env);
+   if(!terms)return data({ok:false,error:'stars_terms_unconfigured'},503,origin);
+   if(body?.accepted!==true||body?.version!==terms.version)
+    return data({ok:false,error:'stars_terms_explicit_acceptance_required'},409,origin);
+   const receipt=await recordStarsTermsAcceptance(db,userId,terms);
+   return data({ok:true,...receipt},200,origin);
+  }
   if(path==='/api/stars/catalog'){
    const catalog=await db.prepare(
     'SELECT p.sku,p.title,p.description,p.price_stars FROM rustup_stars_products p '+
