@@ -37,6 +37,7 @@ function relativePaths(root,dir){
 export function buildPlan(root=ROOT,{quick=false}={}){
  const from=(folder)=>relativePaths(root,path.join(root,folder));
  const scripts=from('scripts');
+ const frontend=from('frontend/telegram-miniapp');
  const stars=from('integration/telegram-stars');
  const game=from('integration/existing-game-state-sandbox');
  const demo=from('integration/demo-game-wallet');
@@ -48,6 +49,9 @@ export function buildPlan(root=ROOT,{quick=false}={}){
  ]){
   if(!scripts.includes(needed))throw Error('missing_critical_test_'+needed);
  }
+ if(!frontend.includes('frontend/telegram-miniapp/stars-supporter-ui.test.mjs')||
+    !stars.includes('integration/telegram-stars/supporter-badge.test.mjs'))
+  throw Error('missing_supporter_badge_delivery_or_ui_tests');
  if(!stars.includes('integration/telegram-stars/variable-payments.test.mjs'))
   throw Error('missing_variable_stars_receipt_tests');
  const steps=[
@@ -60,7 +64,7 @@ export function buildPlan(root=ROOT,{quick=false}={}){
   {name:'isolated_nonredeemable_demo_wallet',command:process.execPath,
    args:['--test',...demo],cwd:root},
   {name:'miniapp_worker_recovery_release_and_test_bot',command:process.execPath,
-   args:['--test',...scripts],cwd:root}
+   args:['--test',...scripts,...frontend],cwd:root}
  ];
  return steps;
 }
