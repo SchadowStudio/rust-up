@@ -34,7 +34,14 @@ test('full suite covers crypto, Stars, game protection, isolated wallet and rele
  for(const step of plan){
   assert.equal(step.command,process.execPath);
   assert.equal(step.cwd.endsWith('payments'),true);
-  assert.ok(step.args.length>=2);
+  assert.ok(step.args.length>=1);
+  if(step.name==='crypto_provider_and_multi_project'){
+   // The local crypto runner correctly needs only one positional script.
+   assert.deepEqual(step.args,['scripts/local-test.mjs']);
+  }else{
+   assert.equal(step.args[0],'--test');
+   assert.ok(step.args.length>=2);
+  }
   // Test filenames may contain words like "deployment", but are not commands.
   assert.equal(step.args.some(x=>['--deploy','--live','--production'].includes(x)),false);
   assert.equal(step.args.some(x=>/^https?:\/\//.test(x)),false);
