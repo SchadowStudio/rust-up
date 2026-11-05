@@ -16,6 +16,11 @@ export async function issueVariableStarsRefund(env,{
  adminId,orderId,confirmation,fetchImpl=fetch,now=Date.now()
 }={}){
  if(env?.STARS_REFUNDS_ENABLED!=='true')throw Error('variable_refunds_disabled');
+ // Never refund a top-up after an independent game-wallet credit might exist:
+ // first implement and audit an atomic entitlement/credit reversal.
+ if(env?.STARS_VARIABLE_CREDIT_LEDGER_READY==='true'||
+    env?.STARS_VARIABLE_GAME_CREDIT_ENABLED==='true')
+   throw Error('variable_refund_game_credit_reversal_unavailable');
  if(!isPaymentAdmin(adminId,env))throw Error('variable_refund_finance_admin_required');
  if(!UUID.test(orderId||'')||confirmation!=='REFUND '+orderId)
   throw Error('variable_refund_explicit_confirmation_required');
