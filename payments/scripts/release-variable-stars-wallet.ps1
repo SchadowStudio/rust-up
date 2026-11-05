@@ -35,6 +35,12 @@ Run 'Test variable user amounts, quotes and payment callbacks'{
 Run 'Test current Worker config and payment gates'{
  node --test ".\payments\scripts\stage-current-variable-stars.test.mjs" ".\payments\scripts\recover-current-stars-variable.test.mjs"
 }
+Run 'Test Stars read-only reconciliation and payment anomaly rules'{
+ node --test ".\payments\scripts\audit-variable-stars.test.mjs"
+}
+Run 'Verify live Stars order counts and disabled payment switches without writes'{
+ node ".\payments\scripts\audit-variable-stars.mjs"
+}
 Run 'Test Mini App amount input and publisher'{
  node --test ".\payments\scripts\publish-variable-stars-wallet.test.mjs"
 }
