@@ -29,7 +29,7 @@ export function extractCurrentLiveModule(raw){
  if(parts.length!==1)fail('worker_module_layout_changed');
  const part=parts[0],sep=part.includes('\r\n\r\n')?'\r\n\r\n':'\n\n';
  const cut=part.indexOf(sep);
- if(cut<0||!part.includes('filename="worker.telegram-gateway-live-hotfix.mjs"'))
+ if(cut<0||!part.includes('name="worker.telegram-gateway-live-hotfix.mjs"; filename="worker.telegram-gateway-live-hotfix.mjs"'))
   fail('live_worker_filename_changed');
  const source=part.slice(cut+sep.length).trimEnd();
  if(!source.includes('wrapCurrentStarsWebhook(wrapHistoryOnlyWorker(worker_default))')||
