@@ -69,6 +69,7 @@ jobs:
       - name: Verify read-only variable Stars history is safely routed but checkout remains unreachable
         run: |
           node --test payments/integration/telegram-stars/stars-existing-worker-variable-history.test.mjs
+          node --test payments/integration/telegram-stars/stars-variable-webhook-routing.test.mjs
       - name: Test source-map-free recovery and isolated read-only deposit history, no deploy
         run: |
           node --check payments/scripts/stage-history-only-compiled-worker.mjs
