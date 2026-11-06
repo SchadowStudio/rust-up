@@ -103,19 +103,42 @@ test('live Cloudflare inspection runs only aggregate SELECT requests and no bala
   assert.equal(request.method,'POST');
   const query=JSON.parse(request.body).sql;
   assert.ok(query.startsWith('WITH observed AS')||
+   query.startsWith('WITH first_admin(alias)')||
    query.startsWith('SELECT enabled,approval_reference'));
+  if(query.startsWith('WITH first_admin(alias)'))
+   assert.deepEqual(JSON.parse(request.body).params,['']);
+  const result=query.startsWith('WITH observed AS')?aggregate():
+   query.startsWith('WITH first_admin(alias)')?{
+    account_count:193,known_admin_accounts:5,legacy_admin_accounts:4,
+    first_admin_accounts:1,review_accounts:5,
+    admin_review_accounts:1,regular_review_accounts:4
+   }:config().releaseControl;
   return {ok:true,json:async()=>({
-   success:true,result:[{results:[query.startsWith('WITH')
-    ?aggregate():config().releaseControl]}]
+   success:true,result:[{results:[result]}]
   })};
  };
  const result=await inspectLiveGameAccountIntegrity(
   'not-a-production-token-only-for-offline-testing',fakeFetch);
  assert.equal(result.distinctAccountsRequiringManualReview,5);
+ assert.equal(result.adminClassification.adminAccounts,5);
+ assert.equal(result.adminClassification.adminAccountsWithBalanceReview,1);
+ assert.equal(result.adminClassification.otherAccountsWithBalanceReview,4);
+ assert.equal(result.adminClassification.paymentRulesUnchanged,true);
  assert.ok(calls.every(x=>x.method==='GET'||x.method==='POST'));
  const encoded=JSON.stringify(result);
  assert.equal(encoded.includes('not-a-production-token'),false);
  assert.equal(encoded.includes('123456789'),false);
  assert.equal(encoded.includes('actualBalance'),false);
  assert.equal(result.playerIdentitiesIncluded,false);
+});
+
+test('admin classification mismatch never silently hides a balance anomaly',()=>{
+ const bad={
+  account_count:193,known_admin_accounts:5,legacy_admin_accounts:4,
+  first_admin_accounts:1,review_accounts:4,
+  admin_review_accounts:1,regular_review_accounts:3
+ };
+ assert.throws(()=>evaluateGameAccountIntegrity(aggregate(),{
+  ...config(),adminCounts:bad
+ }),/snapshot_mismatch/);
 });
