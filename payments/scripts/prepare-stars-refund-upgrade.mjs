@@ -11,7 +11,7 @@ const ORIGINAL=['worker.live-compiled-original.mjs','telegram-initdata.mjs',
  'deposit-history-readonly.mjs','stars-owner-price-preview.mjs',
  'stars-history-only-wrapper.mjs','worker.history-only-compiled-entry.mjs'];
 const MODULES=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
- 'variable-stars.mjs','stars.mjs','payment-controls.mjs',
+ 'variable-stars.mjs','stars.mjs','stars-payment-support.mjs','payment-controls.mjs',
  'stars-delivery-queue.mjs','verified-stars-game-credit.mjs',
  'verified-stars-game-refund.mjs',
  'freeze-verified-stars-game-quote.mjs'];
