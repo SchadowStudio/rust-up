@@ -22,11 +22,11 @@ const API='https://api.cloudflare.com/client/v4/accounts/af72e32cb9f1ba99dba07df
 const NAMES=[
  'worker.live-compiled-original.mjs','telegram-initdata.mjs',
  'deposit-history-readonly.mjs','stars-owner-price-preview.mjs',
- 'stars-history-only-wrapper.mjs','stars.mjs','variable-stars.mjs',
+ TARGET,'stars.mjs','variable-stars.mjs',
  'payment-controls.mjs','stars-variable-bridge.mjs',
  'stars-payment-support.mjs','freeze-verified-stars-game-quote.mjs',
  'verified-stars-game-credit.mjs','stars-delivery-queue.mjs',
- 'verified-stars-game-refund.mjs',TARGET,ENTRY
+ 'verified-stars-game-refund.mjs','stars-variable-webhook-wrapper.mjs',ENTRY
 ];
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const normal=s=>s.replace(/\r\n/g,'\n').trimEnd();
