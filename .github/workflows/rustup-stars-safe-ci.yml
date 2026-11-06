@@ -60,6 +60,9 @@ jobs:
         run: |
           node --test payments/scripts/stage-current-bot19-stars.test.mjs
           node --test payments/scripts/stage-current-verified-worker.test.mjs
+      - name: Verify Cloudflare Worker publisher conflict audit without exposing identities
+        run: |
+          node --test payments/scripts/audit-worker-publishers.test.mjs
       - name: Verify read-only cross-D1 payment and game ledger reconciliation
         run: |
           node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
