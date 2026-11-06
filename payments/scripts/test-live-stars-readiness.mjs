@@ -42,7 +42,7 @@ const vars=Object.fromEntries((settings?.bindings||[]).filter(x=>x.type==='plain
 const secrets=new Set((settings?.bindings||[]).filter(x=>x.type==='secret_text')
  .map(x=>x.name));
 const channel=Object.fromEntries(paymentControls.map(x=>[x.channel,x.enabled]));
-const blockers=[];
+const blockers=['Pilot secret values are masked; read-only API cannot prove pilot checkout readiness'];
 if(version!==VERSION)blockers.push('Worker version changed: re-review update');
 for(const key of ['STARS_PAYMENT_ENABLED','STARS_VARIABLE_TOPUP_ENABLED']){
  if(vars[key]!=='true')blockers.push(key+' is OFF');
@@ -78,7 +78,8 @@ const report={
   Number(vars.STARS_RUB_MINOR_PER_STAR_DEN)/100,
  channels:channel,gameReleaseApproved:release[0]?.enabled===1,
  ordersByStatus:orders,offlineTestsPassed:offlinePassed,
- liveOneStarPilotReady:blockers.length===0&&offlinePassed,
+ liveOneStarPilotReady:false,
+ secretValuesVerified:false,
  blockers
 };
 console.log('\\nRUST UP LIVE STARS PAYMENT READINESS');
