@@ -3,7 +3,7 @@
 // The variable Stars handler records delayed/duplicate XTR evidence even
 // while ALL payment switches stay OFF. Never credits a game balance.
 import {variableStarsWebhook,variableStarsApi} from './stars-variable-bridge.mjs';
-import {freezeVerifiedStarsGameQuote} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
+import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
 import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
@@ -20,7 +20,7 @@ export function wrapCurrentStarsWebhook(original,{
  settlePaidStars=runVariableStarsDeliveryQueue,
  reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
  handleCheckout=variableStarsApi,
- calculateEntitlement=null,
+ calculateEntitlement=calculateRubCoinOneToOne,
  freezeQuote=freezeVerifiedStarsGameQuote,
  fetchImpl=fetch
 }={}){
