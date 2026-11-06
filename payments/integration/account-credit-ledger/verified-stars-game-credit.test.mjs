@@ -112,13 +112,19 @@ test('same Telegram charge ID appears as both payment and refund: never settle',
  }
 });
 
-test('invoice payload absent from a genuine-looking Telegram StarTransaction cannot justify credit',async()=>{
+test('Telegram may omit optional invoice payload in history when the authenticated webhook already bound charge to order',async()=>{
  const credit=validatePaidStarsSettlementOrder(paid,quote,ID);
- const lookalike={...matching,source:{...matching.source}};
- delete lookalike.source.invoice_payload; // optional in Telegram Bot API
- await assert.rejects(
-  ()=>independentlyVerifyStarsCharge({BOT_TOKEN:'123456789:'+('a'.repeat(25))},
-   credit,535,gateway([lookalike]).fetchImpl),
-  /stars_transaction_amount_owner_or_invoice_mismatch/
- );
+ const withoutPayload={...matching,source:{...matching.source}};
+ delete withoutPayload.source.invoice_payload;
+ assert.equal(await independentlyVerifyStarsCharge(
+  {BOT_TOKEN:'123456789:'+('a'.repeat(25))},credit,535,
+  gateway([withoutPayload]).fetchImpl),true);
+ for(const altered of [
+  {...withoutPayload,amount:534},
+  {...withoutPayload,id:'other-charge'},
+  {...withoutPayload,source:{...withoutPayload.source,user:{id:123}}},
+  {...withoutPayload,source:{...withoutPayload.source,invoice_payload:'v:wrong'}}
+ ])await assert.rejects(()=>independentlyVerifyStarsCharge(
+  {BOT_TOKEN:'123456789:'+('a'.repeat(25))},credit,535,
+  gateway([altered]).fetchImpl));
 });
