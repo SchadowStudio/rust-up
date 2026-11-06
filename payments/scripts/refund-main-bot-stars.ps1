@@ -15,6 +15,14 @@ try {
   $env:CLOUDFLARE_API_TOKEN=[string]$credential.token
   $ownedCloudflare=$true
  }
+ node --check '.\payments\scripts\refund-main-bot-stars.mjs'
+ if($LASTEXITCODE -ne 0){throw 'Refund code syntax check failed'}
+ Write-Host 'Checking payment, frozen quote and game mirror before any Telegram refund...' -ForegroundColor Cyan
+ node '.\payments\scripts\refund-main-bot-stars.mjs' --preflight $OrderId
+ if($LASTEXITCODE -ne 0){
+  Write-Host 'Refund was NOT attempted. Fix the above account or receipt issue first.' -ForegroundColor Yellow
+  return
+ }
  if([string]::IsNullOrWhiteSpace($env:RUSTUP_MAIN_BOT_TOKEN)){
   $secret=Read-Host 'Main bot @rustuper_bot token (hidden, never paste in chat)' -AsSecureString
   $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
