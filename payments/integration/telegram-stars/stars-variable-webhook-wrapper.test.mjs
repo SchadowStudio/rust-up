@@ -157,7 +157,7 @@ test('refund cron uses its own gate and preserves original cron with settlement 
  },{});
  assert.deepEqual(calls,['game','refund','game']);
 });
-test('refund reconciliation exception fails closed without settlement or game interruption',async()=>{
+test('refund failure still attempts independent paid settlement before reporting error',async()=>{
  const calls=[];
  const original={fetch:async()=>new Response('ok'),scheduled:async()=>calls.push('game')};
  const wrapper=wrapCurrentStarsWebhook(original,{
@@ -173,7 +173,56 @@ test('refund reconciliation exception fails closed without settlement or game in
   BOT_TOKEN:'offline-only',
   DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
  },{}),/stars_refund_reconciliation_scheduler_requires_review/);
- assert.deepEqual(calls,['game','refund']);
+ assert.deepEqual(calls,['game','refund','settlement']);
+});
+
+test('original cron failure does not starve settlement or refund',async()=>{
+ const calls=[];
+ const original={
+  fetch:async()=>new Response('ok'),
+  scheduled:async()=>{calls.push('game');throw Error('game cron down');}
+ };
+ const wrapped=wrapCurrentStarsWebhook(original,{
+  reconcileRefundedStars:async()=>{calls.push('refund');return {manualReview:0};},
+  settlePaidStars:async()=>{calls.push('settlement');}
+ });
+ const env={
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'true',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+  BOT_TOKEN:'offline-only',
+  DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
+ };
+ await assert.rejects(()=>wrapped.scheduled({},env,{}),
+  /original_game_cron_requires_retry/);
+ assert.deepEqual(calls,['game','refund','settlement']);
+});
+
+test('independent scheduler failures are all surfaced without suppressing work',async()=>{
+ const calls=[];
+ const wrapped=wrapCurrentStarsWebhook({
+  fetch:async()=>new Response('ok'),
+  scheduled:async()=>{calls.push('game');throw Error('down');}
+ },{
+  reconcileRefundedStars:async()=>{calls.push('refund');throw Error('down');},
+  settlePaidStars:async()=>{calls.push('settlement');throw Error('down');}
+ });
+ const env={
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'true',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+  BOT_TOKEN:'offline-only',
+  DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
+ };
+ await assert.rejects(()=>wrapped.scheduled({},env,{}),err=>
+  /original_game_cron_requires_retry/.test(err.message)&&
+  /stars_refund_reconciliation_scheduler_requires_review/.test(err.message)&&
+  /stars_delivery_scheduler_requires_retry/.test(err.message));
+ assert.deepEqual(calls,['game','refund','settlement']);
 });
 
 test('checkout routing passes only a server-side quote freezer to authenticated API',async()=>{
