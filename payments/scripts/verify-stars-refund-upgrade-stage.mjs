@@ -18,33 +18,36 @@ export const STAGE_SOURCES=Object.freeze([
  'freeze-verified-stars-game-quote.mjs',
  'worker.stars-webhook-only-entry.mjs'
 ]);
+export const DEPLOYED_SOURCES=Object.freeze(STAGE_SOURCES.filter(name=>name!=='stars-payment-support.mjs'));
 const OFF=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
  'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
  'PAYMENT_WALLET_STRICT_MODE'];
 const SHA=bytes=>createHash('sha256').update(bytes).digest('hex');
 function fail(reason){throw Error('stars_refund_stage_'+reason);}
-export function checkRefundSourceMap(map,sourceHashes){
+export function checkRefundSourceMap(map,sourceHashes,{deployedBaseline=false}={}){
+ const sources=deployedBaseline?DEPLOYED_SOURCES:STAGE_SOURCES;
  if(map?.version!==3||!Array.isArray(map.sources)||
     !Array.isArray(map.sourcesContent)||
-    map.sources.length!==STAGE_SOURCES.length||
-    map.sourcesContent.length!==STAGE_SOURCES.length)
+    map.sources.length!==sources.length||
+    map.sourcesContent.length!==sources.length)
   fail('source_map_count_or_format');
  const seen=new Set();
  for(let i=0;i<map.sources.length;i++){
   const name=String(map.sources[i]).split('/').pop();
-  if(!STAGE_SOURCES.includes(name)||seen.has(name)||
+  if(!sources.includes(name)||seen.has(name)||
      typeof map.sourcesContent[i]!=='string'||
      SHA(map.sourcesContent[i])!==sourceHashes[name])
    fail('altered_or_unexpected_source_'+name);
   seen.add(name);
  }
- if(STAGE_SOURCES.some(name=>!seen.has(name))||
-    sourceHashes[STAGE_SOURCES[0]]!==ORIGINAL_SHA)
+ if(sources.some(name=>!seen.has(name))||
+    sourceHashes[sources[0]]!==ORIGINAL_SHA)
   fail('original_bot_or_required_module_missing');
  return {sources:seen.size,originalBotExact:true};
 }
-export async function verifyRefundStage(folder){
+export async function verifyRefundStage(folder,{deployedBaseline=false}={}){
+ const sources=deployedBaseline?DEPLOYED_SOURCES:STAGE_SOURCES;
  const dir=await fs.realpath(path.resolve(folder||''));
  if(!dir.startsWith(PRIVATE))fail('untrusted_stage');
  const manifest=JSON.parse(await fs.readFile(path.join(dir,
@@ -71,18 +74,18 @@ export async function verifyRefundStage(folder){
     !config.includes('upload_source_maps = true'))
   fail('critical_worker_binding_missing');
  const hashes={};
- for(const name of STAGE_SOURCES)
+ for(const name of sources)
   hashes[name]=SHA(await fs.readFile(path.join(dir,name)));
  const map=JSON.parse(await fs.readFile(path.join(dir,
   'worker.stars-webhook-only.bundle.js.map'),'utf8'));
- const review=checkRefundSourceMap(map,hashes);
+ const review=checkRefundSourceMap(map,hashes,{deployedBaseline});
  const bundle=await fs.readFile(path.join(dir,
   'worker.stars-webhook-only.bundle.js'),'utf8');
  for(const required of ['freezeVerifiedStarsGameQuote',
   'calculateRubCoinOneToOne','runVariableStarsDeliveryQueue',
-  'reconcileRecordedStarsRefundBatch','handleStarsSupportCommand',
-  'wrapCurrentStarsWebhook',
-  'refDeposit']){
+  'reconcileRecordedStarsRefundBatch',
+  ...(deployedBaseline?[]:['handleStarsSupportCommand']),
+  'wrapCurrentStarsWebhook','refDeposit']){
   if(!bundle.includes(required))fail('missing_compiled_behavior_'+required);
  }
  if(!bundle.includes('worker.stars-webhook-only.bundle.js.map'))
