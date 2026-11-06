@@ -87,7 +87,7 @@ function transaction(incoming=true){
   source:{type:'user',transaction_type:'invoice_payment',
    user:{id:ACCOUNT},invoice_payload:'v:'+ORDER}
  }:{
-  id:CHARGE,amount:-STARS,
+  id:CHARGE,amount:STARS,
   receiver:{type:'user',user:{id:ACCOUNT}}
  };
 }
