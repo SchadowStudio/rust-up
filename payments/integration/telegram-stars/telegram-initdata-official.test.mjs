@@ -18,7 +18,7 @@ test('validates Telegram bot-token HMAC including its optional signature attribu
  params.set('signature','example-ed25519-signature');
  params.delete('hash');
  const check=[...params.entries()].sort(([a],[b])=>a.localeCompare(b))
-  .map(([key,value])=>key+'='+value).join('\\n');
+  .map(([key,value])=>key+'='+value).join('\n');
  const secret=createHmac('sha256','WebAppData').update(token).digest();
  const hash=createHmac('sha256',secret).update(check).digest('hex');
  params.set('hash',hash);
