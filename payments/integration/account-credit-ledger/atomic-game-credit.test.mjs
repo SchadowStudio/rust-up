@@ -9,7 +9,7 @@ const orderId='123e4567-e89b-42d3-a456-426614174000';
 function fixture(balance=10,mirror=true){
  const db=new DatabaseSync(':memory:');
  db.exec('CREATE TABLE accounts(id INTEGER PRIMARY KEY,state TEXT NOT NULL,v INTEGER NOT NULL,updated INTEGER NOT NULL);');
- db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL);');
+ db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL,blocked INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0);');
  db.exec(schema);
  db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(123456789,JSON.stringify({
   balance,inventory:['old-item'],history:[{kind:'existing'}]
@@ -78,6 +78,55 @@ function refund(db,{order=orderId,charge='tg-charge-12345678',
   'VALUES (?,?,?,?,?,?)')
   .run('stars_variable',order,charge,user,coinCents,1794000100000);
 }
+
+test('blocked and banned accounts are never credited, journal remains empty',()=>{
+ for(const field of ['blocked','banned']){
+  const db=fixture();
+  try{
+   db.prepare('UPDATE users SET '+field+'=1 WHERE id=?').run(123456789);
+   assert.throws(()=>credit(db),/restricted_or_unsynced/);
+   assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_receipts').get().n,0);
+   assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,10);
+  }finally{db.close();}
+ }
+});
+test('mirror disagreement, missing user balance and fractional cents block paid credit',()=>{
+ for(const problem of ['mirror','null','fractional']){
+  const db=fixture();
+  try{
+   if(problem==='mirror')db.prepare('UPDATE users SET balance=balance+1').run();
+   if(problem==='null')db.prepare('UPDATE users SET balance=NULL').run();
+   if(problem==='fractional'){
+    db.prepare('UPDATE accounts SET state=?').run(JSON.stringify({balance:1.001}));
+    db.prepare('UPDATE users SET balance=1.001').run();
+   }
+   assert.throws(()=>credit(db),/restricted_or_unsynced/);
+   assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_receipts').get().n,0);
+   assert.equal(db.prepare('SELECT v FROM accounts').get().v,3);
+  }finally{db.close();}
+ }
+});
+test('a refunded, subsequently blocked player still gets an exact matching reversal',()=>{
+ const db=fixture();
+ try{
+  credit(db);
+  db.prepare('UPDATE users SET blocked=1,banned=1').run();
+  assert.equal(refund(db).changes,1);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,10);
+  assert.equal(db.prepare('SELECT balance FROM users').get().balance,10);
+ }finally{db.close();}
+});
+test('refund refuses inconsistent mirror and never creates a reversal row',()=>{
+ const db=fixture();
+ try{
+  credit(db);
+  db.prepare('UPDATE users SET balance=99').run();
+  assert.throws(()=>refund(db),/unsynced_manual_review/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,11.5);
+ }finally{db.close();}
+});
+
 test('provider-verified refund event reverses exact credit and mirrored balance once',()=>{
  const db=fixture();
  try{
