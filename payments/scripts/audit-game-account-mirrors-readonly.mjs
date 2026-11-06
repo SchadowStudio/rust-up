@@ -4,6 +4,7 @@
 // No D1 writes, no automatic repair, no payment activation.
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {EXISTING_ADMIN_SQL,evaluateExistingAdminCounts} from './existing-admin-classification.mjs';
 
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
 const DB='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
@@ -72,7 +73,7 @@ SELECT COUNT(*) AS accounts,
  SUM(CASE WHEN blocked=1 OR banned=1 THEN 1 ELSE 0 END) AS restricted_accounts
 FROM classified`.trim();
 
-export function evaluateGameAccountIntegrity(aggregate,{bindings,releaseControl}={}){
+export function evaluateGameAccountIntegrity(aggregate,{bindings,releaseControl,adminCounts=null}={}){
  if(!aggregate||!Array.isArray(bindings)||!releaseControl)
   throw Error('game_account_integrity_evidence_missing');
  const counts={};
@@ -103,6 +104,10 @@ export function evaluateGameAccountIntegrity(aggregate,{bindings,releaseControl}
  const gameLedgerGateOff=releaseControl.enabled===0&&
   releaseControl.approval_reference==null&&
   releaseControl.reviewed_at_ms==null;
+ const adminClassification=adminCounts===null?null:evaluateExistingAdminCounts(adminCounts);
+ if(adminCounts!==null && (adminCounts.account_count!==counts.accounts ||
+    adminCounts.review_accounts!==counts.distinct_account_review))
+  throw Error('existing_admin_account_audit_snapshot_mismatch');
  const reviewRequired=counts.distinct_account_review>0;
  return {
   mode:'READ_ONLY_GAME_ACCOUNT_INTEGRITY_AUDIT',
@@ -127,19 +132,20 @@ export function evaluateGameAccountIntegrity(aggregate,{bindings,releaseControl}
    restrictedAccounts:counts.restricted_accounts
   },
   workerPaymentsOff,gameDBBound,gameLedgerGateOff,
+  ...(adminClassification?{adminClassification}:{}),
   reviewRequired,
   // No payment release may be inferred from the absence of findings.
   releaseApproval:false
  };
 }
 
-async function readJson(token,route,{sql=null,fetchImpl=fetch}={}){
+async function readJson(token,route,{sql=null,params=[],fetchImpl=fetch}={}){
  const res=await fetchImpl(API+route,{
   method:sql?'POST':'GET',
   redirect:'error',
   headers:{authorization:'Bearer '+token,
    ...(sql?{'content-type':'application/json'}:{})},
-  ...(sql?{body:JSON.stringify({sql})}:{}),
+  ...(sql?{body:JSON.stringify({sql,params})}:{}),
   signal:AbortSignal.timeout(25000)
  });
  if(!res?.ok)throw Error('account_integrity_cloudflare_read_http_'+res?.status);
@@ -151,20 +157,29 @@ export async function inspectLiveGameAccountIntegrity(token,fetchImpl=fetch){
  if(typeof token!=='string'||token.length<15)
   throw Error('account_integrity_read_only_token_required');
  const base='/d1/database/'+DB+'/query';
- const [aggregateRows,releaseRows,settings]=await Promise.all([
+ const settings=await readJson(token,
+  '/workers/scripts/'+WORKER+'/settings',{fetchImpl});
+ const firstAdmin=settings?.bindings?.find(b=>b.name==='FIRST_ADMIN');
+ const firstAdminAlias=firstAdmin?.type==='plain_text'&&
+  typeof firstAdmin.text==='string'?firstAdmin.text.trim():'';
+ const [aggregateRows,releaseRows,adminRows]=await Promise.all([
   readJson(token,base,{sql:AGGREGATE_SQL,fetchImpl}),
   readJson(token,base,{sql:
    'SELECT enabled,approval_reference,reviewed_at_ms FROM rustup_game_paid_release_control WHERE id=1',
    fetchImpl}),
-  readJson(token,'/workers/scripts/'+WORKER+'/settings',{fetchImpl})
+  readJson(token,base,{sql:EXISTING_ADMIN_SQL,
+   params:[firstAdminAlias],fetchImpl})
  ]);
  const rows=aggregateRows?.[0]?.results;
  const gate=releaseRows?.[0]?.results;
+ const admins=adminRows?.[0]?.results;
  if(!Array.isArray(rows)||rows.length!==1||
-    !Array.isArray(gate)||gate.length!==1)
+    !Array.isArray(gate)||gate.length!==1||
+    !Array.isArray(admins)||admins.length!==1)
   throw Error('account_integrity_incomplete_d1_results');
  return evaluateGameAccountIntegrity(rows[0],{
-  bindings:settings?.bindings,releaseControl:gate[0]
+  bindings:settings?.bindings,releaseControl:gate[0],
+  adminCounts:admins[0]
  });
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
