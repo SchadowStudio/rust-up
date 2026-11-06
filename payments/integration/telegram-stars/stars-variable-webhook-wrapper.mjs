@@ -4,6 +4,7 @@
 // while ALL payment switches stay OFF. Never credits a game balance.
 import {variableStarsWebhook} from './stars-variable-bridge.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
+import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
 const WEBHOOK='/tg';
 function hasVariableStarsPayload(update){
@@ -16,11 +17,13 @@ function hasVariableStarsPayload(update){
 export function wrapCurrentStarsWebhook(original,{
  receiveVariableStars=variableStarsWebhook,
  settlePaidStars=runVariableStarsDeliveryQueue,
+ reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
  fetchImpl=fetch
 }={}){
  if(!original||typeof original.fetch!=='function'||
     typeof receiveVariableStars!=='function'||
-    typeof settlePaidStars!=='function')
+    typeof settlePaidStars!=='function'||
+    typeof reconcileRefundedStars!=='function')
   throw Error('variable_stars_original_bot_missing');
  return {
   ...original,
@@ -30,10 +33,23 @@ export function wrapCurrentStarsWebhook(original,{
     await original.scheduled.call(original,controller,env,ctx);
    // An already-verified paid order is processed only if all the
    // settlement/ledger/operator gates are independently enabled.
+   // Refund reconciliation has an independent gate: never activate it
+   // merely because invoice or settlement switches are enabled.
+   if(env?.PAYMENT_PRODUCTION_ENABLED==='true'&&
+      env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED==='true'&&
+      env?.PAYMENT_WALLET_STRICT_MODE==='true'){
+    try{
+     const summary=await reconcileRefundedStars(env,{fetchImpl});
+     if(summary?.manualReview>0)
+      console.error('RUST UP Stars refund reconciliation needs operator review',
+       summary.manualReview);
+    }catch{
+     throw Error('stars_refund_reconciliation_scheduler_requires_review');
+    }
+   }
    if(!settlementWorkerAllowed(env))return;
    try{await settlePaidStars(env);}
    catch{
-    // Cloudflare should report the scheduler error so it is investigated.
     // The durable queue retains the leased job for a later retry.
     throw Error('stars_delivery_scheduler_requires_retry');
    }
