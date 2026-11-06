@@ -25,7 +25,7 @@ try{
   git diff --exit-code -- payments
  }
  Run 'Check Stars checkout, credit, refund and webhook tests'{
-  node --test '.\payments\integration\account-credit-ledger\freeze-verified-stars-game-quote.test.mjs' '.\payments\integration\account-credit-ledger\stars-checkout-frozen-quote-e2e.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-credit.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\telegram-stars\stars-delivery-queue.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
+  node --test '.\payments\integration\account-credit-ledger\freeze-verified-stars-game-quote.test.mjs' '.\payments\integration\account-credit-ledger\stars-checkout-frozen-quote-e2e.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-credit.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\telegram-stars\stars-delivery-queue.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\integration\telegram-stars\stars-payment-support.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
  }
  $root=(Resolve-Path -LiteralPath '.\.private\rustup-bot-recovered').Path.TrimEnd('\')+'\'
  $stage=(Resolve-Path -LiteralPath $StageFolder).Path
@@ -50,7 +50,7 @@ try{
   $result=$null;$data=$null
  }
  $env:CLOUDFLARE_ACCOUNT_ID='af72e32cb9f1ba99dba07df30fe540fe'
- $baseline=Join-Path $repo '.private\rustup-bot-recovered\webhook-only-d618b572-dc181bc6f2-deployed-285f2656'
+ $baseline=Join-Path $repo '.private\rustup-bot-recovered\webhook-only-d618b572-dc181bc6f2-deployed-f6b6c0d4'
  Run 'Verify unchanged deployed Worker source against pinned baseline'{
   node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$baseline"
  }
