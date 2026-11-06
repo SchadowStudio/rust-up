@@ -18,6 +18,13 @@ try {
   $owned=$true
  }
  if($Action -eq 'activate'){
+  Write-Host 'Pruefe zuerst Zwei-Kaeufe-Sperre und vollstaendige Offline-Zahlungskette...' -ForegroundColor Cyan
+  node --test '.\payments\scripts\main-bot-stars-ops.test.mjs'
+  if($LASTEXITCODE -ne 0){throw 'Pilot atomic-limit test failed; no activation'}
+  node '.\payments\scripts\test-full-stars-offline-e2e.mjs'
+  if($LASTEXITCODE -ne 0){throw 'Stars game credit/refund E2E test failed; no activation'}
+  node --check '.\payments\scripts\refund-main-bot-stars.mjs'
+  if($LASTEXITCODE -ne 0){throw 'Refund operator script syntax failed; no activation'}
   Write-Host 'Pilot: max. zwei Bestellungen, nur Telegram-ID 7390606911, erste Zahlung 1 Star.' -ForegroundColor Yellow
   Write-Host 'Bei Problemen kann eine Rueckerstattung manuelle Pruefung benoetigen.' -ForegroundColor Yellow
   if([string]::IsNullOrWhiteSpace($ApprovalReference)){
