@@ -84,16 +84,16 @@ export function checkHistoryReleaseMetadata({bindings,schedules,versionInfo,
 export function inspectDeployedHistorySource(raw,expectedOriginalHash=null){
  if(typeof raw!=='string'||raw.length<100000||raw.length>25000000)
   fail('missing_compiled_source');
- const boundary=raw.split(/\\r?\\n/,1)[0].trim();
+ const boundary=raw.split(/\r?\n/,1)[0].trim();
  if(!/^--[a-zA-Z0-9_=-]{8,200}$/.test(boundary))
   fail('invalid_multipart');
  const sections=raw.split(boundary).filter(p=>p.includes('Content-Disposition:'));
  const parts=sections.map(section=>{
-  const separator=section.includes('\\r\\n\\r\\n')?'\\r\\n\\r\\n':'\\n\\n';
+  const separator=section.includes('\r\n\r\n')?'\r\n\r\n':'\n\n';
   const at=section.indexOf(separator);
   if(at<0)fail('multipart_headers_invalid');
   const header=section.slice(0,at);
-  const filename=/(?:^|\\r?\\n)Content-Disposition:[^\\r\\n]*filename="([^"]+)"/i.exec(header)?.[1];
+  const filename=/(?:^|\r?\n)Content-Disposition:[^\r\n]*filename="([^"]+)"/i.exec(header)?.[1];
   if(!filename)fail('multipart_filename_missing');
   return {filename,body:section.slice(at+separator.length).trim()};
  });
