@@ -154,3 +154,76 @@ export async function reconcileRecordedStarsRefundBatch(env,{
  }
  return summary;
 }
+
+
+ // Detect refunds made outside the admin refund command by scanning independent
+ // Telegram bot transaction history. This never calls refundStarPayment.
+ // Only a matching original incoming payment AND outgoing refund with the
+ // same charge ID, Star count and Telegram account can mark an order refunded.
+ export async function discoverVerifiedStarsRefunds(env,{
+  fetchImpl=fetch,maxBatch=25
+ }={}){
+  if(env?.PAYMENT_PRODUCTION_ENABLED!=='true'||
+     env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED!=='true'||
+     env?.PAYMENT_WALLET_STRICT_MODE!=='true')
+   return {enabled:false,detected:0,recorded:0,review:0};
+  if(!env.PAYMENTS_DB?.prepare||typeof env.BOT_TOKEN!=='string'||
+     !Number.isSafeInteger(maxBatch)||maxBatch<1||maxBatch>25)
+   throw Error('stars_refund_discovery_unavailable');
+  const transactions=[];
+  let complete=false;
+  for(let offset=0;offset<2000;offset+=100){
+   const data=await telegramApi({TG_STARS_BOT_TOKEN:env.BOT_TOKEN},
+    'getStarTransactions',{offset,limit:100},fetchImpl);
+   if(!Array.isArray(data?.transactions))
+    throw Error('stars_refund_discovery_history_invalid');
+   transactions.push(...data.transactions);
+   if(data.transactions.length<100){complete=true;break;}
+  }
+  if(!complete)throw Error('stars_refund_discovery_history_incomplete_review');
+  const originals=new Map(),refunded=new Map(),ambiguous=new Set();
+  for(const tx of transactions){
+   if(typeof tx?.id!=='string'||tx.id.length<8||tx.id.length>256)continue;
+   const incoming=tx.source?.type==='user'&&tx.receiver==null;
+   const outgoing=tx.source==null&&tx.receiver?.type==='user';
+   if(!incoming&&!outgoing)continue;
+   if(!Number.isSafeInteger(tx.amount)||tx.amount<1||
+      !Number.isSafeInteger(tx.date)||tx.date<1)continue;
+   const user=(incoming?tx.source:tx.receiver)?.user?.id;
+   if(!Number.isSafeInteger(user)||user<1)continue;
+   const destination=incoming?originals:refunded;
+   if(destination.has(tx.id))ambiguous.add(tx.id);
+   destination.set(tx.id,{amount:tx.amount,user,date:tx.date});
+  }
+  const result={enabled:true,detected:0,recorded:0,review:0};
+  for(const [chargeId,refund] of refunded){
+   if(result.detected>=maxBatch)break;
+   const original=originals.get(chargeId);
+   if(!original||ambiguous.has(chargeId)||
+      original.user!==refund.user||
+      original.amount!==refund.amount||refund.date<original.date){
+    result.review++;continue;
+   }
+   const order=await env.PAYMENTS_DB.prepare(
+    'SELECT id,telegram_user_id,price_stars,status FROM rustup_stars_variable_orders '+
+    'WHERE telegram_charge_id=?'
+   ).bind(chargeId).first();
+   if(!order)continue; // Not a variable Stars deposit.
+   if(order.telegram_user_id!==refund.user||
+      order.price_stars!==refund.amount||
+      !['paid','refunded'].includes(order.status)){
+    result.review++;continue;
+   }
+   result.detected++;
+   if(order.status==='refunded')continue;
+   const applied=await env.PAYMENTS_DB.prepare(
+    "UPDATE rustup_stars_variable_orders SET status='refunded' "+
+    "WHERE id=? AND status='paid' AND telegram_charge_id=? "+
+    'AND telegram_user_id=? AND price_stars=?'
+   ).bind(order.id,chargeId,refund.user,refund.amount).run();
+   if(applied?.meta?.changes===1)result.recorded++;
+   else if(applied?.meta?.changes!==0)
+    throw Error('stars_refund_discovery_write_unconfirmed');
+  }
+  return result;
+ }
