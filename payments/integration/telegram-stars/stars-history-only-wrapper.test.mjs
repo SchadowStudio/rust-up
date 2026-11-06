@@ -185,10 +185,10 @@ test('sanitized 401 diagnostics distinguish expired from malformed Telegram auth
   const expired=await wrapped.fetch(req('/api/stars/variable/quote',{
    body:JSON.stringify({initData:initData(ID,90000),amountMinor:10000})
   }),f.env,{});
-  for(const response of [malformed,expired]){
+  for(const [response,reason] of [[malformed,'signature_or_format'],[expired,'expired']]){
    assert.equal(response.status,401);
    assert.deepEqual(await response.json(),
-    {ok:false,error:'telegram_auth_required'});
+    {ok:false,error:'telegram_auth_required',authReason:reason});
   }
   assert.deepEqual(messages,[
    ['rustup_stars_auth_denied','quote','signature_or_format'],
