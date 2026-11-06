@@ -74,6 +74,10 @@ jobs:
       - name: Verify read-only cross-D1 payment and game ledger reconciliation
         run: |
           node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
+      - name: Review live D1 migration safety and account mirror consistency, without deployment
+        run: |
+          node --check payments/scripts/preflight-game-ledger-migration.mjs
+          node --test payments/scripts/preflight-game-ledger-migration.test.mjs
       - name: Verify account import guard without enabling money
         run: |
           node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs
