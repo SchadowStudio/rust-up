@@ -142,6 +142,7 @@ test('refund cron uses its own gate and preserves original cron with settlement 
  const calls=[];
  const original={fetch:async()=>new Response('ok'),scheduled:async()=>calls.push('game')};
  const wrapper=wrapCurrentStarsWebhook(original,{
+  discoverRefundedStars:async()=>({review:0}),
   reconcileRefundedStars:async()=>{calls.push('refund');return {manualReview:0};},
   settlePaidStars:async()=>calls.push('settlement')
  });
@@ -161,6 +162,7 @@ test('refund failure still attempts independent paid settlement before reporting
  const calls=[];
  const original={fetch:async()=>new Response('ok'),scheduled:async()=>calls.push('game')};
  const wrapper=wrapCurrentStarsWebhook(original,{
+  discoverRefundedStars:async()=>({review:0}),
   reconcileRefundedStars:async()=>{calls.push('refund');throw Error('failed provider verification');},
   settlePaidStars:async()=>calls.push('settlement')
  });
@@ -183,6 +185,7 @@ test('original cron failure does not starve settlement or refund',async()=>{
   scheduled:async()=>{calls.push('game');throw Error('game cron down');}
  };
  const wrapped=wrapCurrentStarsWebhook(original,{
+  discoverRefundedStars:async()=>({review:0}),
   reconcileRefundedStars:async()=>{calls.push('refund');return {manualReview:0};},
   settlePaidStars:async()=>{calls.push('settlement');}
  });
@@ -206,6 +209,7 @@ test('independent scheduler failures are all surfaced without suppressing work',
   fetch:async()=>new Response('ok'),
   scheduled:async()=>{calls.push('game');throw Error('down');}
  },{
+  discoverRefundedStars:async()=>({review:0}),
   reconcileRefundedStars:async()=>{calls.push('refund');throw Error('down');},
   settlePaidStars:async()=>{calls.push('settlement');throw Error('down');}
  });
