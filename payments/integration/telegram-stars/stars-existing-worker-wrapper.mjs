@@ -4,7 +4,7 @@
 import {receiveExistingBotStarsUpdate,existingBotStarsApi,existingBotPaySupport} from './stars-live-bridge.mjs';
 import {telegramApi} from './stars.mjs';
 import {handleRefundCommand} from './refunds.mjs';
-import {variableStarsApi} from './stars-variable-bridge.mjs';
+import {variableStarsApi,variableStarsWebhook} from './stars-variable-bridge.mjs';
 
 function privateCommand(update,name){
  const msg=update?.message;
@@ -33,6 +33,7 @@ async function openExistingMiniApp(update,env,fetchImpl){
 }
 export function wrapExistingWorker(original,{
  receiveStars=receiveExistingBotStarsUpdate,
+ receiveVariableStars=variableStarsWebhook,
  refundStars=handleRefundCommand,
  handleStarsApi=existingBotStarsApi,
  handleVariableStarsHistory=variableStarsApi,
@@ -84,6 +85,11 @@ export function wrapExistingWorker(original,{
         if(await paySupport(update,env,(e,m,b)=>telegramCall(e,m,b,fetchImpl)))
           return new Response('ok');
        }
+       // v:<order UUID> belongs to the variable Stars order journal, NOT
+       // the fixed-goods handler. Dispatch first, even when all charging
+       // gates are OFF, to preserve evidence of delayed paid receipts.
+       if(await receiveVariableStars(update,env,fetchImpl))
+         return new Response('ok');
        if(await receiveStars(update,env,fetchImpl))
          return new Response('ok');
       }catch(e){
