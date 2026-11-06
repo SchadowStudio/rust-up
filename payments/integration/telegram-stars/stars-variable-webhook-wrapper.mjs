@@ -1,7 +1,7 @@
-// Strict webhook-only extension for the CURRENT, quote/history-only Worker.
-// The original game/Telegram bot remains the fallback. No checkout is exposed.
+// Live extension for Stars quote, checkout, and webhook on the current Worker.
+// The original game/Telegram bot remains the fallback for unrelated routes.
 // The variable Stars handler records delayed/duplicate XTR evidence even
-// while ALL payment switches stay OFF. Never credits a game balance.
+// even while payment switches are OFF. Game credit is independently gated.
 import {variableStarsWebhook,variableStarsApi} from './stars-variable-bridge.mjs';
 import {isStarsSupportCommand,handleStarsSupportCommand} from './stars-payment-support.mjs';
 import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
@@ -65,7 +65,10 @@ export function wrapCurrentStarsWebhook(original,{
   },
   async fetch(request,env,ctx){
    const url=new URL(request.url);
-   if(url.pathname==='/api/stars/variable/checkout'){
+   // Both quote and checkout must go through the SAME guarded Stars API.
+   // Old read-only /quote always returns checkoutEnabled:false.
+   if(url.pathname==='/api/stars/variable/checkout'||
+      url.pathname==='/api/stars/variable/quote'){
     // A trusted server-side pricing function must be wired at Worker build
     // time. Never derive coin price from browser input or environment flags.
     if(typeof calculateEntitlement!=='function')
