@@ -1,6 +1,6 @@
 // RUST UP: safe staging for the exact supported currently deployed Worker.
-// Supports the old 10-module game and newer 12-module game, with or without
-// the reviewed 9-module fixed-goods Stars wrapper (10/12/19/21 source modules).
+// Supports reviewed 10-, 12- and current verified 13-module game bot layouts,
+// with or without the 9-module fixed-goods Stars wrapper (10/12/13/19/21/22).
 // Source-maps recovered from Cloudflare; NO payment enabling or deployment.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,13 +19,20 @@ const BASE10=['money.js','broadcast.js','creator.js','gamedata.js',
 const BASE12=['money.js','broadcast.js','creator.js','gamedata.js',
  'progress.js','fairlib.js','modes.js','social.js','game.js','support.js',
  'admin.js','worker.js'];
+// Observed in the actual 2026-11-06 live Cloudflare source map, in this order.
+// Preserve brand.js rather than replacing the running 13-module game.
+const BASE13=['money.js','broadcast.js','creator.js','gamedata.js',
+ 'progress.js','fairlib.js','modes.js','social.js','game.js','brand.js',
+ 'support.js','admin.js','worker.js'];
 const STARS=['stars.mjs','telegram-initdata.mjs','payment-controls.mjs',
  'supporter-badge.mjs','stars-terms.mjs','stars-live-bridge.mjs',
  'refunds.mjs','stars-existing-worker-wrapper.mjs',
  'worker.stars-commerce-entry.mjs'];
 const LAYOUTS=[
  {original:BASE10,activeStars:false},{original:BASE12,activeStars:false},
- {original:BASE10,activeStars:true},{original:BASE12,activeStars:true}
+ {original:BASE13,activeStars:false},
+ {original:BASE10,activeStars:true},{original:BASE12,activeStars:true},
+ {original:BASE13,activeStars:true}
 ].map(l=>({...l,names:[...l.original,...(l.activeStars?STARS:[])]}));
 const NAME='RUSTUP-VERIFIED-WORKER-MANIFEST.json';
 const CONFIG='wrangler.stars-verified.toml';
@@ -64,6 +71,9 @@ export function parseSupportedLiveWorker(body,contentType=''){
    fail('invalid_source_'+layout.names[i]);
   files.set(layout.names[i],source);
  }
+ if(layout.original===BASE13&&
+    !/from\\s*['\"]\\.\\/brand\\.js['\"]/.test(files.get('worker.js')))
+  fail('current_brand_module_import_missing');
  if(!files.get('worker.js').includes('export default {')||
     !files.get('worker.js').includes('async function onUpdate(upd, env)')||
     !files.get('game.js').includes('export async function withAccount(env, id, fn)')||
