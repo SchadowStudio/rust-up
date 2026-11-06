@@ -41,6 +41,11 @@ jobs:
       - name: Test amount entry and existing website integration
         run: |
           node --test payments/scripts/stars-variable-wallet-ui.test.mjs payments/scripts/publish-stars-ui-refresh.test.mjs payments/scripts/publish-variable-stars-wallet.test.mjs
+      - name: Verify current website deposit panel safe version patch without publishing
+        run: |
+          node --check payments/scripts/prepare-current-deposit-wallet.mjs
+          node --test payments/scripts/prepare-current-deposit-wallet.test.mjs payments/scripts/publish-rustup-deposit-wallet.test.mjs
+
       - name: Test current public demo wallet fixed-goods shop safety and publish version guards
         run: |
           node --test payments/scripts/publish-current-demo-stars-fixed-goods.test.mjs
