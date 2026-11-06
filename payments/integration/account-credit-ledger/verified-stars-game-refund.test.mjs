@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {
- verifyStarsRefundHistory,reconcileVerifiedStarsGameRefund
+ verifyStarsRefundHistory,reconcileVerifiedStarsGameRefund,reconcileRecordedStarsRefundBatch
 } from './verified-stars-game-refund.mjs';
 const id='123e4567-e89b-42d3-a456-426614174000';
 const user=123456789;
@@ -126,4 +126,55 @@ test('refund refuses mismatched original credit amount without modifying balance
   assert.equal(JSON.parse(f.game.prepare('SELECT state FROM accounts').get().state).balance,before);
   assert.equal(f.game.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
  }finally{f.game.close();f.pay.close();}
+});
+
+test('refund batch stays off without explicit financial gates',async()=>{
+ const summary=await reconcileRecordedStarsRefundBatch({
+  PAYMENT_PRODUCTION_ENABLED:'false',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true'
+ });
+ assert.equal(summary.enabled,false);
+ assert.equal(summary.selected,0);
+});
+test('refund batch handles exact verified results and exceptions without fallback credits',async()=>{
+ const seen=[];
+ const env={
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  DB:{prepare(){}},
+  PAYMENTS_DB:{prepare(query){
+   assert.match(query,/status='refunded'/);
+   return {bind(limit){assert.equal(limit,4);return {
+    async all(){return {results:[{id:'a'},{id:'b'},{id:'c'},{id:'d'}]};}
+   };}};
+  }}
+ };
+ const result=await reconcileRecordedStarsRefundBatch(env,{
+  maxBatch:4,reconcile:async(_env,id)=>{
+   seen.push(id);
+   if(id==='a')return {gameCreditReversed:true,replayed:false};
+   if(id==='b')return {gameCreditReversed:true,replayed:true};
+   if(id==='c')return {refunded:true,gameCreditHadBeenApplied:false};
+   throw Error('independent Telegram confirmation unavailable');
+  }
+ });
+ assert.deepEqual(seen,['a','b','c','d']);
+ assert.deepEqual(result,{enabled:true,selected:4,reversed:1,
+  alreadyReversed:1,noGameCredit:1,manualReview:1});
+});
+test('refund batch refuses unbounded and malformed database work',async()=>{
+ const env={
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  DB:{prepare(){}},PAYMENTS_DB:{prepare(){return {bind(){return {
+   async all(){return {results:null};}
+  };}};}}
+ };
+ await assert.rejects(()=>reconcileRecordedStarsRefundBatch(env,{maxBatch:26}),
+  /stars_refund_batch_unconfigured/);
+ await assert.rejects(()=>reconcileRecordedStarsRefundBatch(env,{maxBatch:1}),
+  /stars_refund_batch_database_unavailable/);
 });
