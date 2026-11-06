@@ -14,7 +14,7 @@ function Run([string]$name,[scriptblock]$command){
  if($LASTEXITCODE -ne 0){throw ($name+' exit '+$LASTEXITCODE)}
 }
 Run 'Run refund, webhook and staging tests' {
- node --test '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\account-credit-ledger\freeze-verified-stars-game-quote.test.mjs' '.\payments\integration\account-credit-ledger\stars-checkout-frozen-quote-e2e.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
+ node --test '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\account-credit-ledger\freeze-verified-stars-game-quote.test.mjs' '.\payments\integration\account-credit-ledger\stars-checkout-frozen-quote-e2e.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\integration\telegram-stars\stars-payment-support.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
 }
 $ownToken=$false
 try{
@@ -29,7 +29,7 @@ try{
  }
  $base=(Resolve-Path -LiteralPath $StageFolder).Path
  $previous=$base+'-refund-preflight'
- $baseline=$base+'-deployed-285f2656'
+ $baseline=$base+'-deployed-f6b6c0d4'
  if(!(Test-Path -LiteralPath $baseline)){
   Run 'Verify published Worker against previous verified refund-stage bundle'{
    node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$previous"
