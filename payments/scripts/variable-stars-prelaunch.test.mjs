@@ -42,7 +42,7 @@ function fixture(){
 }
 test('accepts price intentionally deferred; never converts a passing offline check to live money readiness',()=>{
  const result=evaluateVariableStarsPrelaunch(fixture());
- assert.equal(result.pricing,'PENDING_OPERATOR_APPROVAL');
+ assert.equal(result.pricing,'APPROVED_BY_OPERATOR');
  assert.equal(result.pricingConfigured,false);
  assert.equal(result.paymentOrGameCreditActivated,false);
  assert.equal(result.readyToAcceptRealPayments,false);
@@ -127,7 +127,7 @@ test('end-to-end prelaunch inspector reads only approved Cloudflare APIs and use
   throw Error('unexpected_mock_endpoint');
  };
  const result=await inspectVariableStarsPrelaunch('private-read-token-000001',fakeFetch);
- assert.equal(result.pricing,'PENDING_OPERATOR_APPROVAL');
+ assert.equal(result.pricing,'APPROVED_BY_OPERATOR');
  assert.equal(result.sourceWorkerVersion,'mock-worker-version');
  assert.equal(result.counts.paid_orders,0);
  assert.equal(result.counts.gameAccounts,4);
@@ -164,24 +164,29 @@ test('pending variable Stars refunds are independently counted and block prelaun
  assert.throws(()=>evaluateVariableStarsPrelaunch(missing),/incomplete_payment_counts/);
 });
 
-test('an illustrative Stars rate cannot be approved by matching live Worker variables',()=>{
+test('owner-approved rate is 1.83 RUB per Star but live settings must match and checkout stays OFF',()=>{
  const owner=JSON.parse(readFileSync(new URL('../stars-owner-rate.json',import.meta.url),'utf8'));
+ assert.equal(owner.operatorApproved,true);
+ assert.equal(owner.rubPerStarDecimal,'1.83');
  const f=fixture();
  let report=evaluateVariableStarsPrelaunch(f);
  assert.equal(report.rateStoredInRepository,true);
- assert.equal(report.rateRubPerStar,null);
- assert.equal(owner.operatorApproved,false);
+ assert.equal(report.rateRubPerStar,'1.83');
+ assert.equal(report.pricing,'APPROVED_BY_OPERATOR');
  assert.equal(report.pricingConfigured,false);
  assert.ok(report.blockers.includes('operator_approved_rate_matches_live_worker'));
- for(const name of ['STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
-  'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN']){
+ const names=[
+  'STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
+  'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN'
+ ];
+ for(const name of names)
   f.bindings.push({name,type:'plain_text',text:owner[name]});
- }
  report=evaluateVariableStarsPrelaunch(f);
- assert.equal(report.pricingConfigured,false);
- assert.equal(report.blockers.includes('operator_approved_rate_matches_live_worker'),true);
- assert.equal(report.pricing,'PENDING_OPERATOR_APPROVAL');
+ assert.equal(report.pricingConfigured,true);
+ assert.equal(report.blockers.includes('operator_approved_rate_matches_live_worker'),false);
+ assert.equal(report.pricing,'APPROVED_BY_OPERATOR');
  assert.equal(report.readyToAcceptRealPayments,false);
+ assert.equal(report.paymentOrGameCreditActivated,false);
  f.bindings.find(x=>x.name==='STARS_RUB_MINOR_PER_STAR_DEN').text='1';
  report=evaluateVariableStarsPrelaunch(f);
  assert.equal(report.pricingConfigured,false);
