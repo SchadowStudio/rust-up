@@ -32,8 +32,8 @@ function code(name){
   '// '+name;
  return start+'\nconst filler="'+('x'.repeat(140))+'";';
 }
-function multi(names,mark='--rustupWorkerBoundaryTest'){
- const map={version:3,sources:names,sourcesContent:names.map(code)};
+function multi(names,mark='--rustupWorkerBoundaryTest',overrides={}){
+ const map={version:3,sources:names,sourcesContent:names.map(n=>overrides[n]||code(n))};
  return mark+'\r\nContent-Disposition: form-data; name="map"; filename="worker.js.map"\r\n'+
   'Content-Type: application/json\r\n\r\n'+JSON.stringify(map)+'\r\n'+mark+'--';
 }
@@ -88,7 +88,8 @@ test('brand.js can only be accepted in exact observed order and when the Worker 
  assert.throws(()=>parseSupportedLiveWorker(multi(moved)),
   /unreviewed_worker_module_layout/);
  assert.throws(()=>parseSupportedLiveWorker(
-  multi(a13).replace('from \\"./brand.js\\"','from \\"./unrelated.js\\"')
+  multi(a13,undefined,{'worker.js':code('worker.js')
+   .replace('./brand.js','./unrelated.js')})
  ),/current_brand_module_import_missing/);
 });
 
