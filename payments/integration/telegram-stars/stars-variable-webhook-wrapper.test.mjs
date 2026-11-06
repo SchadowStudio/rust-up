@@ -137,3 +137,41 @@ test('scheduled Worker runs original cron; paid delivery only with all separate 
  }).scheduled({},configured,{}),/stars_delivery_scheduler_requires_retry/);
  assert.deepEqual(calls.slice(-1),['original-cron']);
 });
+
+test('refund cron uses its own gate and preserves original cron with settlement OFF',async()=>{
+ const calls=[];
+ const original={fetch:async()=>new Response('ok'),scheduled:async()=>calls.push('game')};
+ const wrapper=wrapCurrentStarsWebhook(original,{
+  reconcileRefundedStars:async()=>{calls.push('refund');return {manualReview:0};},
+  settlePaidStars:async()=>calls.push('settlement')
+ });
+ const base={PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'false',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'false'};
+ await wrapper.scheduled({},base,{});
+ assert.deepEqual(calls,['game','refund']);
+ await wrapper.scheduled({},{
+  ...base,STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'false'
+ },{});
+ assert.deepEqual(calls,['game','refund','game']);
+});
+test('refund reconciliation exception fails closed without settlement or game interruption',async()=>{
+ const calls=[];
+ const original={fetch:async()=>new Response('ok'),scheduled:async()=>calls.push('game')};
+ const wrapper=wrapCurrentStarsWebhook(original,{
+  reconcileRefundedStars:async()=>{calls.push('refund');throw Error('failed provider verification');},
+  settlePaidStars:async()=>calls.push('settlement')
+ });
+ await assert.rejects(()=>wrapper.scheduled({},{
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'true',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+  BOT_TOKEN:'offline-only',
+  DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
+ },{}),/stars_refund_reconciliation_scheduler_requires_review/);
+ assert.deepEqual(calls,['game','refund']);
+});
