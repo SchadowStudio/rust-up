@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
 import {extractReviewedCompiledWorker}
  from './stage-current-compiled-worker.mjs';
 
@@ -80,28 +81,70 @@ export function checkHistoryReleaseMetadata({bindings,schedules,versionInfo,
  };
 }
 
-export function inspectDeployedHistorySource(raw){
+export function inspectDeployedHistorySource(raw,expectedOriginalHash=null){
  if(typeof raw!=='string'||raw.length<100000||raw.length>25000000)
   fail('missing_compiled_source');
- const boundary=raw.split(/\r?\n/,1)[0].trim();
+ const boundary=raw.split(/\\r?\\n/,1)[0].trim();
  if(!/^--[a-zA-Z0-9_=-]{8,200}$/.test(boundary))
   fail('invalid_multipart');
- const parts=raw.split(boundary);
- const scripts=parts.filter(s=>/filename="worker\.js"/.test(s));
- const maps=parts.filter(s=>/filename="worker\.js\.map"/.test(s));
- if(scripts.length!==1||maps.length!==1)
-  fail('missing_or_ambiguous_source_map');
- const script=scripts[0];
- const separator=script.includes('\r\n\r\n')?'\r\n\r\n':'\n\n';
- const at=script.indexOf(separator);
- if(at<0)fail('missing_compiled_script_separator');
- const compiled=script.slice(at+separator.length);
- if(!compiled.includes('/api/stars/variable/history')||
+ const sections=raw.split(boundary).filter(p=>p.includes('Content-Disposition:'));
+ const parts=sections.map(section=>{
+  const separator=section.includes('\\r\\n\\r\\n')?'\\r\\n\\r\\n':'\\n\\n';
+  const at=section.indexOf(separator);
+  if(at<0)fail('multipart_headers_invalid');
+  const header=section.slice(0,at);
+  const filename=/(?:^|\\r?\\n)Content-Disposition:[^\\r\\n]*filename="([^"]+)"/i.exec(header)?.[1];
+  if(!filename)fail('multipart_filename_missing');
+  return {filename,body:section.slice(at+separator.length).trim()};
+ });
+ // Cloudflare's script API can call the main entry "worker.js", while
+ // Wrangler's module upload retains "worker.stars-history-only.bundle.js".
+ // Accept only either complete, exact JS+source-map pair, never mixed names.
+ const expected=[
+  ['worker.js','worker.js.map'],
+  ['worker.stars-history-only.bundle.js',
+   'worker.stars-history-only.bundle.js.map']
+ ];
+ const pair=expected.find(([js,map])=>
+  parts.length===2&&parts.filter(p=>p.filename===js).length===1&&
+  parts.filter(p=>p.filename===map).length===1);
+ if(!pair)fail('missing_or_ambiguous_source_map');
+ const compiled=parts.find(p=>p.filename===pair[0]).body;
+ if(compiled.length<100000||
+    !compiled.includes('/api/stars/variable/history')||
     !compiled.includes('wrapHistoryOnlyWorker')||
     !compiled.includes('refDeposit'))
   fail('history_or_original_named_class_not_in_bundle');
- return {historyAdapterPresent:true,namedClassInBundle:true,sourceMapPresent:true};
+ let map;
+ try{map=JSON.parse(parts.find(p=>p.filename===pair[1]).body);}
+ catch{fail('deployed_source_map_invalid_json');}
+ const required=[
+  'worker.live-compiled-original.mjs',
+  'telegram-initdata.mjs',
+  'deposit-history-readonly.mjs',
+  'stars-history-only-wrapper.mjs',
+  'worker.history-only-compiled-entry.mjs'
+ ];
+ if(map?.version!==3||!Array.isArray(map.sources)||
+    !Array.isArray(map.sourcesContent)||
+    map.sources.length!==required.length||
+    map.sourcesContent.length!==required.length||
+    required.some(name=>map.sources.filter(src=>
+      typeof src==='string'&&src.split('/').pop()===name).length!==1))
+  fail('deployed_source_map_not_history_only');
+ if(expectedOriginalHash!==null){
+  if(!/^[a-f0-9]{64}$/.test(expectedOriginalHash))
+   fail('original_hash_invalid');
+  const idx=map.sources.findIndex(src=>src.split('/').pop()===required[0]);
+  const originalSource=map.sourcesContent[idx];
+  if(typeof originalSource!=='string'||
+     createHash('sha256').update(originalSource).digest('hex')!==expectedOriginalHash)
+   fail('original_compiled_bot_not_byte_identical');
+ }
+ return {historyAdapterPresent:true,namedClassInBundle:true,
+  sourceMapPresent:true,originalCodeHashVerified:expectedOriginalHash!==null};
 }
+
 async function get(token,suffix,raw=false,fetchImpl=fetch){
  const r=await fetchImpl(API+suffix,{
   method:'GET',headers:{authorization:'Bearer '+token},
@@ -140,7 +183,7 @@ export async function verifyHistoryOnlyWorkerRelease(token,directory,phase,
   if(original.hash!==manifest.sourceHash)
    fail('original_code_changed_since_stage');
  }else{
-  Object.assign(metadata,inspectDeployedHistorySource(raw));
+  Object.assign(metadata,inspectDeployedHistorySource(raw,manifest.sourceHash));
  }
  // Only sanitized booleans and version IDs may be printed to stdout.
  return metadata;
