@@ -85,3 +85,48 @@ export async function reconcileVerifiedStarsGameRefund(env,orderId,fetchImpl=fet
   throw Error('stars_refund_spent_credit_or_db_failure_manual_review');
  }
 }
+
+
+// Reconcile previously refunded orders in bounded batches. The caller must
+// explicitly enable this separately from invoice and settlement controls.
+// Successful provider refunds are NEVER issued here. Every individual refund
+// is independently verified before the atomic game-ledger reversal.
+export async function reconcileRecordedStarsRefundBatch(env,{
+ maxBatch=10,fetchImpl=fetch,reconcile=reconcileVerifiedStarsGameRefund
+}={}){
+ if(env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED!=='true'||
+    env?.PAYMENT_WALLET_STRICT_MODE!=='true'||
+    env?.PAYMENT_PRODUCTION_ENABLED!=='true')
+  return {enabled:false,selected:0,reversed:0,alreadyReversed:0,
+   noGameCredit:0,manualReview:0};
+ if(!env?.DB?.prepare||!env?.PAYMENTS_DB?.prepare||
+    !Number.isSafeInteger(maxBatch)||maxBatch<1||maxBatch>25||
+    typeof reconcile!=='function')
+  throw Error('stars_refund_batch_unconfigured');
+ // Only payments with a documented provider refund are eligible. Never infer
+ // a refund merely because an invoice was cancelled or a user requested one.
+ const rows=await env.PAYMENTS_DB.prepare(
+  'SELECT id FROM rustup_stars_variable_orders '+
+  "WHERE status='refunded' ORDER BY paid_at_ms ASC,id ASC LIMIT ?"
+ ).bind(maxBatch).all();
+ if(!Array.isArray(rows?.results))
+  throw Error('stars_refund_batch_database_unavailable');
+ const summary={enabled:true,selected:rows.results.length,reversed:0,
+  alreadyReversed:0,noGameCredit:0,manualReview:0};
+ for(const row of rows.results){
+  try{
+   const result=await reconcile(env,row.id,fetchImpl);
+   if(result?.gameCreditReversed===true){
+    if(result.replayed===true)summary.alreadyReversed++;
+    else summary.reversed++;
+   }else if(result?.refunded===true&&
+      result?.gameCreditHadBeenApplied===false){
+    summary.noGameCredit++;
+   }else summary.manualReview++;
+  }catch{
+   // Never skip uncertainty silently or mutate the game ledger as a fallback.
+   summary.manualReview++;
+  }
+ }
+ return summary;
+}
