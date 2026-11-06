@@ -127,13 +127,14 @@ test('historical 1:1 helper remains explicit, but paid RUB converts to displayed
   {coinCents:457,rubPerUsdMinor:8000});
  const f=setup();
  try{
-  const quoteResult=await freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne);
-  assert.deepEqual(quoteResult,{orderId:ORDER,amountMinor:10000,coinCents:10000});
+  const quoteResult=await freezeVerifiedStarsGameQuote(f.env,quote(),
+   async()=>calculateRubGameCredit({amountMinor:10000,rubPerUsdMinor:8000}));
+  assert.deepEqual(quoteResult,{orderId:ORDER,amountMinor:10000,coinCents:6250});
   const stored=f.pay.prepare(
    'SELECT coin_cents,rub_per_usd_minor FROM rustup_stars_variable_credit_quotes'
   ).get();
-  assert.equal(stored.coin_cents,10000);
-  assert.equal(stored.rub_per_usd_minor,null);
+  assert.equal(stored.coin_cents,6250);
+  assert.equal(stored.rub_per_usd_minor,8000);
  }finally{f.close();}
 });
 
