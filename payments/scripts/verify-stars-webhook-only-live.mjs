@@ -25,7 +25,7 @@ const REQUIRED=['worker.live-compiled-original.mjs',
 const SHA=v=>createHash('sha256').update(v).digest('hex');
 const fail=v=>{throw Error('stars_webhook_release_'+v);};
 
-export function inspectWebhookOnlySource(raw,expectedHashes){
+export function inspectWebhookOnlySource(raw,expectedHashes,originalSha=ORIGINAL_SHA){
  if(typeof raw!=='string'||raw.length<100000||raw.length>25000000||
     typeof expectedHashes!=='object'||!expectedHashes)
   fail('missing_compiled_or_stage_evidence');
@@ -69,7 +69,7 @@ export function inspectWebhookOnlySource(raw,expectedHashes){
  }
  if(REQUIRED.some(name=>!seen.has(name)))
   fail('missing_required_verified_source');
- if(expectedHashes['worker.live-compiled-original.mjs']!==ORIGINAL_SHA)
+ if(expectedHashes['worker.live-compiled-original.mjs']!==originalSha)
   fail('original_bot_sha_changed');
  return {sourceMapVerified:true,originalBotExact:true,
   variableReceiptCapturePresent:true,paidDeliveryConsumerPresent:true,
