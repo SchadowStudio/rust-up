@@ -125,3 +125,14 @@ test('refund upgrade always copies the reviewed parent manifest for release veri
  assert.match(source,/for\(const name of \[\.\.\.ORIGINAL,\.\.\.FILES\]\)/);
  assert.match(source,/fs\.copyFile\(path\.join\(base,name\),path\.join\(target,name\)\)/);
 });
+
+test('deployed Worker verification uses old 15-module snapshot and next build uses 16',async()=>{
+ const {STAGE_SOURCES,DEPLOYED_SOURCES}=await import('./verify-stars-refund-upgrade-stage.mjs');
+ assert.equal(STAGE_SOURCES.length,16);
+ assert.equal(DEPLOYED_SOURCES.length,15);
+ assert.ok(STAGE_SOURCES.includes('stars-payment-support.mjs'));
+ assert.ok(!DEPLOYED_SOURCES.includes('stars-payment-support.mjs'));
+ const verifier=readFileSync(new URL('./verify-stars-refund-upgrade-live.mjs',import.meta.url),'utf8');
+ assert.match(verifier,/deployedBaseline:phase==='deployed'/);
+ assert.match(verifier,/phase==='deployed'\?DEPLOYED_SOURCES:STAGE_SOURCES/);
+});
