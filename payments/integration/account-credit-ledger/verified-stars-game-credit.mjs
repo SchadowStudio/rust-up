@@ -38,7 +38,10 @@ export function validatePaidStarsSettlementOrder(order,quote,orderId){
 
 // Bot API getStarTransactions has stable IDs matching SuccessfulPayment's
 // telegram_payment_charge_id. Never rely solely on a browser-supplied ID.
-// Missing source user/payload is ambiguous: quarantine, do NOT auto-credit.
+// A history invoice_payload is OPTIONAL in Telegram's Bot API. The
+// authenticated successful_payment webhook already durably binds the unique
+// Telegram charge ID to this order; independent history must match charge ID,
+// user, positive amount and invoice type, and must not contradict a payload.
 export async function independentlyVerifyStarsCharge(env,credit,priceStars,
  fetchImpl=fetch){
  if(!env?.BOT_TOKEN||!stars(priceStars))throw Error('stars_verifier_unconfigured');
@@ -55,7 +58,7 @@ export async function independentlyVerifyStarsCharge(env,credit,priceStars,
    if(tx.amount!==priceStars||src?.type!=='user'||
       src.transaction_type!=='invoice_payment'||
       src.user?.id!==credit.telegram_user_id||
-      src.invoice_payload!==match)
+      (src.invoice_payload!=null&&src.invoice_payload!==match))
     throw Error('stars_transaction_amount_owner_or_invoice_mismatch');
    found=true;
   }
