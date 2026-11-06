@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHmac} from 'node:crypto';
-import {variableStarsApi,variableStarsWebhook,pilotStarsUserAllowed,pilotStarsAmountAllowed} from './stars-variable-bridge.mjs';
+import {variableStarsApi,variableStarsWebhook,pilotStarsUserAllowed,pilotStarsAmountAllowed,pilotStarsPhaseAllowed} from './stars-variable-bridge.mjs';
 import {quoteVariableStars} from './variable-stars.mjs';
 
 const bot='123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
@@ -154,4 +154,31 @@ test('pilot payment amount is capped and expires within one day',()=>{
   {...good,STARS_VARIABLE_PILOT_EXPIRES_AT_MS:'never'},
   {}
  ])assert.equal(pilotStarsAmountAllowed(x,1,now),false);
+});
+
+test('pilot phases require one fixed Star first, then permit custom, then reject new purchases on refund',()=>{
+ for(const phase of [undefined,'','refund','enabled','FIXED']){
+  assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:phase},1),false);
+ }
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'fixed'},1),true);
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'fixed'},2),false);
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'custom'},1),true);
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'custom'},8),true);
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'custom'},0),false);
+ assert.equal(pilotStarsPhaseAllowed({STARS_VARIABLE_PILOT_PHASE:'refund'},1),false);
+});
+test('pilot phase cannot unlock unavailable financial infrastructure',async()=>{
+ const base={...env,
+  STARS_VARIABLE_PILOT_USER_IDS:'123456',
+  STARS_VARIABLE_PILOT_MAX_STARS:'10',
+  STARS_VARIABLE_PILOT_EXPIRES_AT_MS:String(Date.now()+60*60*1000),
+  STARS_VARIABLE_PILOT_PHASE:'fixed'
+ };
+ const q=await variableStarsApi(req('quote',{amountMinor:100}),base);
+ assert.equal(q.status,200);
+ assert.equal((await q.json()).checkoutEnabled,false);
+ const denied=await variableStarsApi(req('checkout',{
+  amountMinor:100,requestId:'66c5e3f1-21ca-4331-9cf4-ea46f0f4e3f1'
+ }),base,async()=>{throw Error('must_not_contact_telegram')});
+ assert.equal(denied.status,503);
 });
