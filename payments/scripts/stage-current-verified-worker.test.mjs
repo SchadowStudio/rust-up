@@ -15,6 +15,9 @@ const a12=['money.js','broadcast.js','creator.js','gamedata.js',
 const a13=['money.js','broadcast.js','creator.js','gamedata.js',
  'progress.js','fairlib.js','modes.js','social.js','game.js','brand.js',
  'support.js','admin.js','worker.js'];
+const a13w=['money.js','broadcast.js','gamedata.js','progress.js',
+ 'fairlib.js','modes.js','game.js','social.js','creator.js','brand.js',
+ 'support.js','admin.js','worker.js'];
 const stars=['stars.mjs','telegram-initdata.mjs','payment-controls.mjs',
  'supporter-badge.mjs','stars-terms.mjs','stars-live-bridge.mjs',
  'refunds.mjs','stars-existing-worker-wrapper.mjs',
@@ -51,7 +54,7 @@ function env(){
 }
 const schedule={schedules:[{cron:'* * * * *'}]};
 test('exact 10/12/13/19/21/22-module Worker layouts are supported',()=>{
- for(const original of [a10,a12,a13]){
+ for(const original of [a10,a12,a13,a13w]){
   for(const addon of [[],stars]){
    const names=[...original,...addon];
    const parsed=parseSupportedLiveWorker(multi(names));
@@ -81,6 +84,15 @@ test('exact current live 13-module layout preserves brand and game bot without r
  assert.equal(withStars.layout.activeStars,true);
 });
 
+test('alternate live Wrangler 13-module order is preserved byte-for-byte',()=>{
+ const parsed=parseSupportedLiveWorker(multi(a13w));
+ assert.deepEqual(parsed.layout.original,a13w);
+ assert.equal(parsed.files.get('worker.js'),code('worker.js'));
+ assert.equal(parsed.files.get('game.js'),code('game.js'));
+ const extended=parseSupportedLiveWorker(multi([...a13w,...stars]));
+ assert.equal(extended.layout.original.length,13);
+ assert.equal(extended.layout.activeStars,true);
+});
 test('brand.js can only be accepted in exact observed order and when the Worker imports it',()=>{
  const moved=[...a13];
  moved.splice(moved.indexOf('brand.js'),1);
