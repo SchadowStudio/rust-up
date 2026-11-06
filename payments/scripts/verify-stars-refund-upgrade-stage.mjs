@@ -80,7 +80,8 @@ export async function verifyRefundStage(folder){
   'worker.stars-webhook-only.bundle.js'),'utf8');
  for(const required of ['freezeVerifiedStarsGameQuote',
   'calculateRubCoinOneToOne','runVariableStarsDeliveryQueue',
-  'reconcileRecordedStarsRefundBatch','wrapCurrentStarsWebhook',
+  'reconcileRecordedStarsRefundBatch','handleStarsSupportCommand',
+  'wrapCurrentStarsWebhook',
   'refDeposit']){
   if(!bundle.includes(required))fail('missing_compiled_behavior_'+required);
  }
