@@ -10,7 +10,7 @@ import {STAGE_SOURCES,verifyRefundStage}
  from './verify-stars-refund-upgrade-stage.mjs';
 const API='https://api.cloudflare.com/client/v4/accounts/'+
  'af72e32cb9f1ba99dba07df30fe540fe/workers/scripts/rustup-bot';
-const CURRENT_VERSION='285f2656-d696-4fe4-a078-b90efb987e6d';
+const CURRENT_VERSION='f6b6c0d4-0886-4172-b2a0-12b8725176bf';
 const SHA=x=>createHash('sha256').update(x).digest('hex');
 function stop(x){throw Error('stars_refund_live_'+x);}
 async function cloud(token,route,raw=false){
