@@ -135,13 +135,25 @@ test('wallet top-up readiness does not require unrelated supporter badge module'
  assert.equal(report.gameCreditConnected,false);
 });
 
-test('missing credit/refund settlement flags fail readiness closed',()=>{
+test('missing settlement flags mean runtime OFF, not readiness failure',()=>{
  const live=settings(true);
  live.bindings=live.bindings.filter(x=>!settlementFlags.includes(x.name));
  const report=audit({settings:live});
- assert.equal(report.safeCurrentMode,false);
- assert.ok(report.blockers.includes('settlement_flags_explicitly_off'));
+ assert.equal(report.safeCurrentMode,true);
+ assert.equal(report.settlementFlagConfiguration.explicitlyConfigured,false);
+ assert.deepEqual(report.settlementFlagConfiguration.unset,settlementFlags);
+ assert.ok(!report.blockers.includes('settlement_flags_safely_disabled'));
  assert.equal(report.realPaymentActivationReady,false);
+});
+test('enabled or malformed settlement flags fail closed',()=>{
+ for(const value of ['true','maybe']){
+  const live=settings(true);
+  live.bindings.find(x=>x.name===settlementFlags[0]).text=value;
+  const report=audit({settings:live});
+  assert.equal(report.safeCurrentMode,false);
+  assert.ok(report.blockers.includes('settlement_flags_safely_disabled'));
+  assert.equal(report.realPaymentActivationReady,false);
+ }
 });
 test('missing production triggers and release gate fail audit closed',()=>{
  const noTrigger=audit({gameTriggers:[]});
