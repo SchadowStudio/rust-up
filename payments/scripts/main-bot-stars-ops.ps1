@@ -29,7 +29,42 @@ try {
   if([string]::IsNullOrWhiteSpace($ApprovalReference)){
    $ApprovalReference=Read-Host 'Enter the ACTUAL documented release-review reference'
   }
-  if($ApprovalReference -cnotmatch '^[A-Za-z0-9._:-]{12,160}$'){
+  if($ApprovalReference -eq 'RUSTUP-STARS-REVIEW-001'){
+   throw 'This was only an example identifier. It is not real release evidence.'
+  }
+  if($ApprovalReference -cnotmatch '^[A-Za-z0-9._:-]{12,160}
+   throw 'A real release-review reference of 12-160 safe characters is required'
+  }
+  $consent=Read-Host 'Type START TEST to authorize the controlled REAL Stars pilot'
+  if($consent -cne 'START TEST'){throw 'No activation: operator declined'}
+  $env:RUSTUP_OPERATOR_RELEASE_REFERENCE=$ApprovalReference
+  $env:RUSTUP_OPERATOR_REVIEW_CONFIRMED='true'
+ }
+ if([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)){
+  $raw=@(npx --yes wrangler auth token --json 2>$null)
+  if($LASTEXITCODE -ne 0){throw 'Run npx wrangler login first'}
+  $credential=$raw|Out-String|ConvertFrom-Json
+  if([string]::IsNullOrWhiteSpace([string]$credential.token)){
+   throw 'Wrangler credential unavailable'
+  }
+  $env:CLOUDFLARE_API_TOKEN=[string]$credential.token
+  $ownedCloudflare=$true
+ }
+ node '.\payments\scripts\main-bot-stars-ops.mjs' $Action
+ $code=$LASTEXITCODE
+ if($code -eq 2 -and $Action -eq 'activate'){
+  Write-Host 'Pilot NOT activated. Above are the exact remaining live blockers.' -ForegroundColor Yellow
+  exit 2
+ }
+ if($code -ne 0){throw ('Pilot operator action failed, exit code '+$code)}
+}finally{
+ Remove-Item Env:RUSTUP_OPERATOR_RELEASE_REFERENCE -ErrorAction SilentlyContinue
+ Remove-Item Env:RUSTUP_OPERATOR_REVIEW_CONFIRMED -ErrorAction SilentlyContinue
+ if($ownedCloudflare){Remove-Item Env:CLOUDFLARE_API_TOKEN -ErrorAction SilentlyContinue}
+ $raw=$null
+ $credential=$null
+}
+){
    throw 'A real release-review reference of 12-160 safe characters is required'
   }
   $consent=Read-Host 'Type START TEST to authorize the controlled REAL Stars pilot'
