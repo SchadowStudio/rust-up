@@ -14,7 +14,7 @@ function Run([string]$name,[scriptblock]$command){
  if($LASTEXITCODE -ne 0){throw ($name+' exit '+$LASTEXITCODE)}
 }
 Run 'Run refund, webhook and staging tests' {
- node --test '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
+ node --test '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs' '.\payments\integration\account-credit-ledger\freeze-verified-stars-game-quote.test.mjs' '.\payments\integration\account-credit-ledger\stars-checkout-frozen-quote-e2e.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
 }
 $ownToken=$false
 try{
