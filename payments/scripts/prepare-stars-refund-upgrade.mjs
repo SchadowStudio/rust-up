@@ -13,7 +13,8 @@ const ORIGINAL=['worker.live-compiled-original.mjs','telegram-initdata.mjs',
 const MODULES=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
  'variable-stars.mjs','stars.mjs','payment-controls.mjs',
  'stars-delivery-queue.mjs','verified-stars-game-credit.mjs',
- 'verified-stars-game-refund.mjs'];
+ 'verified-stars-game-refund.mjs',
+ 'freeze-verified-stars-game-quote.mjs'];
 const FILES=['worker.stars-webhook-only-entry.mjs',
  'wrangler.stars-webhook-only.toml'];
 function refuse(reason){throw Error('refund_upgrade_prepare_'+reason);}
@@ -41,7 +42,8 @@ export async function prepareRefundUpgrade(input){
  for(const name of [...ORIGINAL,...FILES])
   await fs.copyFile(path.join(base,name),path.join(target,name));
  for(const name of MODULES){
-  const account=name.startsWith('verified-stars-game-');
+  const account=name.startsWith('verified-stars-game-')||
+   name==='freeze-verified-stars-game-quote.mjs';
   const sourcePath=path.join(ROOT,'payments','integration',
    account?'account-credit-ledger':'telegram-stars',name);
   let contents=flattenVerifiedSettlementImport(name,
