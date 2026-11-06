@@ -65,7 +65,7 @@ test('bad webhook secret, non-variable payment and unrelated messages retain ori
  }}}),f.env,{});
  await f.wrapper.fetch(req({message:{text:'ordinary'}}),f.env,{});
  assert.deepEqual(f.calls,['game','game','game']);
- f.wrapper.scheduled();
+ await f.wrapper.scheduled();
  assert.equal(f.calls.at(-1),'cron');
 });
 test('invalid JSON retains the old bot handling, never forges a payment event',async()=>{
@@ -105,4 +105,35 @@ test('the read-only quote and history routes remain delegated, never replaced by
  const denied=await f.wrapper.fetch(input,f.env,{});
  assert.equal(denied.status,404);
  assert.deepEqual(f.calls,[]);
+});
+
+test('scheduled Worker runs original cron; paid delivery only with all separate gates ON',async()=>{
+ const calls=[];
+ const original={
+  fetch:async()=>new Response('original'),
+  scheduled:async()=>{calls.push('original-cron');}
+ };
+ const wrapped=wrapCurrentStarsWebhook(original,{
+  settlePaidStars:async()=>{calls.push('durable-delivery');}
+ });
+ const off={PAYMENT_PRODUCTION_ENABLED:'false',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'false',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'false',
+  PAYMENT_WALLET_STRICT_MODE:'false'};
+ await wrapped.scheduled({},off,{});
+ assert.deepEqual(calls,['original-cron']);
+ const configured={
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'true',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+  PAYMENT_WALLET_STRICT_MODE:'true',
+  BOT_TOKEN:'offline-string',
+  DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
+ };
+ await wrapped.scheduled({},configured,{});
+ assert.deepEqual(calls,['original-cron','original-cron','durable-delivery']);
+ await assert.rejects(()=>wrapCurrentStarsWebhook(original,{
+  settlePaidStars:async()=>{throw Error('provider offline');}
+ }).scheduled({},configured,{}),/stars_delivery_scheduler_requires_retry/);
+ assert.deepEqual(calls.slice(-1),['original-cron']);
 });
