@@ -129,7 +129,8 @@ async function activate(){
  // This limits total checkout orders rather than relying on a browser counter.
  await sql(PD,`CREATE TABLE IF NOT EXISTS rustup_stars_pilot_guard(
   id INTEGER PRIMARY KEY CHECK(id=1),enabled INTEGER NOT NULL DEFAULT 0,
-  owner_id INTEGER NOT NULL,max_orders INTEGER NOT NULL)`);
+  owner_id INTEGER NOT NULL,max_orders INTEGER NOT NULL,
+  phase TEXT NOT NULL DEFAULT 'fixed' CHECK(phase IN ('fixed','custom')))`);
  await sql(PD,`INSERT OR IGNORE INTO rustup_stars_pilot_guard(id,enabled,owner_id,max_orders)
   VALUES(1,0,7390606911,2)`);
  await sql(PD,`CREATE TRIGGER IF NOT EXISTS rustup_stars_pilot_order_cap
@@ -139,6 +140,11 @@ async function activate(){
    SELECT CASE WHEN NEW.telegram_user_id !=
     (SELECT owner_id FROM rustup_stars_pilot_guard WHERE id=1)
     THEN RAISE(ABORT,'pilot_user_denied') END;
+   SELECT CASE WHEN (SELECT phase FROM rustup_stars_pilot_guard WHERE id=1)='fixed'
+    AND NEW.price_stars<>1 THEN RAISE(ABORT,'pilot_fixed_one_star_required') END;
+   SELECT CASE WHEN (SELECT COUNT(*) FROM rustup_stars_variable_orders)=1
+    AND (SELECT phase FROM rustup_stars_pilot_guard WHERE id=1)<>'custom'
+    THEN RAISE(ABORT,'pilot_second_order_not_open') END;
    SELECT CASE WHEN (SELECT COUNT(*) FROM rustup_stars_variable_orders)>=
     (SELECT max_orders FROM rustup_stars_pilot_guard WHERE id=1)
     THEN RAISE(ABORT,'pilot_order_limit_reached') END;
@@ -146,7 +152,7 @@ async function activate(){
  const installed=await sql(PD,`SELECT name FROM sqlite_master
   WHERE type='trigger' AND name='rustup_stars_pilot_order_cap'`);
  if(installed.length!==1)throw Error('atomic_pilot_order_trigger_unconfirmed');
- await sql(PD,`UPDATE rustup_stars_pilot_guard SET enabled=1,owner_id=7390606911,max_orders=2 WHERE id=1 AND enabled=0`);
+ await sql(PD,`UPDATE rustup_stars_pilot_guard SET enabled=1,owner_id=7390606911,max_orders=2,phase='fixed' WHERE id=1 AND enabled=0`);
 
   for(const [name,text] of [
    ['STARS_VARIABLE_PILOT_USER_IDS','7390606911'],
@@ -173,11 +179,37 @@ async function activate(){
   process.exitCode=1;
  }
 }
+async function customPhase(){
+ const snap=await report();
+ if(snap.checkoutDisabled)throw Error('checkout_is_not_active');
+ const rows=await sql(PD,
+  "SELECT id,status,telegram_user_id,price_stars FROM rustup_stars_variable_orders ORDER BY created_at_ms ASC");
+ if(rows.length!==1||rows[0].telegram_user_id!==7390606911||
+    rows[0].price_stars!==1||rows[0].status!=='paid')
+   throw Error('first_paid_one_star_order_required');
+ const credit=await sql(GD,
+  "SELECT order_id FROM rustup_game_paid_receipts WHERE source='stars_variable' AND order_id='"+rows[0].id+"'");
+ if(credit.length!==1)throw Error('first_payment_game_credit_not_verified');
+ const now=Date.now();
+ const expiry=String(now+15*60*1000);
+ await api(SCRIPT+'/secrets','PUT',
+  {name:'STARS_VARIABLE_PILOT_MAX_STARS',type:'secret_text',text:'10'});
+ await api(SCRIPT+'/secrets','PUT',
+  {name:'STARS_VARIABLE_PILOT_EXPIRES_AT_MS',type:'secret_text',text:expiry});
+ await api(SCRIPT+'/secrets','PUT',
+  {name:'STARS_VARIABLE_PILOT_PHASE',type:'secret_text',text:'custom'});
+ await sql(PD,"UPDATE rustup_stars_pilot_guard SET phase='custom' WHERE id=1 AND enabled=1 AND phase='fixed'");
+ console.log(JSON.stringify({action:'custom',enabled:true,maxStars:10,
+  firstOrderVerifiedPaid:true,firstGameCreditVerified:true,
+  expiresAtMs:expiry,remainingOrderSlots:1},null,2));
+}
+
 async function main(){
  const action=process.argv[2];
  if(action==='status')console.log(JSON.stringify(await report(),null,2));
  else if(action==='stop')await stop();
  else if(action==='activate')await activate();
- else throw Error('Usage: status | stop | activate');
+ else if(action==='custom')await customPhase();
+ else throw Error('Usage: status | stop | activate | custom');
 }
 main().catch(e=>{console.error('RUST UP PAYMENT OPS: '+String(e.message||e));process.exitCode=1;});
