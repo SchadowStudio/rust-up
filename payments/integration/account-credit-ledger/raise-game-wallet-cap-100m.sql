@@ -26,7 +26,7 @@ BEGIN
               ROUND(json_extract(a.state,'$.balance')*100.0))<0.00001
      ELSE 0 END
  );
-END;;
+END;
 DROP TRIGGER IF EXISTS rustup_game_paid_receipts_apply;
 CREATE TRIGGER IF NOT EXISTS rustup_game_paid_receipts_apply
 AFTER INSERT ON rustup_game_paid_receipts
@@ -53,4 +53,4 @@ BEGIN
   ) WHERE id=NEW.telegram_user_id;
   SELECT RAISE(ABORT,'rustup_paid_credit_user_mirror_missing')
    WHERE changes()<>1;
-END;;
+END;
