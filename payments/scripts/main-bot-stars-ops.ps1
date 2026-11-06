@@ -17,7 +17,13 @@ try {
  node --check '.\payments\scripts\main-bot-stars-ops.mjs'
  if($LASTEXITCODE -ne 0){throw 'Safety script failed syntax check'}
  node '.\payments\scripts\main-bot-stars-ops.mjs' $Action
- if($LASTEXITCODE -ne 0){throw 'Payment operation blocked or incomplete; inspect output'}
+ if($LASTEXITCODE -eq 2 -and $Action -eq 'activate'){
+  Write-Host 'Freigabe nicht erfolgt. Die oben aufgefuehrten Voraussetzungen fehlen.' -ForegroundColor Yellow
+  # Preserve a nonzero process status without throwing an unhelpful PowerShell stack trace.
+  $global:LASTEXITCODE=2
+ }elseif($LASTEXITCODE -ne 0){
+  throw ('Payment operation failed (exit '+$LASTEXITCODE+'). Inspect output before retrying.')
+ }
 }finally {
  if($owned){Remove-Item Env:CLOUDFLARE_API_TOKEN -ErrorAction SilentlyContinue}
  $raw=$null;$credential=$null
