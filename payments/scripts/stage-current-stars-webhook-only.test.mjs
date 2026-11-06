@@ -118,3 +118,10 @@ test('staging script has no deploy, no money writes or automatic checkout',()=>{
  assert.match(source,/ORIGINAL_SHA='dc181bc6/);
  assert.match(source,/checkOwnerQuoteSource\(raw,ORIGINAL_SHA\)/);
 });
+
+test('refund upgrade always copies the reviewed parent manifest for release verification',()=>{
+ const source=readFileSync(new URL('./prepare-stars-refund-upgrade.mjs',import.meta.url),'utf8');
+ assert.match(source,/const FILES=\[[\s\S]*?'RUSTUP-STARS-WEBHOOK-ONLY-STAGE\.json'/);
+ assert.match(source,/for\(const name of \[\.\.\.ORIGINAL,\.\.\.FILES\]\)/);
+ assert.match(source,/fs\.copyFile\(path\.join\(base,name\),path\.join\(target,name\)\)/);
+});
