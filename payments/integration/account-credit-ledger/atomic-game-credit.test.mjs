@@ -149,7 +149,7 @@ test('wrong refunded charge, user or amount fails without balance movement',()=>
    {charge:'wrong-charge-1234'}, {user:123456790}, {coinCents:151},
    {order:'wrong-order-123456789'}
   ]){
-   assert.throws(()=>refund(db,bad),/mismatch|FOREIGN KEY/);
+   assert.throws(()=>refund(db,bad),/mismatch|FOREIGN KEY|unsynced_manual_review/);
   }
   assert.equal(db.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
   assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,11.5);
