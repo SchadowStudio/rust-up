@@ -4,11 +4,16 @@
 // even while payment switches are OFF. Game credit is independently gated.
 import {variableStarsWebhook,variableStarsApi} from './stars-variable-bridge.mjs';
 import {isStarsSupportCommand,handleStarsSupportCommand} from './stars-payment-support.mjs';
-import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
+import {freezeVerifiedStarsGameQuote,calculateRubGameCredit} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
+import {readIndependentlyConfirmedRubUsdRate} from '../account-credit-ledger/trusted-rub-usd.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
 import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
 const WEBHOOK='/tg';
+async function trustedRubleEntitlement({amountMinor}){
+ const fx=await readIndependentlyConfirmedRubUsdRate();
+ return calculateRubGameCredit({amountMinor,rubPerUsdMinor:fx.rubPerUsdMinor});
+}
 function hasVariableStarsPayload(update){
  const query=update?.pre_checkout_query;
  const receipt=update?.message?.successful_payment;
@@ -22,7 +27,7 @@ export function wrapCurrentStarsWebhook(original,{
  reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
  handleCheckout=variableStarsApi,
  handlePaymentSupport=handleStarsSupportCommand,
- calculateEntitlement=calculateRubCoinOneToOne,
+ calculateEntitlement=trustedRubleEntitlement,
  freezeQuote=freezeVerifiedStarsGameQuote,
  fetchImpl=fetch
 }={}){
