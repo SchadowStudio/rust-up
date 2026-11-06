@@ -96,6 +96,42 @@ function makeStarsDb(){
   };
 }
 
+test('all other payment gates ON cannot create an invoice without the frozen credit ledger',async()=>{
+ const db=makeStarsDb(),requestId=randomUUID();
+ const blocked={...rate,DB:db,TG_STARS_BOT_TOKEN:token,
+  STARS_PAYMENT_ENABLED:'true',STARS_VARIABLE_TOPUP_ENABLED:'true',
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_VARIABLE_CREDIT_LEDGER_READY:'false'};
+ let telegramCalls=0;
+ const transport=async()=>{telegramCalls++;return {ok:true,json:async()=>({ok:true,result:true})};};
+ await assert.rejects(
+  ()=>createVariableStarsCheckout(blocked,{
+   verifiedTelegramUserId:12345,amountMinor:15000,requestId,
+   now,fetchImpl:transport,freezeQuote:db.freezeQuote
+  }),/variable_stars_checkout_disabled/);
+ assert.equal(telegramCalls,0);
+ assert.equal(db.row,null);
+
+ // A previously persisted pending invoice cannot be authorized if the
+ // credit ledger is disabled after issuance.
+ const ready={...blocked,STARS_VARIABLE_CREDIT_LEDGER_READY:'true'};
+ const issued=await createVariableStarsCheckout(ready,{
+  verifiedTelegramUserId:12345,amountMinor:15000,requestId,
+  now,freezeQuote:db.freezeQuote,
+  fetchImpl:async()=>({ok:true,json:async()=>({
+   ok:true,result:'https://t.me/$offline-invoice'
+  })})
+ });
+ const result=await handleVariableStarsUpdate({
+  pre_checkout_query:{id:'offline-q',from:{id:12345},
+   currency:'XTR',total_amount:50,
+   invoice_payload:'v:'+issued.orderId}
+ },blocked,transport,now);
+ assert.equal(result.ok,false);
+ assert.equal(telegramCalls,1);
+ assert.equal(db.row.status,'pending');
+});
+
 test('variable Stars checkout: one user-chosen sum, stable retries, no credits',async()=>{
   const db=makeStarsDb(),requestId=randomUUID();
   const env={...rate,STARS_PAYMENT_ENABLED:'true',
