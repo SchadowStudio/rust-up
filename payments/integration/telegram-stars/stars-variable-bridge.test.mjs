@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHmac} from 'node:crypto';
-import {variableStarsApi,variableStarsWebhook,pilotStarsUserAllowed} from './stars-variable-bridge.mjs';
+import {variableStarsApi,variableStarsWebhook,pilotStarsUserAllowed,pilotStarsAmountAllowed} from './stars-variable-bridge.mjs';
 import {quoteVariableStars} from './variable-stars.mjs';
 
 const bot='123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
@@ -134,4 +134,24 @@ test('ordinary player cannot see payable quote or reach checkout without pilot a
  }),pay,async()=>{throw Error('unexpected_telegram_invoice');});
  assert.equal(buy.status,503);
  assert.equal((await buy.json()).error,'topup_checkout_disabled');
+});
+
+test('pilot payment amount is capped and expires within one day',()=>{
+ const now=Date.now();
+ const good={
+  STARS_VARIABLE_PILOT_MAX_STARS:'2',
+  STARS_VARIABLE_PILOT_EXPIRES_AT_MS:String(now+30*60*1000)
+ };
+ assert.equal(pilotStarsAmountAllowed(good,1,now),true);
+ assert.equal(pilotStarsAmountAllowed(good,2,now),true);
+ assert.equal(pilotStarsAmountAllowed(good,3,now),false);
+ assert.equal(pilotStarsAmountAllowed(good,2,now+31*60*1000),false);
+ for(const x of [
+  {...good,STARS_VARIABLE_PILOT_MAX_STARS:'0'},
+  {...good,STARS_VARIABLE_PILOT_MAX_STARS:'11'},
+  {...good,STARS_VARIABLE_PILOT_EXPIRES_AT_MS:String(now+25*60*60*1000)},
+  {...good,STARS_VARIABLE_PILOT_EXPIRES_AT_MS:String(now-1)},
+  {...good,STARS_VARIABLE_PILOT_EXPIRES_AT_MS:'never'},
+  {}
+ ])assert.equal(pilotStarsAmountAllowed(x,1,now),false);
 });
