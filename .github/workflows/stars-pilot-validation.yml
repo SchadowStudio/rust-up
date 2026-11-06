@@ -31,5 +31,7 @@ jobs:
         run: node --test payments/integration/account-credit-ledger/canonical-game-balance-sync.test.mjs
       - name: Verify standalone mirror guard and refund-safe canonical writes
         run: node --test payments/integration/account-credit-ledger/guard-game-balance-mirror.test.mjs
+      - name: Verify operator refund idempotency and mirror preflight
+        run: node --test payments/scripts/refund-main-bot-stars.test.mjs
       - name: Verify Stars API, receipts, refunds, and game ledger
         run: node payments/scripts/test-full-stars-offline-e2e.mjs
