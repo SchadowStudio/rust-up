@@ -63,6 +63,7 @@ for(const secret of ['STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
 }
 const tests=[
  'payments/integration/telegram-stars/stars-variable-webhook-sqlite-e2e.test.mjs',
+ 'payments/integration/telegram-stars/complete-synthetic-payment-to-game.test.mjs',
  'payments/integration/telegram-stars/stars-delivery-queue.test.mjs',
  'payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs',
  'payments/integration/account-credit-ledger/verified-stars-game-refund.test.mjs',
