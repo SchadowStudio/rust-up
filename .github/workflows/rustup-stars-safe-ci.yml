@@ -80,6 +80,7 @@ jobs:
           node --check payments/scripts/probe-history-only-worker.mjs
           node --test payments/scripts/probe-history-only-worker.test.mjs
           node --test payments/scripts/release-history-only-worker.test.mjs
+          node --test payments/scripts/verify-deployed-history-only-worker.test.mjs
       - name: Simulate complete Telegram receipt to player and refund with no live money or database
         run: |
           node --test payments/integration/account-credit-ledger/offline-settlement-cycle.test.mjs
