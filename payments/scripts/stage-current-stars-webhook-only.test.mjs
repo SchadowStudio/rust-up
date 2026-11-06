@@ -102,6 +102,10 @@ test('private Worker recovery safely flattens reviewed settlement and refund imp
  const refund=readFileSync(new URL('../integration/account-credit-ledger/verified-stars-game-refund.mjs',import.meta.url),'utf8');
  assert.ok(flattenVerifiedSettlementImport('stars-variable-webhook-wrapper.mjs',wrapper)
   .includes("from './verified-stars-game-refund.mjs'"));
+ assert.ok(flattenVerifiedSettlementImport('stars-variable-webhook-wrapper.mjs',wrapper)
+  .includes("from './trusted-rub-usd.mjs'"));
+ assert.ok(flattenVerifiedSettlementImport('stars-variable-webhook-wrapper.mjs',wrapper)
+  .includes("from './freeze-verified-stars-game-quote.mjs'"));
  assert.ok(flattenVerifiedSettlementImport('verified-stars-game-refund.mjs',refund)
   .includes("from './stars.mjs'"));
  assert.doesNotMatch(stagedQueue,/from '\.\.\/account-credit-ledger\//);
