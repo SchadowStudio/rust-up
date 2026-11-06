@@ -76,6 +76,12 @@ jobs:
           node --test payments/scripts/stage-history-only-compiled-worker.test.mjs
           node --test payments/integration/telegram-stars/stars-history-only-wrapper.test.mjs
           node --test payments/integration/telegram-stars/stars-owner-price-preview.test.mjs
+          node --check payments/scripts/stage-current-stars-owner-quote.mjs
+          node --test payments/scripts/stage-current-stars-owner-quote.test.mjs
+          node --check payments/scripts/verify-owner-stars-quote-live.mjs
+          node --test payments/scripts/verify-owner-stars-quote-live.test.mjs
+          node --check payments/scripts/probe-owner-stars-quote.mjs
+          node --test payments/scripts/probe-owner-stars-quote.test.mjs
           node --check payments/scripts/verify-history-only-worker-release.mjs
           node --test payments/scripts/verify-history-only-worker-release.test.mjs
           node --check payments/scripts/probe-history-only-worker.mjs
