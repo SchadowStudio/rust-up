@@ -116,6 +116,21 @@ export async function inspectLiveWorker(token,fetchImpl=fetch){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  inspectLiveWorker(process.env.CLOUDFLARE_API_TOKEN)
   .then(report=>{
+   if(process.argv[2]==='--source-preflight'){
+    console.log(JSON.stringify({
+     activeVersion:report.activeVersion,
+     sourceMapAvailable:report.sourceMapAvailable,
+     bothDatabasesBound:report.bothDatabasesBound,
+     botSecretsIntact:report.botSecretsIntact,
+     allPaymentFlagsOff:report.allPaymentFlagsOff
+    },null,2));
+    if(!report.sourceMapAvailable){
+     console.error('SAFE RECOVERY BLOCKED: Live Worker source map absent; '+
+      'do not overwrite newer bot code from an older private backup.');
+     process.exitCode=2;
+    }
+    return;
+   }
    console.log(JSON.stringify(report,null,2));
    console.log('READ ONLY: no Worker, payment settings or player balances changed.');
    if(report.blockers.length)process.exitCode=2;
