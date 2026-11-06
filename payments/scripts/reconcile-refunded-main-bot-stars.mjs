@@ -43,16 +43,34 @@ async function telegram(method,payload){
 }
 export function evaluateRefundTransactions(transactions,{chargeId,stars,userId}){
  requireThat(Array.isArray(transactions),'telegram_history_invalid');
+ requireThat(typeof chargeId==='string'&&Number.isSafeInteger(stars)&&stars>0&&
+  Number.isSafeInteger(userId)&&userId>0,'refund_identity_invalid');
  const matches=transactions.filter(tx=>tx?.id===chargeId);
- const refund=matches.filter(tx=>tx.amount===-stars&&
+ // Bot API StarTransaction.amount is the transaction magnitude, not
+ // a signed debit indicator. Incoming payment has source=user;
+ // outgoing refund has receiver=user, with the ORIGINAL charge id.
+ const originals=matches.filter(tx=>tx.amount===stars&&
+  tx.source?.type==='user'&&tx.source.user?.id===userId&&
+  tx.receiver==null);
+ const refunds=matches.filter(tx=>tx.amount===stars&&
   tx.receiver?.type==='user'&&tx.receiver.user?.id===userId&&
   tx.source==null);
- const mismatch=matches.filter(tx=>tx.amount<0&&!refund.includes(tx));
- const original=matches.filter(tx=>tx.amount===stars&&
-  tx.source?.type==='user'&&tx.source.user?.id===userId);
- return {refundVerified:refund.length===1&&mismatch.length===0,
-  conflictingRefundEvidence:mismatch.length>0||refund.length>1,
-  originalChargeVisible:original.length>0};
+ const conflicting=matches.filter(tx=>
+  !originals.includes(tx)&&!refunds.includes(tx));
+ const validPairs=originals.length===1&&refunds.length===1&&
+  conflicting.length===0&&
+  Number.isSafeInteger(originals[0].date)&&
+  Number.isSafeInteger(refunds[0].date)&&
+  refunds[0].date>=originals[0].date;
+ return {refundVerified:validPairs,
+  conflictingRefundEvidence:conflicting.length>0||
+   originals.length>1||refunds.length>1||
+   (originals.length===1&&refunds.length===1&&
+    Number.isSafeInteger(originals[0].date)&&
+    Number.isSafeInteger(refunds[0].date)&&
+    refunds[0].date<originals[0].date),
+  originalChargeVisible:originals.length===1,
+  refundTransactionVisible:refunds.length===1};
 }
 async function independentlyVerifyRefund(order){
  const me=await telegram('getMe',{});
