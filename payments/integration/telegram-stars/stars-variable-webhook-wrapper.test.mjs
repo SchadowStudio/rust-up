@@ -96,14 +96,14 @@ test('non-acknowledged variable event also fails closed with 503',async()=>{
  assert.equal(r.status,503);
  assert.deepEqual(f.calls,[]);
 });
-test('the read-only quote and history routes remain delegated, never replaced by webhook layer',async()=>{
+test('checkout remains unavailable without an audited server pricing function',async()=>{
  const f=fixture();
  const input=new Request(HOST+'/api/stars/variable/checkout',{
   method:'POST',headers:{'content-type':'application/json'},
   body:'{}'
  });
  const denied=await f.wrapper.fetch(input,f.env,{});
- assert.equal(denied.status,404);
+ assert.equal(denied.status,503);
  assert.deepEqual(f.calls,[]);
 });
 
@@ -174,4 +174,47 @@ test('refund reconciliation exception fails closed without settlement or game in
   DB:{prepare(){}},PAYMENTS_DB:{prepare(){}}
  },{}),/stars_refund_reconciliation_scheduler_requires_review/);
  assert.deepEqual(calls,['game','refund']);
+});
+
+test('checkout routing passes only a server-side quote freezer to authenticated API',async()=>{
+ const seen=[];
+ const calc=async()=>({coinCents:150,rubPerUsdMinor:9500});
+ const freeze=async(env,data,price)=>{
+  seen.push('freeze');
+  assert.equal(price,calc);
+  assert.equal(data.verifiedTelegramUserId,123456);
+  return {orderId:data.orderId,amountMinor:data.amountMinor,coinCents:150};
+ };
+ const wrapped=wrapCurrentStarsWebhook({
+  fetch:async()=>{throw Error('must not delegate checkout to original game bot');}
+ },{
+  calculateEntitlement:calc,freezeQuote:freeze,
+  handleCheckout:async(request,env,fetchImpl,freezer)=>{
+   seen.push('api');
+   assert.equal(new URL(request.url).pathname,'/api/stars/variable/checkout');
+   assert.equal(typeof freezer,'function');
+   await freezer({orderId:'123e4567-e89b-42d3-a456-426614174000',
+    verifiedTelegramUserId:123456,amountMinor:10000});
+   return Response.json({ok:true,simulated:true});
+  }
+ });
+ const response=await wrapped.fetch(new Request(HOST+'/api/stars/variable/checkout',{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({amountMinor:10000})
+ }),{},null);
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).simulated,true);
+ assert.deepEqual(seen,['api','freeze']);
+});
+test('checkout never reaches original bot or Telegram when no trusted pricing supplied',async()=>{
+ let hit=0;
+ const wrapped=wrapCurrentStarsWebhook({
+  fetch:async()=>{hit++;return new Response('original');}
+ });
+ const response=await wrapped.fetch(new Request(HOST+'/api/stars/variable/checkout',{
+  method:'POST',body:'{}'
+ }),{},null);
+ assert.equal(response.status,503);
+ assert.equal((await response.json()).error,'checkout_not_configured');
+ assert.equal(hit,0);
 });
