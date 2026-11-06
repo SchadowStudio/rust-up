@@ -3,6 +3,7 @@
 // The variable Stars handler records delayed/duplicate XTR evidence even
 // while ALL payment switches stay OFF. Never credits a game balance.
 import {variableStarsWebhook,variableStarsApi} from './stars-variable-bridge.mjs';
+import {isStarsSupportCommand,handleStarsSupportCommand} from './stars-payment-support.mjs';
 import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
 import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
@@ -20,6 +21,7 @@ export function wrapCurrentStarsWebhook(original,{
  settlePaidStars=runVariableStarsDeliveryQueue,
  reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
  handleCheckout=variableStarsApi,
+ handlePaymentSupport=handleStarsSupportCommand,
  calculateEntitlement=calculateRubCoinOneToOne,
  freezeQuote=freezeVerifiedStarsGameQuote,
  fetchImpl=fetch
@@ -78,6 +80,16 @@ export function wrapCurrentStarsWebhook(original,{
    let update;
    try{update=await request.clone().json();}
    catch{return original.fetch(request,env,ctx);}
+   if(isStarsSupportCommand(update)){
+    try{
+     if(await handlePaymentSupport(update,env,fetchImpl))
+      return new Response('ok',{status:200,headers:{'cache-control':'no-store'}});
+    }catch(e){
+     console.error('RUST UP payment support requires retry',
+      String(e?.message||'error').slice(0,100));
+     return new Response('payment support requires retry',{status:503});
+    }
+   }
    if(!hasVariableStarsPayload(update))
     return original.fetch(request,env,ctx);
 
