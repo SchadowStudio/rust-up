@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {
  checkHistoryReleaseMetadata,inspectDeployedHistorySource
 } from './verify-history-only-worker-release.mjs';
@@ -70,22 +71,62 @@ test('any changed payment flag, DB, secret, app origin, cron or named class abor
   assert.throws(()=>checkHistoryReleaseMetadata(x),/history_only_release_/);
  }
 });
-function multipart({withMap=true,withHistory=true,withClass=true}={}){
+const original='the exact compiled original Worker source fixture';
+const originalHash=createHash('sha256').update(original).digest('hex');
+function multipart({withMap=true,withHistory=true,withClass=true,
+ basename='worker.js',unrelated=false,badMap=false,badOriginal=false,
+ extraPart=false,duplicatePart=false}={}){
  const b='--rustupHistoryReleaseBoundary345';
  const code=('export default {fetch(){}};'+
   (withHistory?'/api/stars/variable/history wrapHistoryOnlyWorker':'')+
   (withClass?' refDeposit':'')+'x'.repeat(140000));
- return b+'\r\nContent-Disposition: form-data; name="worker.js"; filename="worker.js"'+
-  '\r\nContent-Type: application/javascript+module\r\n\r\n'+code+'\r\n'+
-  (withMap?b+'\r\nContent-Disposition: form-data; name="map"; filename="worker.js.map"'+
-   '\r\nContent-Type: application/json\r\n\r\n{"version":3}\r\n':'')+
-  b+'--';
-}
-test('post-deploy compiled source must contain history route, original named class and source map',()=>{
- assert.deepEqual(inspectDeployedHistorySource(multipart()),{
-  historyAdapterPresent:true,namedClassInBundle:true,sourceMapPresent:true
+ const sources=[
+  '../worker.live-compiled-original.mjs',
+  '../telegram-initdata.mjs',
+  '../deposit-history-readonly.mjs',
+  '../stars-history-only-wrapper.mjs',
+  '../worker.history-only-compiled-entry.mjs'
+ ];
+ const map=JSON.stringify({version:3,
+  sources:unrelated?sources.slice(1):sources,
+  sourcesContent:unrelated?
+   ['a','b','c','d']:
+   [badOriginal?original+'-changed':original,'a','b','c','d']
  });
+ const script=b+'\\r\\nContent-Disposition: form-data; name="'+basename+
+  '"; filename="'+basename+'"'+
+  '\\r\\nContent-Type: application/javascript+module\\r\\n\\r\\n'+code+'\\r\\n';
+ const mapPart=b+'\\r\\nContent-Disposition: form-data; name="'+basename+'.map"; filename="'+basename+'.map"'+
+  '\\r\\nContent-Type: application/source-map\\r\\n\\r\\n'+
+  (badMap?'{broken':map)+'\\r\\n';
+ return script+(duplicatePart?script:'')+
+  (withMap?mapPart:'')+(extraPart?b+'\\r\\nContent-Disposition: form-data; name="intruder"; filename="extra.js"\\r\\n\\r\\nhack\\r\\n':'')+b+'--';
+}
+
+test('post-deploy compiled source accepts Cloudflare API and Wrangler module filenames with exact map',()=>{
+ for(const basename of ['worker.js','worker.stars-history-only.bundle.js']){
+  assert.deepEqual(inspectDeployedHistorySource(multipart({basename})),{
+   historyAdapterPresent:true,namedClassInBundle:true,
+   sourceMapPresent:true,originalCodeHashVerified:false
+  });
+  assert.deepEqual(inspectDeployedHistorySource(multipart({basename}),originalHash),{
+   historyAdapterPresent:true,namedClassInBundle:true,
+   sourceMapPresent:true,originalCodeHashVerified:true
+  });
+ }
+});
+test('missing, mismatched, duplicate or extra multipart files are rejected',()=>{
  assert.throws(()=>inspectDeployedHistorySource(multipart({withMap:false})),/source_map/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({basename:'unexpected.js'})),/source_map/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({extraPart:true})),/source_map/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({duplicatePart:true})),/source_map/);
+});
+test('incorrect code, source map, altered original bytes or hash must fail closed',()=>{
  assert.throws(()=>inspectDeployedHistorySource(multipart({withHistory:false})),/not_in_bundle/);
  assert.throws(()=>inspectDeployedHistorySource(multipart({withClass:false})),/not_in_bundle/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({badMap:true})),/invalid_json/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({unrelated:true})),/not_history_only/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart({badOriginal:true}),originalHash),
+  /not_byte_identical/);
+ assert.throws(()=>inspectDeployedHistorySource(multipart(),'invalid-hash'),/hash_invalid/);
 });
