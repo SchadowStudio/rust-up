@@ -71,7 +71,7 @@
   let usdRub = 81;                 // fallback until the Central Bank rate loads
   try { const r = JSON.parse(localStorage.getItem(RATE_KEY)); if (r && r.v > 0) usdRub = r.v; } catch (e) { /* no storage */ }
   const CURRENCIES = {
-    rub: { name: 'Рубли', sym: '₽', perCoin: () => COIN_USD * usdRub, dec: n => (n && Math.abs(n) < 100 ? 2 : 0),
+    rub: { name: 'Рубли', sym: '₽', perCoin: () => COIN_USD * usdRub, dec: () => 2,
       icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2f7cf6"/><circle cx="10" cy="10" r="8.6" fill="#3d8bff"/><path d="M8.2 15V5.2h3a2.55 2.55 0 010 5.1H6.6M6.6 12.7h5" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
     usdt: { name: 'USDT', sym: 'USDT', perCoin: () => COIN_USD, dec: () => 2,
       icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#26a17b"/><path d="M5.6 5.8h8.8M10 5.8v9.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><ellipse cx="10" cy="9.4" rx="4.7" ry="1.5" fill="none" stroke="#fff" stroke-width="1.1"/></svg>' },
