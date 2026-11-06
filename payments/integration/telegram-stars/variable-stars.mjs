@@ -33,7 +33,8 @@ export function quoteVariableStars(amountMinor,env){
 }
 
 async function ensureFrozenSettlementQuote(env,row,freezeQuote,now){
- if(env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')return;
+ if(env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')
+  throw Error('variable_stars_paid_credit_ledger_disabled');
  if(typeof freezeQuote!=='function')
   throw Error('variable_stars_paid_quote_freezer_missing');
  const quote=await freezeQuote({
@@ -52,7 +53,8 @@ export async function createVariableStarsCheckout(env,{
   freezeQuote=null
 }){
   if(env.STARS_PAYMENT_ENABLED!=='true'||
-     env.STARS_VARIABLE_TOPUP_ENABLED!=='true')
+     env.STARS_VARIABLE_TOPUP_ENABLED!=='true'||
+     env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')
     throw Error('variable_stars_checkout_disabled');
   if(!env.DB||!isPositiveSafe(verifiedTelegramUserId)||!UUID.test(requestId||''))
     throw Error('invalid_variable_stars_identity_or_request');
@@ -190,8 +192,10 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
       'SELECT * FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(id).first():null;
     let ok=env.STARS_VARIABLE_TOPUP_ENABLED==='true'&&
-      env.STARS_PAYMENT_ENABLED==='true'&&validVariableStarsPrecheckout(row,q,now);
-    if(ok&&env.STARS_VARIABLE_CREDIT_LEDGER_READY==='true'){
+      env.STARS_PAYMENT_ENABLED==='true'&&
+      env.STARS_VARIABLE_CREDIT_LEDGER_READY==='true'&&
+      validVariableStarsPrecheckout(row,q,now);
+    if(ok){
       try{
         const immutable=await env.DB.prepare(
           'SELECT telegram_user_id,amount_minor,coin_cents,quoted_at_ms '+
