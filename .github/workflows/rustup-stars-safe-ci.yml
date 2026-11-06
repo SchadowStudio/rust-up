@@ -75,6 +75,7 @@ jobs:
           node --check payments/integration/telegram-stars/stars-history-only-wrapper.mjs
           node --test payments/scripts/stage-history-only-compiled-worker.test.mjs
           node --test payments/integration/telegram-stars/stars-history-only-wrapper.test.mjs
+          node --test payments/integration/telegram-stars/stars-owner-price-preview.test.mjs
           node --check payments/scripts/verify-history-only-worker-release.mjs
           node --test payments/scripts/verify-history-only-worker-release.test.mjs
           node --check payments/scripts/probe-history-only-worker.mjs
