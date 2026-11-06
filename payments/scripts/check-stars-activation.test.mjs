@@ -112,3 +112,13 @@ test('read-only live parser supports current webhook-only source map',()=>{
  assert.throws(()=>parseLiveSourceNames(raw.replace('"version":3','"version":2')),
   /invalid_live_worker_source_map_shape/);
 });
+
+test('wallet top-up readiness does not require unrelated supporter badge module',()=>{
+ const report=audit({settings:settings(true)});
+ assert.equal(report.optionalComponents.supporter_badge_worker_module,false);
+ assert.equal(report.optionalComponents.supporter_badge_table,false);
+ assert.ok(!report.blockers.includes('supporter_badge_worker_module'));
+ assert.equal(report.pricePreviewReady,true);
+ assert.equal(report.realPaymentActivationReady,false);
+ assert.equal(report.gameCreditConnected,false);
+});
