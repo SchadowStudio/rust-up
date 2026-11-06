@@ -82,9 +82,9 @@ async function purchase(){
  console.log('Waiting for Telegram verified pre-checkout and successful_payment...');
  await watch(order);
 }
-async function watch(order){
+async function watch(order,{resume=false}={}){
  let offset=Number.isSafeInteger(order.lastUpdateId)?order.lastUpdateId+1:0;
- const deadline=order.expires+120000;
+ const deadline=resume?Date.now()+5*60*1000:order.expires+120000;
  while(Date.now()<deadline){
   const updates=await api('getUpdates',{
    offset,timeout:15,limit:30,allowed_updates:['pre_checkout_query','message']
@@ -158,7 +158,7 @@ async function refund(){
  }
 }
 async function main(){
- assert(['purchase','refund','status'].includes(action||''),'Action: purchase|status|refund');
+ assert(['purchase','listen','refund','status'].includes(action||''),'Action: purchase|listen|status|refund');
  assert(validId,'valid_telegram_user_id_required');
  if(action==='status'){
   const order=await read();
@@ -170,7 +170,14 @@ async function main(){
  }
  validate();
  if(action==='purchase')await purchase();
- else await refund();
+ else if(action==='listen'){
+  const order=await read();
+  assert(order&&['invoice_created','checkout_approved'].includes(order.status),
+   'no_unresolved_invoice_to_listen_for');
+  assert(order.bot===await preflight(),'wrong_dedicated_test_bot');
+  console.log('Resuming invoice listener. No new invoice will be created.');
+  await watch(order,{resume:true});
+ }else await refund();
 }
 main().catch(e=>{
  console.error('ONE-STAR TEST STOPPED:',String(e.message||'unknown').slice(0,110));
