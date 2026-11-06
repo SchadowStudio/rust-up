@@ -76,7 +76,8 @@ try {
   node '.\payments\scripts\stage-current-verified-worker.mjs' --verify "$dir"
  }
  if(!$DeployWithPaymentsOff){
-  Write-Host 'PASS: reviewed current supported-module bot is ready for an optional dark deploy.' -ForegroundColor Green
+  Write-Host 'PASS: reviewed Worker recovered, bundled and checked with a Cloudflare DRY RUN only.' -ForegroundColor Green
+  if($auditExit -ne 0){Write-Warning 'LIVE PUBLISH BLOCKED: worker publisher/finance configuration audit unresolved. The dark build is NOT a deployment approval.'}
   Write-Host 'NOT DEPLOYED. No payment, balance, or Worker was modified.'
   exit 0
  }
