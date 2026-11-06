@@ -75,6 +75,12 @@ export async function freezeVerifiedStarsGameQuote(env,{
       entitlement.coinCents===amountMinor)&&
     !validInt(entitlement?.rubPerUsdMinor,100,100000))
   throw Error('stars_quote_freezer_pricing_unavailable');
+ // The GAME D1 paid-credit trigger enforces a strict 1,000,000 Coin cap.
+ // Refuse the invoice BEFORE Telegram can charge if delivery is impossible.
+ // The trigger independently rechecks this cap at actual settlement time.
+ const resultingCents=Math.round(account.balance*100)+entitlement.coinCents;
+ if(!Number.isSafeInteger(resultingCents)||resultingCents>100000000)
+  throw Error('stars_quote_freezer_game_balance_cap_exceeded');
  const values=[orderId,verifiedTelegramUserId,amountMinor,
   entitlement.coinCents,entitlement.rubPerUsdMinor,now];
  await env.PAYMENTS_DB.prepare(
