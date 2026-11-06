@@ -14,12 +14,14 @@ const TODAY=1793999000000, PAID=TODAY+60000;
 const INVOICE_PRICE=55,AMOUNT_MINOR=10000,CREDIT_CENTS=150;
 const BOT='123456789:'+('a'.repeat(35));
 function api(database){
- return {prepare(sql){const statement=database.prepare(sql);
-  return {bind(...args){return {
+ return {prepare(sql){
+  const statement=database.prepare(sql);
+  const forArgs=args=>({
    async first(){return statement.get(...args)||null;},
    async all(){return {results:statement.all(...args)};},
    async run(){return {meta:{changes:statement.run(...args).changes}};}
-  }}};
+  });
+  return {...forArgs([]),bind(...args){return forArgs(args);}};
  }};
 }
 function makeFixture({paid=true,release=true,settlement=true}={}){
@@ -162,28 +164,29 @@ test('concurrent cron invocations cannot claim one delivery twice',async()=>{
   assert.deepEqual(f.money(),{canonical:11.5,mirror:11.5,v:2});
  }finally{f.close();}
 });
-test('crash after game credit, before job ACK replays proof without a second game credit',async()=>{
+test('crash after game credit but before delivery ACK replays safely without second game credit',async()=>{
  const f=makeFixture();
  try{
-  let crash=true;
-  const wrapped={prepare(sql){
-   if(crash&&sql.includes("SET state='delivered'"))
-    return {bind(){return {async run(){crash=false;throw Error('offline-crash-after-game-credit');}}}};
-   return f.env.PAYMENTS_DB.prepare(sql);
+  const originalDb=f.env.PAYMENTS_DB;
+  let interrupted=true;
+  f.env.PAYMENTS_DB={prepare(sql){
+   if(interrupted&&sql.includes("SET state='delivered'"))
+    return {bind(){return {async run(){
+     interrupted=false;
+     throw Error('simulated_worker_crash_after_credit_before_ack');
+    }}}};
+   return originalDb.prepare(sql);
   }};
-  await assert.rejects(()=>run(f,{now:PAID+1000, // inject a one-time failure only on job ACK
-   deliver:async(env,orderId,fetchImpl)=>{
-    const {deliverVerifiedVariableStarsCredit}=await import(
-     '../account-credit-ledger/verified-stars-game-credit.mjs');
-    return deliverVerifiedVariableStarsCredit({...env,PAYMENTS_DB:wrapped},
-     orderId,fetchImpl);
-   }
-  }),/this_should_not_throw/).catch(()=>{});
-  // This fixture can also be tested by artificially recovering the claimed lease.
+  await assert.rejects(()=>run(f),/simulated_worker_crash_after_credit_before_ack/);
   assert.equal(f.totals().credits,1);
+  assert.equal(f.jobs()[0].state,'leased');
+  assert.deepEqual(f.money(),{canonical:11.5,mirror:11.5,v:2});
+  f.env.PAYMENTS_DB=originalDb;
   const replay=await run(f,{now:PAID+180000});
   assert.equal(replay.delivered,1);
+  assert.equal(f.jobs()[0].state,'delivered');
   assert.equal(f.totals().credits,1);
+  assert.deepEqual(f.money(),{canonical:11.5,mirror:11.5,v:2});
  }finally{f.close();}
 });
 test('bounded retry schedule and invalid args never approve delivery',()=>{
