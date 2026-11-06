@@ -97,14 +97,65 @@ async function read(token,suffix,plain=false){
  if(data?.success!==true)fail('cloudflare_api_failure');
  return data.result;
 }
-async function snapshot(token){
+// After Wrangler secret updates, Cloudflare may return only the Worker JS,
+// without its source map. Recover local sources only when the currently LIVE
+// bundle bytes exactly match the previously postverified private deployment.
+// A mismatch aborts; never reconstruct a Worker from an unverified guess.
+const VERIFIED_PREVIOUS='targeted-6b8b2704-45002eba4f';
+const PREVIOUS_BUNDLE='worker.stars-auth-reason.bundle.js';
+const PREVIOUS_MANIFEST='TARGETED-STARS-AUTH-REASON.json';
+function workerScriptPart(body){
+ const boundary=body.split(/\r?\n/,1)[0];
+ if(!/^--[a-zA-Z0-9_=-]{8,200}$/.test(boundary))
+  fail('bundle_boundary_invalid');
+ const delimiter='\r\n'+boundary;
+ const head=body.indexOf('\r\n\r\n');
+ const end=body.indexOf(delimiter,head+4);
+ if(head<0||end<0)fail('bundle_multipart_invalid');
+ const header=body.slice(0,head);
+ if(!header.includes('Content-Type: application/javascript+module'))
+  fail('bundle_content_type_unexpected');
+ const code=body.slice(head+4,end);
+ if(code.length<100000||!code.includes('wrapCurrentStarsWebhook'))
+  fail('bundle_code_unexpected');
+ return code;
+}
+async function stagedSources(folder,manifestFile){
+ const json=JSON.parse(await fs.readFile(path.join(folder,manifestFile),'utf8'));
+ if(json?.version!==1||json.paymentsEnabled!==false||
+    !json?.targetSourceHashes||Object.keys(json.targetSourceHashes).length!==NAMES.length)
+  fail('local_stage_manifest_invalid');
+ const out=new Map();
+ for(const name of NAMES){
+  const src=await fs.readFile(path.join(folder,name),'utf8');
+  if(sha(src)!==json.targetSourceHashes[name])
+   fail('local_stage_source_tampered_'+name);
+  out.set(name,src);
+ }
+ return out;
+}
+async function recoverLiveSources(raw,postStage=null){
+ if(/filename="[^"]+\.js\.map"/.test(raw))return parseWorker16(raw);
+ const script=workerScriptPart(raw);
+ const stage=postStage||path.join(PRIVATE,VERIFIED_PREVIOUS);
+ const bundle=path.join(stage,postStage?BUNDLE:PREVIOUS_BUNDLE);
+ const manifestFile=postStage?MANIFEST:PREVIOUS_MANIFEST;
+ const expected=await fs.readFile(bundle,'utf8');
+ if(sha(script)!==sha(expected))
+  fail('live_worker_bundle_does_not_match_private_verified_stage');
+ const sources=await stagedSources(stage,manifestFile);
+ if(!sources.get(ENTRY)?.includes('wrapCurrentStarsWebhook(wrapHistoryOnlyWorker(original))'))
+  fail('recovered_entry_unexpected');
+ return sources;
+}
+async function snapshot(token,postStage=null){
  const [raw,settings,schedules,deployment]=await Promise.all([
   read(token,'/content/v2',true),read(token,'/settings'),
   read(token,'/schedules'),read(token,'/deployments')
  ]);
  const version=deployment?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string')fail('deployment_unknown');
- const sources=parseWorker16(raw);
+ const sources=await recoverLiveSources(raw,postStage);
  const safe=Object.fromEntries((settings?.bindings||[]).map(b=>[
   b.name,{type:b.type,text:b.type==='plain_text'?b.text:null,
   database:b.type==='d1'?(b.id||b.database_id):null}
@@ -180,7 +231,7 @@ async function verify(token,dir,post=false){
     data.paymentsEnabled!==false||
     JSON.stringify(data.changedFiles)!==JSON.stringify([TARGET]))
   fail('stage_manifest_invalid');
- const live=await snapshot(token);
+ const live=await snapshot(token,post?folder:null);
  if(!post&&live.version!==VERSION)fail('worker_version_changed_before_release');
  if(live.metadataHash!==data.metadataHash)
   fail('cloudflare_bindings_or_cron_changed');
