@@ -52,7 +52,7 @@ function fixture(){
   'CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL,blocked INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0);');
  game.exec(readFileSync(new URL('./atomic-game-credit.sql',import.meta.url),'utf8'));
  game.prepare('INSERT INTO accounts VALUES(?,?,0,?)').run(user,'{"balance":10,"inventory":[]}',1);
- game.prepare('INSERT INTO users VALUES(?,?)').run(user,10);
+ game.prepare('INSERT INTO users(id,balance) VALUES(?,?)').run(user,10);
  game.prepare('INSERT INTO rustup_game_paid_receipts '+
  '(source,order_id,receipt_id,telegram_user_id,amount_minor,coin_cents,created_at_ms) '+
  'VALUES (?,?,?,?,?,?,?)')
