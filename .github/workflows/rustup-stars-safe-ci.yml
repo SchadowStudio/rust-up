@@ -77,6 +77,8 @@ jobs:
           node --test payments/integration/telegram-stars/stars-variable-webhook-wrapper.test.mjs
           node --check payments/scripts/stage-current-stars-webhook-only.mjs
           node --test payments/scripts/stage-current-stars-webhook-only.test.mjs
+          node --check payments/scripts/stage-current-rustup-dark-release.mjs
+          node --test payments/scripts/stage-current-rustup-dark-release.test.mjs
           node --check payments/scripts/verify-stars-webhook-only-live.mjs
           node --test payments/scripts/verify-stars-webhook-only-live.test.mjs
           node --test payments/scripts/release-current-stars-webhook-only.test.mjs
