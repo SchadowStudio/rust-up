@@ -35,12 +35,17 @@
   const result=Number(major)*100+Number(minor.padEnd(2,'0'));
   return Number.isSafeInteger(result)&&result>=100&&result<=100000000?result:null;
  }
- const orderStatus=Object.freeze({
-  pending:'Ожидает оплаты',
-  checkout_approved:'Ожидает подтверждения',
-  paid:'Оплата подтверждена',
-  refunded:'Возвращено',
-  manual_review:'Проверяется поддержкой'
+ // "paid" is a Telegram receipt, NOT proof of a game balance credit.
+ // Render only server-reconciled creditState; missing evidence is never green.
+ const depositCreditStatus=Object.freeze({
+  awaiting_payment:'Ожидает оплаты',
+  awaiting_telegram_receipt:'Ожидает подтверждения Telegram',
+  payment_confirmed_credit_pending:'Оплата подтверждена · монеты ещё не зачислены',
+  credited_to_game:'Зачислено на игровой счёт',
+  refunded_no_game_credit:'Возврат · игровое зачисление не выполнялось',
+  refund_reversal_pending:'Возврат · списание игровых монет проверяется',
+  refund_reversed:'Возврат · игровые монеты списаны',
+  manual_review:'Требуется проверка поддержки'
  });
  const formatRub=minor=>(minor/100).toLocaleString('ru-RU',{
   minimumFractionDigits:2,maximumFractionDigits:2
@@ -157,11 +162,21 @@
      const minor=Number(order.requested_amount_minor);
      item.append(make('strong','',
       Number.isSafeInteger(minor)&&minor>=0?formatRub(minor)+' ₽':'Заказ'));
-     const status=Object.hasOwn(orderStatus,order.status)
-       ?orderStatus[order.status]:'Статус уточняется';
+     const state=order.creditState;
+     const verifiedState=typeof state==='string' &&
+       Object.hasOwn(depositCreditStatus,state) &&
+       ((state==='credited_to_game' && order.creditedToGame===true) ||
+        (state!=='credited_to_game' && order.creditedToGame!==true));
+     const status=verifiedState?depositCreditStatus[state]:
+       'Статус зачисления не подтверждён — обратитесь в поддержку';
      const stars=Number.isSafeInteger(order.price_stars)&&order.price_stars>=0
        ?order.price_stars:'—';
      item.append(make('p','w-note',String(stars)+' ⭐ · '+status));
+     if(verifiedState&&state==='credited_to_game'&&
+        Number.isSafeInteger(order.creditedCoinCents)&&
+        order.creditedCoinCents>0)
+      item.append(make('p','w-note',
+       'Игровое зачисление: '+(order.creditedCoinCents/100).toFixed(2)+' монет'));
      history.append(item);
     }
    }catch(e){if(panel.isConnected)history.replaceChildren(make('p','w-note',errorLabel(e)));}
