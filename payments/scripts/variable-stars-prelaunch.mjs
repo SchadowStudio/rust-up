@@ -6,6 +6,7 @@ import path from 'node:path';
 import {readFileSync} from 'node:fs';
 const OWNER_RATE=Object.freeze(JSON.parse(readFileSync(
  new URL('../stars-owner-rate.json',import.meta.url),'utf8')));
+const OWNER_RATE_APPROVED=OWNER_RATE.operatorApproved===true;
 const PRICE_VARS=['STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
  'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN'];
 
@@ -75,7 +76,7 @@ export function evaluateVariableStarsPrelaunch(x){
  if(flags.some(v=>!['true','false'].includes(v)))throw Error('unknown_payment_hard_gate');
  const off=flags.every(v=>v==='false');
  // The saved owner rate does not prove that the deployed Worker uses it.
- const livePriceMatchesOwner=PRICE_VARS.every(name=>{
+ const livePriceMatchesOwner=OWNER_RATE_APPROVED&&PRICE_VARS.every(name=>{
   const binding=b.get(name);
   return binding?.type==='plain_text'&&
    binding.text===OWNER_RATE[name];
@@ -123,7 +124,7 @@ export function evaluateVariableStarsPrelaunch(x){
   check('variable_refund_intent_schema',variableRefundSchema),
   check('verified_refund_operator_allowlist',refundAdminReady),
   check('legacy_game_accounts_present',gs),
-  check('live_worker_has_selected_stars_rate',livePriceMatchesOwner),
+  check('operator_approved_rate_matches_live_worker',livePriceMatchesOwner),
   check('all_hard_payment_flags_off',off),
   check('all_database_payment_switches_off',
    SETTINGS.every(k=>controls.get(k)===0)),
@@ -143,8 +144,8 @@ export function evaluateVariableStarsPrelaunch(x){
  ];
  return {
   mode:'READ_ONLY_PRELAUNCH_DIAGNOSTIC',
-  pricing:'SELECTED_BY_OPERATOR',
-  rateRubPerStar:OWNER_RATE.rubPerStarDecimal,
+  pricing:OWNER_RATE_APPROVED?'APPROVED_BY_OPERATOR':'PENDING_OPERATOR_APPROVAL',
+  rateRubPerStar:OWNER_RATE_APPROVED?OWNER_RATE.rubPerStarDecimal:null,
   rateStoredInRepository:true,
   pricingConfigured:livePriceMatchesOwner,
   sourceWorkerVersion:x.workerVersion||null,
