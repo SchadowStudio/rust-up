@@ -14,7 +14,7 @@ function fixture(balance=10,mirror=true){
  db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(123456789,JSON.stringify({
   balance,inventory:['old-item'],history:[{kind:'existing'}]
  }),3,1);
- if(mirror)db.prepare('INSERT INTO users VALUES(?,?)').run(123456789,balance);
+ if(mirror)db.prepare('INSERT INTO users(id,balance) VALUES(?,?)').run(123456789,balance);
  return db;
 }
 function credit(db,{order=orderId,charge='tg-charge-12345678',user=123456789,coinCents=150,amount=1000}={}){
