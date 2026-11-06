@@ -57,7 +57,22 @@ async function main(){
  if(action==='status')console.log(JSON.stringify(await report(),null,2));
  else if(action==='stop')await stop();
  else if(action==='activate'){
-  console.log('BLOCKED: Real-payment activation needs an atomic two-purchase limit and verified refund/reconciliation.');
+  const current=await report();
+  const blockers=[];
+  if(!current.gameReleaseEnabled)blockers.push('game_paid_release_control.enabled=0');
+  for(const item of current.databaseSwitches){
+   if((item.channel==='master'||item.channel==='stars')&&item.enabled!==1)
+    blockers.push('payment_settings.'+item.channel+'.enabled=0');
+  }
+  for(const item of current.workerFlags){
+   if(!item.configured)blockers.push('worker_binding_missing:'+item.name);
+   else if(item.explicitlyOff)blockers.push('worker_binding_disabled:'+item.name);
+  }
+  blockers.push('atomic_two_purchase_limit_not_verified');
+  blockers.push('live_credit_and_refund_reconciliation_not_verified');
+  console.log(JSON.stringify({action:'activate',activated:false,
+   reason:'production_payment_release_not_verified',blockers,
+   next:'Do not turn on payment flags without an atomic purchase limit and verified game credit/refund.'},null,2));
   process.exitCode=2;
  }else throw Error('Usage: status | stop | activate');
 }
