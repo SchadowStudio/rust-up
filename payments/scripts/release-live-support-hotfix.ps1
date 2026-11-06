@@ -1,6 +1,6 @@
-# RUST UP: deploy ONLY reviewed stars-history-only-wrapper.mjs support redirect repair.
-# Rebuilds the existing Worker from its exact live sources (Cloudflare has no
-# single-file hot-swap). All monetary gates remain OFF; no D1 mutations.
+# RUST UP: deploy ONLY the reviewed compiled-live support webhook redirect repair.
+# The stage script patches the exact live bundle. Never re-bundle from missing sources.
+# All monetary gates remain OFF; no D1 mutations.
 param([switch]$Publish)
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -47,11 +47,10 @@ try {
  if(!(Test-Path -LiteralPath $stage -PathType Container)){
   throw 'Private stage folder missing'
  }
- $entry=Join-Path $stage 'worker.stars-webhook-only-entry.mjs'
  $bundle=Join-Path $stage 'worker.support-live-hotfix.mjs'
  $config=Join-Path $stage 'wrangler.support-live-hotfix.toml'
- Run 'Bundle exact preserved Worker plus targeted patch' {
-  npx --yes esbuild "$entry" --bundle --platform=browser --format=esm --target=es2022 --sourcemap=linked "--outfile=$bundle"
+ if(!(Test-Path -LiteralPath $bundle -PathType Leaf)){
+  throw 'Exact staged live Worker bundle missing; no deployment'
  }
  Run 'Check generated Worker JavaScript syntax' {
   node --check "$bundle"
