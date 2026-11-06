@@ -77,7 +77,8 @@ export async function telegramApi(env, method, body, fetchImpl) {
   const response = await fetchImpl('https://api.telegram.org/bot' +
     env.TG_STARS_BOT_TOKEN + '/' + method, {
       method: 'POST', headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body), redirect: 'error'
+      // Telegram API should not redirect; manual prevents a 3xx from forwarding credentials.
+      body: JSON.stringify(body), redirect: 'manual'
     });
   if (!response.ok) throw Error('telegram_gateway_unavailable');
   const result = await response.json();
