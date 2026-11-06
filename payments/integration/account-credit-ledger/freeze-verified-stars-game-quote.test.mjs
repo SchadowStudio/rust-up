@@ -92,7 +92,9 @@ test('invalid pricing refuses to freeze and cannot create an invoice',async()=>{
    await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),
     async()=>bad),/pricing_unavailable/);
   }
-  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote()),
+  // An omitted calculator now intentionally uses the trusted 1 RUB = 1 Coin
+  // default. Explicitly invalid injection must still fail closed.
+  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),null),
    /unconfigured/);
   assert.equal(f.pay.prepare('SELECT COUNT(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
  }finally{f.close();}
