@@ -149,7 +149,7 @@ test('worker settings 403 is an explicit hard error, not an audit-only fallback'
 test('safe Worker preparation checks live source-map presence before source recovery',()=>{
  const source=readFileSync(new URL('./prepare-current-verified-worker.ps1',
   import.meta.url),'utf8');
- assert.match(source,/audit-current-live-worker\\.mjs' --source-preflight/);
+ assert.ok(source.includes("audit-current-live-worker.mjs' --source-preflight"));
  assert.ok(source.indexOf('audit-current-live-worker.mjs')<
   source.indexOf('stage-current-verified-worker.mjs'));
  assert.match(source,/worker publisher\/finance configuration audit unresolved/);
