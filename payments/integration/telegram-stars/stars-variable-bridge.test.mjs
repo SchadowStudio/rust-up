@@ -13,6 +13,7 @@ const env={APP_URL:origin+'/rust-up/',BOT_TOKEN:bot,
  STARS_RUB_MINOR_PER_STAR_NUM:'300',STARS_RUB_MINOR_PER_STAR_DEN:'1',
  STARS_PAYMENT_ENABLED:'false',STARS_VARIABLE_TOPUP_ENABLED:'false',
  PAYMENT_PRODUCTION_ENABLED:'false',
+ DB:{prepare(){throw Error('empty owner history must not query game journals')}},
  PAYMENTS_DB:{prepare(sql){
   assert.match(sql,/rustup_stars_variable_orders/);
   return {bind(id){assert.equal(id,123456);return {async all(){return {results:[]};}}}};
@@ -78,7 +79,7 @@ test('origin preflight and owner-only history have no personally identifying out
  assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
  const history=await variableStarsApi(req('history',{}),env);
  assert.equal(history.status,200);
- assert.deepEqual(await history.json(),{ok:true,orders:[]});
+ assert.deepEqual(await history.json(),{ok:true,orders:[],statusComplete:true});
 });
 test('forged or missing Telegram authentication fails closed',async()=>{
  const response=await variableStarsApi(new Request(endpoint+'quote',{
