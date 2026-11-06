@@ -46,3 +46,15 @@ test('clean wallet keeps arbitrary RUB amount, real invoice gates, and does not 
   'payButton.disabled=data.checkoutEnabled!==true','payButton.disabled=false'),css),
   /required_deposit_safety_marker_missing/);
 });
+
+test('deposit panel separates paid Telegram notice from proof of game credit',()=>{
+ assert.match(js,/payment_confirmed_credit_pending/);
+ assert.match(js,/credited_to_game/);
+ assert.match(js,/refund_reversal_pending/);
+ assert.match(js,/refund_reversed/);
+ assert.match(js,/order\.creditState/);
+ assert.match(js,/order\.creditedToGame===true/);
+ assert.match(js,/if\(!historyButton\.disabled\)historyButton\.click\(\)/);
+ assert.doesNotMatch(js,/balance\s*(?:\+\+|\+=|=\s*balance\s*\+)/);
+ assert.doesNotMatch(js,/innerHTML\s*=/);
+});
