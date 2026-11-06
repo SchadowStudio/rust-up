@@ -1,3 +1,5 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 // Read-only owner pilot refund readiness diagnostic.
 // No payment or game balance writes, no Telegram token required.
 // Reports evidence and controlled blockers for the two completed test orders.
@@ -26,7 +28,9 @@ export function evaluateSnapshot({balance,orders,credits,refunds,intents,channel
   !Number.isFinite(account?.mirror))blockers.push('game_account_unavailable');
  const difference=account?Math.round((account.canonical-account.mirror)*100)/100:null;
  if(account&&Math.abs(difference)>=0.01)blockers.push('game_mirror_must_be_reconciled_before_refund');
- if(orders.length!==2||orders.some(x=>x.status!=='paid'||!x.has_charge))
+ if(orders.length!==2||!orders.some(x=>x.id===first&&x.price_stars===1&&x.requested_amount_minor===183)||
+  !orders.some(x=>x.id===second&&x.price_stars===3&&x.requested_amount_minor===500)||
+  orders.some(x=>x.status!=='paid'||!x.has_charge))
   blockers.push('paid_orders_or_telegram_charges_not_complete');
  if(credits.length!==2||credits.reduce((n,x)=>n+x.coin_cents,0)!==683||
    !credits.some(x=>x.order_id===first&&x.coin_cents===183)||
@@ -72,7 +76,7 @@ export async function readSnapshot(){
  return {balance,orders,credits,refunds,intents,channels,
   triggerNames:triggers.map(x=>x.name)};
 }
-if(import.meta.url===new URL('file://'+process.argv[1]).href){
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const token=process.env.CLOUDFLARE_API_TOKEN;
  if(!token||token.length<20)throw Error('cloudflare_token_required');
  const report=evaluateSnapshot(await readSnapshot());
