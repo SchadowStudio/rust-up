@@ -30,12 +30,26 @@ test('arbitrary RUB minor amount is quoted in whole Stars from owner rate, not f
 function makeStarsDb(){
   let row=null,updates=0;
   const incidents=new Map();
+  const frozenQuotes=new Map();
   return {
     get row(){return row;},get updates(){return updates;},
     get incidents(){return incidents;},
+    freezeQuote:async ({orderId,verifiedTelegramUserId,amountMinor,now:at})=>{
+      const found=frozenQuotes.get(orderId);
+      const snapshot={order_id:orderId,telegram_user_id:verifiedTelegramUserId,
+        amount_minor:amountMinor,coin_cents:789,quoted_at_ms:at};
+      if(found){
+        if(found.telegram_user_id!==verifiedTelegramUserId||
+           found.amount_minor!==amountMinor)
+          throw Error('offline_frozen_quote_conflict');
+      }else frozenQuotes.set(orderId,snapshot);
+      return {orderId,amountMinor,coinCents:789};
+    },
     prepare(sql){
       return {bind(...args){return {
         async first(){
+          if(sql.includes('FROM rustup_stars_variable_credit_quotes'))
+            return frozenQuotes.get(args[0])||null;
           if(sql.includes('FROM rustup_stars_variable_orders')) return row&&
             ((sql.includes('telegram_user_id=?')&&(row.telegram_user_id!==args[0]||
               row.client_request_id!==args[1]))|| 
@@ -85,7 +99,8 @@ function makeStarsDb(){
 test('variable Stars checkout: one user-chosen sum, stable retries, no credits',async()=>{
   const db=makeStarsDb(),requestId=randomUUID();
   const env={...rate,STARS_PAYMENT_ENABLED:'true',
-    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:db};
+    STARS_VARIABLE_TOPUP_ENABLED:'true',STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+    TG_STARS_BOT_TOKEN:token,DB:db};
   let apiCalls=0;
   const telegram=async(url,opts)=>{
     assert.ok(url.endsWith('/createInvoiceLink'));
@@ -98,7 +113,7 @@ test('variable Stars checkout: one user-chosen sum, stable retries, no credits',
     return {ok:true,async json(){return {ok:true,result:'https://t.me/$demo-invoice'}}};
   };
   const opts={verifiedTelegramUserId:12345,amountMinor:15000,requestId,
-    now,fetchImpl:telegram};
+    now,fetchImpl:telegram,freezeQuote:db.freezeQuote};
   const a=await createVariableStarsCheckout(env,opts);
   assert.equal(a.creditedToGame,false);
   assert.equal(a.priceStars,50);
@@ -115,7 +130,8 @@ test('variable Stars checkout: one user-chosen sum, stable retries, no credits',
 test('variable Stars one-use checkout, delayed verified receipt, duplicate safe',async()=>{
   const db=makeStarsDb(),requestId=randomUUID();
   const env={...rate,STARS_PAYMENT_ENABLED:'true',
-    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:db};
+    STARS_VARIABLE_TOPUP_ENABLED:'true',STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+    TG_STARS_BOT_TOKEN:token,DB:db};
   const bot=async(url,opt)=>{
     const m=url.endsWith('/answerPreCheckoutQuery')?'pre':'invoice';
     const body=JSON.parse(opt.body);
@@ -124,7 +140,7 @@ test('variable Stars one-use checkout, delayed verified receipt, duplicate safe'
   };
   const ord=await createVariableStarsCheckout(env,{
     verifiedTelegramUserId:12345,amountMinor:15000,requestId,
-    now,fetchImpl:bot
+    now,fetchImpl:bot,freezeQuote:db.freezeQuote
   });
   const q={id:'q1',from:{id:12345},currency:'XTR',total_amount:50,
     invoice_payload:'v:'+ord.orderId};
@@ -162,11 +178,13 @@ test('variable Stars one-use checkout, delayed verified receipt, duplicate safe'
 test('a second real Stars charge is quarantined instead of endlessly retried or double-credited',async()=>{
   const db=makeStarsDb(),requestId=randomUUID();
   const env={...rate,STARS_PAYMENT_ENABLED:'true',
-    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:db};
+    STARS_VARIABLE_TOPUP_ENABLED:'true',STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+    TG_STARS_BOT_TOKEN:token,DB:db};
   const bot=async(url)=>({ok:true,async json(){return {ok:true,
     result:url.endsWith('/createInvoiceLink')?'https://t.me/$receipt-test':true}}});
   const order=await createVariableStarsCheckout(env,{
-    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot
+    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot,
+    freezeQuote:db.freezeQuote
   });
   const invoice_payload='v:'+order.orderId;
   await handleVariableStarsUpdate({pre_checkout_query:{id:'query-1',from:{id:12345},
@@ -191,11 +209,13 @@ test('a second real Stars charge is quarantined instead of endlessly retried or 
 test('transient database failure cannot be acknowledged as a paid receipt',async()=>{
   const base=makeStarsDb(),requestId=randomUUID();
   const env={...rate,STARS_PAYMENT_ENABLED:'true',
-    STARS_VARIABLE_TOPUP_ENABLED:'true',TG_STARS_BOT_TOKEN:token,DB:base};
+    STARS_VARIABLE_TOPUP_ENABLED:'true',STARS_VARIABLE_CREDIT_LEDGER_READY:'true',
+    TG_STARS_BOT_TOKEN:token,DB:base};
   const bot=async(url)=>({ok:true,async json(){return {ok:true,
     result:url.endsWith('/createInvoiceLink')?'https://t.me/$db-retry':true}}});
   const order=await createVariableStarsCheckout(env,{
-    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot
+    verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot,
+    freezeQuote:db.freezeQuote
   });
   const invoice_payload='v:'+order.orderId;
   await handleVariableStarsUpdate({pre_checkout_query:{id:'query-retry',from:{id:12345},
