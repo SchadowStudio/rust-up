@@ -98,6 +98,10 @@ async function activate(){
    'reconcileRecordedStarsRefundBatch','freezeVerifiedStarsGameQuote']){
   if(!code.includes(marker))blockers.push('worker_missing_'+marker);
  }
+ // The existing variable refund handler explicitly refuses game-credit mode.
+ // No checkout while that handler is not wired to a verified reversal.
+ if(!code.includes('issueVariableStarsRefundWithGameReconciliation'))
+  blockers.push('production_game_credit_aware_refund_endpoint_not_wired');
  const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string')blockers.push('live_version_unknown');
  // A D1 BEFORE INSERT trigger is the atomic pilot order cap. It is installed
