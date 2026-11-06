@@ -145,6 +145,7 @@ test('refund batch handles exact verified results and exceptions without fallbac
   PAYMENT_WALLET_STRICT_MODE:'true',
   DB:{prepare(){}},
   PAYMENTS_DB:{prepare(query){
+   if(query.includes('INSERT OR IGNORE'))return {bind(){return {async run(){return {meta:{changes:1}};}};}};
    assert.match(query,/status='refunded'/);
    return {bind(limit){assert.equal(limit,4);return {
     async all(){return {results:[{id:'a'},{id:'b'},{id:'c'},{id:'d'}]};}
