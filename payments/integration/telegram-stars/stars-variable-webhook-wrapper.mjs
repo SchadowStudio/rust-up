@@ -2,7 +2,8 @@
 // The original game/Telegram bot remains the fallback. No checkout is exposed.
 // The variable Stars handler records delayed/duplicate XTR evidence even
 // while ALL payment switches stay OFF. Never credits a game balance.
-import {variableStarsWebhook} from './stars-variable-bridge.mjs';
+import {variableStarsWebhook,variableStarsApi} from './stars-variable-bridge.mjs';
+import {freezeVerifiedStarsGameQuote} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
 import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
@@ -18,12 +19,16 @@ export function wrapCurrentStarsWebhook(original,{
  receiveVariableStars=variableStarsWebhook,
  settlePaidStars=runVariableStarsDeliveryQueue,
  reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
+ handleCheckout=variableStarsApi,
+ calculateEntitlement=null,
+ freezeQuote=freezeVerifiedStarsGameQuote,
  fetchImpl=fetch
 }={}){
  if(!original||typeof original.fetch!=='function'||
     typeof receiveVariableStars!=='function'||
     typeof settlePaidStars!=='function'||
-    typeof reconcileRefundedStars!=='function')
+    typeof reconcileRefundedStars!=='function'||
+    typeof handleCheckout!=='function'||typeof freezeQuote!=='function')
   throw Error('variable_stars_original_bot_missing');
  return {
   ...original,
@@ -56,6 +61,15 @@ export function wrapCurrentStarsWebhook(original,{
   },
   async fetch(request,env,ctx){
    const url=new URL(request.url);
+   if(url.pathname==='/api/stars/variable/checkout'){
+    // A trusted server-side pricing function must be wired at Worker build
+    // time. Never derive coin price from browser input or environment flags.
+    if(typeof calculateEntitlement!=='function')
+     return Response.json({ok:false,error:'checkout_not_configured'},
+      {status:503,headers:{'cache-control':'no-store'}});
+    return handleCheckout(request,env,fetchImpl,
+     data=>freezeQuote(env,data,calculateEntitlement));
+   }
    if(url.pathname!==WEBHOOK||request.method!=='POST'||
       typeof env?.WEBHOOK_SECRET!=='string'||env.WEBHOOK_SECRET.length<1||
       request.headers.get('X-Telegram-Bot-Api-Secret-Token')!==env.WEBHOOK_SECRET)
