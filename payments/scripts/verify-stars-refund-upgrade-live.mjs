@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {checkWebhookOnlyMetadata,inspectWebhookOnlySource}
  from './verify-stars-webhook-only-live.mjs';
-import {STAGE_SOURCES,verifyRefundStage}
+import {STAGE_SOURCES,DEPLOYED_SOURCES,verifyRefundStage}
  from './verify-stars-refund-upgrade-stage.mjs';
 const API='https://api.cloudflare.com/client/v4/accounts/'+
  'af72e32cb9f1ba99dba07df30fe540fe/workers/scripts/rustup-bot';
@@ -26,7 +26,7 @@ async function cloud(token,route,raw=false){
 export async function verifyRefundUpgradeLive(token,folder,phase='after'){
  if(typeof token!=='string'||token.length<15)stop('cloudflare_auth_missing');
  if(!['before','after','deployed'].includes(phase))stop('invalid_phase');
- const stage=await verifyRefundStage(folder);
+ const stage=await verifyRefundStage(folder,{deployedBaseline:phase==='deployed'});
  const dir=await fs.realpath(path.resolve(folder));
  const manifest=JSON.parse(await fs.readFile(path.join(dir,
   'RUSTUP-STARS-WEBHOOK-ONLY-STAGE.json'),'utf8'));
@@ -57,11 +57,12 @@ export async function verifyRefundUpgradeLive(token,folder,phase='after'){
   return {...metadata,phase,stageBundleSha256:stage.bundleSha256,
    expectedExistingVersion:CURRENT_VERSION,realPaymentsEnabled:false};
  }
+ const sources=phase==='deployed'?DEPLOYED_SOURCES:STAGE_SOURCES;
  const expected={};
- for(const name of STAGE_SOURCES)
+ for(const name of sources)
   expected[name]=SHA(await fs.readFile(path.join(dir,name),'utf8'));
  const source=inspectWebhookOnlySource(raw,expected);
- if(source.sourceModulesVerified!==STAGE_SOURCES.length)
+ if(source.sourceModulesVerified!==sources.length)
   stop('source_count_mismatch');
  return {...metadata,...source,phase,stageBundleSha256:stage.bundleSha256,
   ...(phase==='deployed'?{verifiedExistingVersion:version}:{newWorkerVersion:version}),
