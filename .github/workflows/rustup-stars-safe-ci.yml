@@ -44,6 +44,7 @@ jobs:
       - name: Test current public demo wallet fixed-goods shop safety and publish version guards
         run: |
           node --test payments/scripts/publish-current-demo-stars-fixed-goods.test.mjs
+          node --test payments/scripts/release-current-fixed-goods-site.test.mjs
       - name: Test isolated receipts, read-only audit, and fallback recovery
         run: |
           node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/variable-refunds.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/variable-stars-prelaunch.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs payments/scripts/telegram-stars-test-env.test.mjs
