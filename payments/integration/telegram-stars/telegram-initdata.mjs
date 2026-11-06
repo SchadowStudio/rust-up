@@ -32,7 +32,9 @@ export async function verifiedTelegramInitData(raw,botToken,now=Date.now(),maxAg
   const current=Math.floor(now/1000);
   if(!Number.isSafeInteger(authDate)||authDate>current+60||
     authDate<current-maxAgeSeconds) throw Error('expired_telegram_auth');
-  const check=entries.filter(([key])=>key!=='hash'&&key!=='signature')
+  // Telegram bot-token HMAC includes 'signature' when present. Only 'hash' is excluded.
+  // Excluding 'signature' is valid for THIRD-PARTY Ed25519 verification, not this path.
+  const check=entries.filter(([key])=>key!=='hash')
     .sort(([a],[b])=>a.localeCompare(b))
     .map(([key,value])=>key+'='+value).join('\n');
   const secret=await hmac(text('WebAppData'),botToken);
