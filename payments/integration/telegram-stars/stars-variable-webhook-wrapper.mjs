@@ -57,6 +57,10 @@ export function wrapCurrentStarsWebhook(original,{
     try{
      const observed=await discoverRefundedStars(env,{fetchImpl});
      if(observed?.review>0)console.error('RUST UP Stars refund discovery requires review',observed.review);
+    }catch{
+     failures.push('stars_refund_discovery_scheduler_requires_review');
+    }
+    try{
      const summary=await reconcileRefundedStars(env,{fetchImpl});
      if(summary?.manualReview>0)
       console.error('RUST UP Stars refund reconciliation needs operator review',
