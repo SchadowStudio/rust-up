@@ -245,12 +245,36 @@ async function customPhase(){
   expiresAtMs:expiry,remainingOrderSlots:1},null,2));
 }
 
+async function orders(){
+ const found=await sql(PD,
+  "SELECT id,price_stars,requested_amount_minor,status,created_at_ms,"+
+  "paid_at_ms FROM rustup_stars_variable_orders WHERE telegram_user_id=7390606911 "+
+  "ORDER BY created_at_ms DESC LIMIT 5");
+ const output=[];
+ for(const row of found){
+  if(!/^[0-9a-f-]{36}$/i.test(row.id))continue;
+  const [credits,refunds]=await Promise.all([
+   sql(GD,"SELECT COUNT(*) AS c FROM rustup_game_paid_receipts "+
+    "WHERE source='stars_variable' AND order_id='"+row.id+"'"),
+   sql(GD,"SELECT COUNT(*) AS c FROM rustup_game_paid_refunds "+
+    "WHERE source='stars_variable' AND order_id='"+row.id+"'")
+  ]);
+  output.push({orderId:row.id,stars:row.price_stars,
+   requestedRub:row.requested_amount_minor/100,
+   status:row.status,gameCreditApplied:credits[0]?.c===1,
+   gameCreditReversed:refunds[0]?.c===1,
+   createdAtMs:row.created_at_ms,paidAtMs:row.paid_at_ms});
+ }
+ console.log(JSON.stringify({action:'orders',orders:output},null,2));
+}
+
 async function main(){
  const action=process.argv[2];
  if(action==='status')console.log(JSON.stringify(await report(),null,2));
  else if(action==='stop')await stop();
  else if(action==='activate')await activate();
  else if(action==='custom')await customPhase();
- else throw Error('Usage: status | stop | activate | custom');
+ else if(action==='orders')await orders();
+ else throw Error('Usage: status | stop | activate | custom | orders');
 }
 main().catch(e=>{console.error('RUST UP PAYMENT OPS: '+String(e.message||e));process.exitCode=1;});
