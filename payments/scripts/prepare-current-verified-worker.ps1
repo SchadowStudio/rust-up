@@ -1,4 +1,4 @@
-# RUST UP: current supported 10/12/19/21-module bot safe update, with payments OFF.
+# RUST UP: supported 10/12/13/19/21/22-module bot safe update, payments OFF.
 # Default = private backup + tests + Cloudflare dry-run only.
 # -DeployWithPaymentsOff explicitly uploads the reviewed fixed-goods Worker,
 # NEVER activates Stars, variable top-ups, game credit, or crypto deposits.
@@ -49,6 +49,9 @@ try {
    throw 'Cannot verify deployment ownership: live Worker upload blocked.'
   }
  }
+ Check 'Confirm current live source map is still available for verified recovery'{
+  node '.\\payments\\scripts\\audit-current-live-worker.mjs' --source-preflight
+ }
  Write-Host '[RUST UP] Privately recover exact live supported-module Worker...' -ForegroundColor Cyan
  $global:LASTEXITCODE=0
  $log=@(node '.\payments\scripts\stage-current-verified-worker.mjs' --stage 2>&1)
@@ -63,7 +66,7 @@ try {
  $entry=Join-Path $dir 'worker.stars-commerce-entry.mjs'
  $bundle=Join-Path $dir 'worker.stars-commerce.bundle.js'
  $config=Join-Path $dir 'wrangler.stars-verified.toml'
- Check 'Bundle original 10 game/bot modules + reviewed Stars adapter'{
+ Check 'Bundle exact recovered game/bot modules + reviewed Stars adapter'{
   npx --yes esbuild "$entry" --bundle --platform=browser --format=esm --target=es2022 --sourcemap=linked "--outfile=$bundle"
  }
  Check 'Syntax check'{
