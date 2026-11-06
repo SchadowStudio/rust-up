@@ -145,7 +145,8 @@ test('reject an invoice before any quote write when the game balance would excee
    .run(JSON.stringify({balance:99999999.5}),USER);
   f.game.prepare('UPDATE users SET balance=? WHERE id=?')
    .run(99999999.5,USER);
-  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne),
+  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),
+   async()=>calculateRubGameCredit({amountMinor:10000,rubPerUsdMinor:8000})),
    /game_balance_cap_exceeded/);
   assert.equal(f.pay.prepare('SELECT count(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
   f.game.prepare('UPDATE accounts SET state=? WHERE id=?')
@@ -153,6 +154,6 @@ test('reject an invoice before any quote write when the game balance would excee
   f.game.prepare('UPDATE users SET balance=? WHERE id=?')
    .run(99999900,USER);
   const accepted=await freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne);
-  assert.equal(accepted.coinCents,10000);
+  assert.equal(accepted.coinCents,6250);
  }finally{f.close();}
 });
