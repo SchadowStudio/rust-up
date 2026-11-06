@@ -13,7 +13,8 @@ function fixture(){
   paymentTables:['rustup_stars_variable_orders','rustup_stars_variable_credit_quotes',
    'rustup_stars_variable_refund_intents','rustup_stars_receipt_incidents',
    'rustup_payment_settings'],
-  gameTables:['rustup_game_paid_receipts','rustup_game_paid_refunds'],
+  gameTables:['rustup_game_paid_receipts','rustup_game_paid_refunds',
+   'rustup_game_paid_release_control'],
   orders:[{id:ORDER,telegram_user_id:USER,requested_amount_minor:100000,
    price_stars:535,status:'paid',telegram_charge_id:CHARGE,
    paid_at_ms:1794000000000}],
@@ -23,7 +24,8 @@ function fixture(){
    telegram_user_id:USER,amount_minor:100000,coin_cents:62500}],
   refunds:[],incidents:[{value:0}],refundIntents:[],
   controls:['master','stars','crypto'].map(channel=>({channel,enabled:0})),
-  bindings:flags.map(name=>({name,type:'plain_text',text:'false'}))
+  bindings:flags.map(name=>({name,type:'plain_text',text:'false'})),
+  gameReleaseControl:{enabled:0,approval_reference:null,reviewed_at_ms:null}
  };
 }
 test('matching records show consistency without claiming authorization to charge',()=>{
@@ -75,6 +77,18 @@ test('reversal against an unrefunded order is never accepted as reconciled',()=>
  assert.equal(s.anomalies.reversedWithoutRecordedRefund,1);
  assert.equal(s.allChecksPass,false);
 });
+test('ledger release enabled or missing prevents calling read-only reconciliation safe',()=>{
+ const x=fixture();
+ x.gameReleaseControl.enabled=1;
+ let s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.gameLedgerGateOff,false);
+ assert.ok(s.blockers.includes('game_ledger_release_gate_not_verifiably_off'));
+ x.gameReleaseControl=null;
+ s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.gameLedgerGateOff,false);
+ assert.equal(s.allChecksPass,false);
+});
+
 test('missing game journal schema is not misreported as zero payments',()=>{
  const x=fixture();x.gameTables=[];x.credits=[];x.refunds=[];
  const s=evaluateStarsSettlementSnapshot(x);
