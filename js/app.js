@@ -2564,5 +2564,28 @@
     });
   }
   startGame();
+
+  // Keep the displayed wallet current when Telegram Stars settle or refunds
+  // reverse game credits while this Mini App is already open. Always obtain
+  // the authoritative server state; do not mutate a local wallet cache.
+  let walletRefreshBusy = false;
+  let walletRefreshAt = 0;
+  function refreshAuthoritativeWallet() {
+    if (!gameReady || document.hidden || walletRefreshBusy || releaseVisual ||
+        Date.now() - walletRefreshAt < 12000) return;
+    walletRefreshBusy = true;
+    walletRefreshAt = Date.now();
+    api('load').then(d => {
+      if (!d.ok) return;
+      // api('load') already applies state and renders the header.
+      // Refresh the open wallet panel only if its route is active.
+      if (curPath().startsWith('/wallet')) route();
+    }).finally(() => { walletRefreshBusy = false; });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshAuthoritativeWallet();
+  });
+  window.addEventListener('focus', refreshAuthoritativeWallet);
+  setInterval(refreshAuthoritativeWallet, 30000);
   setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();
