@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {evaluateStarsSettlementSnapshot} from './audit-stars-settlement-readonly.mjs';
+import {evaluateStarsSettlementSnapshot,inspectLiveStarsSettlement} from './audit-stars-settlement-readonly.mjs';
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const CHARGE='secret-charge-private-01';
 const USER=123456789;
@@ -165,4 +165,70 @@ test('unknown schemas, counts or payment states fail closed',()=>{
  x.incidents=[{value:0}];x.orders[0].status='hijacked';
  assert.throws(()=>evaluateStarsSettlementSnapshot(x),/unknown_payment_state/);
  assert.throws(()=>evaluateStarsSettlementSnapshot({}),/incomplete_read_only_evidence/);
+});
+
+
+test('real read-only inspector queries all existing D1 optional quote, credit, refund and lock tables',async()=>{
+ const state=fixture();
+ const queries=[];
+ const gameId='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
+ const paymentsId='06079270-a227-466a-9991-abd4201ec5f6';
+ const mockFetch=async (url,options)=>{
+  const uri=String(url);
+  if(uri.endsWith('/settings')){
+   assert.equal(options.method,'GET');
+   return {ok:true,json:async()=>({success:true,result:{bindings:state.bindings}})};
+  }
+  assert.equal(options.method,'POST');
+  const sql=JSON.parse(options.body).sql;
+  assert.match(sql,/^SELECT /);
+  const isGame=uri.includes(gameId),isPayment=uri.includes(paymentsId);
+  assert.ok(isGame||isPayment);
+  queries.push({isGame,isPayment,sql});
+  let rows;
+  if(sql.includes('FROM sqlite_master')){
+   rows=(isGame?state.gameTables:state.paymentTables).map(name=>({name}));
+  }else if(sql.includes('FROM rustup_stars_variable_orders')){
+   assert.ok(isPayment);rows=state.orders;
+  }else if(sql.includes('FROM rustup_stars_variable_credit_quotes')){
+   assert.ok(isPayment);rows=state.quotes;
+  }else if(sql.includes('FROM rustup_game_paid_receipts')){
+   assert.ok(isGame);rows=state.credits;
+  }else if(sql.includes('FROM rustup_game_paid_refunds')){
+   assert.ok(isGame);rows=state.refunds;
+  }else if(sql.includes('FROM rustup_game_paid_release_control')){
+   assert.ok(isGame);rows=[state.gameReleaseControl];
+  }else if(sql.includes('FROM rustup_stars_receipt_incidents')){
+   assert.ok(isPayment);rows=state.incidents;
+  }else if(sql.includes('FROM rustup_stars_variable_refund_intents')){
+   assert.ok(isPayment);rows=state.refundIntents;
+  }else if(sql.includes('FROM rustup_payment_settings')){
+   assert.ok(isPayment);rows=state.controls;
+  }else throw Error('UNEXPECTED_QUERY '+sql);
+  return {ok:true,json:async()=>({success:true,result:[{results:rows}]})};
+ };
+ const run=()=>inspectLiveStarsSettlement('local-test-token-no-real-credentials',mockFetch);
+ let report=await run();
+ assert.equal(report.allChecksPass,true);
+ assert.equal(report.gameLedgerGateOff,true);
+ assert.equal(report.scanned.orders,1);
+ assert.equal(report.scanned.frozenQuotes,1);
+ assert.equal(report.scanned.credits,1);
+ assert.equal(report.scanned.reversals,0);
+ for(const table of ['rustup_stars_variable_credit_quotes','rustup_game_paid_receipts',
+  'rustup_game_paid_refunds','rustup_game_paid_release_control']){
+  assert.equal(queries.some(q=>q.sql.includes('FROM '+table)),true,
+   'optional table was skipped: '+table);
+ }
+ state.credits=[];
+ report=await run();
+ assert.equal(report.allChecksPass,false);
+ assert.equal(report.anomalies.paidNotCredited,1);
+ assert.ok(report.blockers.includes('payment_ledger_or_refund_requires_review'));
+ state.credits=fixture().credits;
+ state.gameReleaseControl.enabled=1;
+ report=await run();
+ assert.equal(report.gameLedgerGateOff,false);
+ assert.ok(report.blockers.includes('game_ledger_release_gate_not_verifiably_off'));
+ assert.equal(JSON.stringify(report).includes('secret-charge-private-01'),false);
 });
