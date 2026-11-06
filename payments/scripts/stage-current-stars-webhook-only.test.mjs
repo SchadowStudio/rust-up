@@ -30,6 +30,8 @@ const base=[
  'STARS_MAX_RUB_MINOR = "100000000"',
  'STARS_RUB_MINOR_PER_STAR_NUM = "183000"',
  'STARS_RUB_MINOR_PER_STAR_DEN = "1000"',
+ '[secrets]',
+ 'required = ["BOT_TOKEN", "WEBHOOK_SECRET", "ADMIN_BOT_TOKEN", "CLIPS_BOT_TOKEN"]',
  '[[d1_databases]]',
  'binding = "DB"',
  '[[d1_databases]]',
