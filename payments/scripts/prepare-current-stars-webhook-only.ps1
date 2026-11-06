@@ -19,7 +19,7 @@ try {
   git pull --ff-only origin feature/rustup-payment-admin-controls
  }
  Run 'Verify original bot + receipt handling with in-memory SQLite, no charges'{
-  node --test '.\payments\integration\telegram-stars\stars-variable-webhook-routing.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-sqlite-e2e.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs'
+  node --test '.\payments\integration\telegram-stars\stars-variable-webhook-routing.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-sqlite-e2e.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\scripts\stage-current-stars-webhook-only.test.mjs' '.\payments\scripts\stage-current-stars-cloudflare-retry.test.mjs'
  }
  if([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)){
   $authOutput=@(npx --yes wrangler auth token --json 2>$null)
