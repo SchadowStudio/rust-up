@@ -35,10 +35,12 @@ function multipart({tamper=null,missing=null,badMap=false}={}){
 }
 test('deployed bundle/map must exactly match verified staged code, even if Worker imports 13 modules',()=>{
  const expected=Object.fromEntries(required.map(name=>[name,sha(source[name])]));
- // Synthetic fixture uses a different original hash: fail closed, not a false success.
- assert.throws(()=>inspectWebhookOnlySource(multipart(),expected),/original_bot_sha_changed/);
- const real=Object.fromEntries(required.map(name=>[name,sha(source[name])]));
- real['worker.live-compiled-original.mjs']='dc181bc6f29e8256342fa216d80c73ff9850d1443c055a9002469f8685e193dc';
+ const ok=inspectWebhookOnlySource(multipart(),expected,originalSha);
+ assert.equal(ok.sourceMapVerified,true);
+ assert.equal(ok.originalBotExact,true);
+ assert.equal(ok.paidDeliveryConsumerPresent,true);
+ const real={...expected,
+  'worker.live-compiled-original.mjs':'dc181bc6f29e8256342fa216d80c73ff9850d1443c055a9002469f8685e193dc'};
  assert.throws(()=>inspectWebhookOnlySource(multipart(),real),/untrusted_or_altered/);
 });
 test('missing module, tampered module and malformed map fail before claiming rollout success',()=>{
@@ -83,9 +85,6 @@ test('verified release retains 1.83 RUB, both D1, named class and all money OFF'
  assert.equal(report.starsRateRubPerStar,'1.83');
  assert.equal(report.allPaymentGatesOff,true);
  assert.equal(report.gameCreditSettlementEnabled,false);
- const altered=metadata();
- altered.settings.bindings.find(x=>x.name==='STARS_GAME_CREDIT_SETTLEMENT_ENABLED')
- ?.text;
 });
 test('any unexpected real-money release switch or changed rate is rejected',()=>{
  for(const type of ['paid','credit','rate']){
