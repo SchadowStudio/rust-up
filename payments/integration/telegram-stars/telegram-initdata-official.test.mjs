@@ -12,9 +12,27 @@ test('validates the official Telegram HMAC Mini App example',async()=>{
  const result=await verifiedTelegramInitData(raw,token,now,600);
  assert.deepEqual(result,{userId:279058397,authDate:1662771648});
 });
-test('accepts a valid Telegram third-party signature attribute without including it in HMAC',async()=>{
- assert.deepEqual(await verifiedTelegramInitData(raw+'&signature=irrelevant_for_bot_token_hmac',token,now,600),
+test('validates Telegram bot-token HMAC including its optional signature attribute',async()=>{
+ // A third-party Ed25519 signature is an ordinary signed parameter in bot-token HMAC.
+ const params=new URLSearchParams(raw);
+ params.set('signature','example-ed25519-signature');
+ params.delete('hash');
+ const check=[...params.entries()].sort(([a],[b])=>a.localeCompare(b))
+  .map(([key,value])=>key+'='+value).join('\\n');
+ const secret=createHmac('sha256','WebAppData').update(token).digest();
+ const hash=createHmac('sha256',secret).update(check).digest('hex');
+ params.set('hash',hash);
+ assert.deepEqual(await verifiedTelegramInitData(params.toString(),token,now,600),
   {userId:279058397,authDate:1662771648});
+ // Removing or altering 'signature' must invalidate its hash; never silently omit it.
+ params.set('signature','tampered-ed25519-signature');
+ await assert.rejects(()=>verifiedTelegramInitData(params.toString(),token,now,600),
+  /invalid_telegram_auth/);
+});
+test('rejects previously accepted injected signature on an unsigned Telegram vector',async()=>{
+ await assert.rejects(()=>
+  verifiedTelegramInitData(raw+'&signature=irrelevant_for_bot_token_hmac',token,now,600),
+  /invalid_telegram_auth/);
 });
 test('rejects a wrong bot token while keeping the original signed data',async()=>{
  const wrong='123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
