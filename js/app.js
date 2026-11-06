@@ -2118,6 +2118,11 @@
     if (!refAvailable() || !S.user || subsOk() || !casesLeft().length || Date.now() - subsCheckedAt < 10000) return;
     checkSubs().then(() => { if (subsOk()) { sfxWin(); toast('Подписки подтверждены — кейсы открыты!', 'success'); refreshCases(); } }).catch(() => {});
   }
+  // A confirmed game receipt from the Stars wallet triggers an immediate
+  // authenticated state load, not a client-side balance increment.
+  window.addEventListener('rustup:wallet-credit-confirmed', () => {
+    refreshAuthoritativeWallet(true);
+  });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && curPath().startsWith('/case')) { subsCheckedAt = 0; autoCheckSubs(); }
   });
@@ -2570,9 +2575,9 @@
   // the authoritative server state; do not mutate a local wallet cache.
   let walletRefreshBusy = false;
   let walletRefreshAt = 0;
-  function refreshAuthoritativeWallet() {
+  function refreshAuthoritativeWallet(force = false) {
     if (!gameReady || document.hidden || walletRefreshBusy || releaseVisual ||
-        Date.now() - walletRefreshAt < 12000) return;
+        (!force && Date.now() - walletRefreshAt < 12000)) return;
     walletRefreshBusy = true;
     walletRefreshAt = Date.now();
     api('load').then(d => {
