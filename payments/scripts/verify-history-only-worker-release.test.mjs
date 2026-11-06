@@ -93,14 +93,14 @@ function multipart({withMap=true,withHistory=true,withClass=true,
    ['a','b','c','d']:
    [badOriginal?original+'-changed':original,'a','b','c','d']
  });
- const script=b+'\\r\\nContent-Disposition: form-data; name="'+basename+
+ const script=b+'\r\nContent-Disposition: form-data; name="'+basename+
   '"; filename="'+basename+'"'+
-  '\\r\\nContent-Type: application/javascript+module\\r\\n\\r\\n'+code+'\\r\\n';
- const mapPart=b+'\\r\\nContent-Disposition: form-data; name="'+basename+'.map"; filename="'+basename+'.map"'+
-  '\\r\\nContent-Type: application/source-map\\r\\n\\r\\n'+
-  (badMap?'{broken':map)+'\\r\\n';
+  '\r\nContent-Type: application/javascript+module\r\n\r\n'+code+'\r\n';
+ const mapPart=b+'\r\nContent-Disposition: form-data; name="'+basename+'.map"; filename="'+basename+'.map"'+
+  '\r\nContent-Type: application/source-map\r\n\r\n'+
+  (badMap?'{broken':map)+'\r\n';
  return script+(duplicatePart?script:'')+
-  (withMap?mapPart:'')+(extraPart?b+'\\r\\nContent-Disposition: form-data; name="intruder"; filename="extra.js"\\r\\n\\r\\nhack\\r\\n':'')+b+'--';
+  (withMap?mapPart:'')+(extraPart?b+'\r\nContent-Disposition: form-data; name="intruder"; filename="extra.js"\r\n\r\nhack\r\n':'')+b+'--';
 }
 
 test('post-deploy compiled source accepts Cloudflare API and Wrangler module filenames with exact map',()=>{
