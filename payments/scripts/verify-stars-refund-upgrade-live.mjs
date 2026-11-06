@@ -10,7 +10,7 @@ import {STAGE_SOURCES,verifyRefundStage}
  from './verify-stars-refund-upgrade-stage.mjs';
 const API='https://api.cloudflare.com/client/v4/accounts/'+
  'af72e32cb9f1ba99dba07df30fe540fe/workers/scripts/rustup-bot';
-const CURRENT_VERSION='acf7c3bb-9939-465e-ade9-e8e9640e1e99';
+const CURRENT_VERSION='285f2656-d696-4fe4-a078-b90efb987e6d';
 const SHA=x=>createHash('sha256').update(x).digest('hex');
 function stop(x){throw Error('stars_refund_live_'+x);}
 async function cloud(token,route,raw=false){
@@ -25,7 +25,7 @@ async function cloud(token,route,raw=false){
 }
 export async function verifyRefundUpgradeLive(token,folder,phase='after'){
  if(typeof token!=='string'||token.length<15)stop('cloudflare_auth_missing');
- if(!['before','after'].includes(phase))stop('invalid_phase');
+ if(!['before','after','deployed'].includes(phase))stop('invalid_phase');
  const stage=await verifyRefundStage(folder);
  const dir=await fs.realpath(path.resolve(folder));
  const manifest=JSON.parse(await fs.readFile(path.join(dir,
@@ -37,7 +37,7 @@ export async function verifyRefundUpgradeLive(token,folder,phase='after'){
  const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string'||version.length<8)
   stop('live_version_missing');
- if(phase==='before'&&version!==CURRENT_VERSION)
+ if((phase==='before'||phase==='deployed')&&version!==CURRENT_VERSION)
   stop('active_version_changed_before_release');
  if(phase==='after'&&version===CURRENT_VERSION)
   stop('no_new_worker_version');
@@ -54,8 +54,6 @@ export async function verifyRefundUpgradeLive(token,folder,phase='after'){
    stop('unexpected_paid_activation_'+name);
  }
  if(phase==='before'){
-  // The existing verifier is deliberately called separately by the
-  // orchestration script to prove the original old Worker bytes.
   return {...metadata,phase,stageBundleSha256:stage.bundleSha256,
    expectedExistingVersion:CURRENT_VERSION,realPaymentsEnabled:false};
  }
@@ -66,12 +64,13 @@ export async function verifyRefundUpgradeLive(token,folder,phase='after'){
  if(source.sourceModulesVerified!==STAGE_SOURCES.length)
   stop('source_count_mismatch');
  return {...metadata,...source,phase,stageBundleSha256:stage.bundleSha256,
-  newWorkerVersion:version,realPaymentsEnabled:false};
+  ...(phase==='deployed'?{verifiedExistingVersion:version}:{newWorkerVersion:version}),
+  realPaymentsEnabled:false};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [phase,dir]=process.argv.slice(2);
- if(!dir||!['before','after'].includes(phase)||process.argv.length!==4){
-  console.error('Usage: node verify-stars-refund-upgrade-live.mjs before|after <stage>');
+ if(!dir||!['before','after','deployed'].includes(phase)||process.argv.length!==4){
+  console.error('Usage: node verify-stars-refund-upgrade-live.mjs before|deployed|after <stage>');
   process.exitCode=2;
  }else verifyRefundUpgradeLive(process.env.CLOUDFLARE_API_TOKEN,dir,phase)
   .then(x=>console.log('PASS: '+JSON.stringify(x)))
