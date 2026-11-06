@@ -3,6 +3,7 @@
 // The variable Stars handler records delayed/duplicate XTR evidence even
 // while ALL payment switches stay OFF. Never credits a game balance.
 import {variableStarsWebhook} from './stars-variable-bridge.mjs';
+import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
 
 const WEBHOOK='/tg';
 function hasVariableStarsPayload(update){
@@ -14,13 +15,29 @@ function hasVariableStarsPayload(update){
 }
 export function wrapCurrentStarsWebhook(original,{
  receiveVariableStars=variableStarsWebhook,
+ settlePaidStars=runVariableStarsDeliveryQueue,
  fetchImpl=fetch
 }={}){
  if(!original||typeof original.fetch!=='function'||
-    typeof receiveVariableStars!=='function')
+    typeof receiveVariableStars!=='function'||
+    typeof settlePaidStars!=='function')
   throw Error('variable_stars_original_bot_missing');
  return {
   ...original,
+  async scheduled(controller,env,ctx){
+   // Keep the original game's scheduled jobs fully intact.
+   if(typeof original.scheduled==='function')
+    await original.scheduled.call(original,controller,env,ctx);
+   // An already-verified paid order is processed only if all the
+   // settlement/ledger/operator gates are independently enabled.
+   if(!settlementWorkerAllowed(env))return;
+   try{await settlePaidStars(env);}
+   catch{
+    // Cloudflare should report the scheduler error so it is investigated.
+    // The durable queue retains the leased job for a later retry.
+    throw Error('stars_delivery_scheduler_requires_retry');
+   }
+  },
   async fetch(request,env,ctx){
    const url=new URL(request.url);
    if(url.pathname!==WEBHOOK||request.method!=='POST'||
