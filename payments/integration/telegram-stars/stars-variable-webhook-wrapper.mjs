@@ -7,7 +7,7 @@ import {isStarsSupportCommand,handleStarsSupportCommand} from './stars-payment-s
 import {freezeVerifiedStarsGameQuote,calculateRubGameCredit} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
 import {readIndependentlyConfirmedRubUsdRate} from '../account-credit-ledger/trusted-rub-usd.mjs';
 import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-delivery-queue.mjs';
-import {reconcileRecordedStarsRefundBatch} from '../account-credit-ledger/verified-stars-game-refund.mjs';
+import {reconcileRecordedStarsRefundBatch,discoverVerifiedStarsRefunds} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
 const WEBHOOK='/tg';
 async function trustedRubleEntitlement({amountMinor}){
@@ -25,6 +25,7 @@ export function wrapCurrentStarsWebhook(original,{
  receiveVariableStars=variableStarsWebhook,
  settlePaidStars=runVariableStarsDeliveryQueue,
  reconcileRefundedStars=reconcileRecordedStarsRefundBatch,
+ discoverRefundedStars=discoverVerifiedStarsRefunds,
  handleCheckout=variableStarsApi,
  handlePaymentSupport=handleStarsSupportCommand,
  calculateEntitlement=trustedRubleEntitlement,
@@ -54,6 +55,8 @@ export function wrapCurrentStarsWebhook(original,{
       env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED==='true'&&
       env?.PAYMENT_WALLET_STRICT_MODE==='true'){
     try{
+     const observed=await discoverRefundedStars(env,{fetchImpl});
+     if(observed?.review>0)console.error('RUST UP Stars refund discovery requires review',observed.review);
      const summary=await reconcileRefundedStars(env,{fetchImpl});
      if(summary?.manualReview>0)
       console.error('RUST UP Stars refund reconciliation needs operator review',
