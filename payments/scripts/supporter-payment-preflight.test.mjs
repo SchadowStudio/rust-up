@@ -30,6 +30,7 @@ function evidence(){
   controls:['master','stars','crypto'].map(channel=>({channel,enabled:0})),
   incidents:[{value:0},{value:0}],
   termsRouteAuthenticated:true,
+  siteAppJs:'',
   siteHtml:'<script src="https://telegram.org/js/telegram-web-app.js?64"></script>'+
    '<script src="js/stars-variable-wallet-v4.js?v=20261105telegramauth2"></script>'+ 
    '<script src="js/stars-fixed-market-v3.js?v=20261105market3"></script>'
@@ -105,4 +106,40 @@ test('only the exact isolated payment D1 binding and bounded owner terms version
  r=evaluateSupporterReadiness(x);
  assert.equal(r.checks.every(c=>c.ok),true);
  assert.equal(r.paymentActivated,false);
+});
+
+test('current signed server-backed 2026-11-06 Mini App passes fixed-goods frontend check',()=>{
+ const sample=evidence();
+ sample.siteHtml='<div class="demo-strip">Демо-режим · виртуальный баланс</div>'+
+  '<script>document.write(\'<script src="https://telegram.org/js/telegram-web-app.js">\')</script>'+
+  '<script src="js/stars-fixed-market-v3.js?v=20261106fixed1"></script>'+
+  '<script src="js/app.js?v=20261106d"></script>';
+ sample.siteAppJs=[
+  "api('load', { local })",
+  'gameReady = true;',
+  'RUSTUP_STARS_FIXED_MARKET_V3.render(box)',
+  "if ('wpay' in d || 'wsend' in d) { haptic('warning'); return toast(NOT_YET, 'error'); }"
+ ].join('\n');
+ const report=evaluateSupporterReadiness(sample);
+ assert.equal(report.checks.find(x=>x.id==='miniapp_telegram_auth_bootstrap')?.ok,true);
+ assert.equal(report.paymentActivated,false);
+ assert.equal(report.readyToAcceptPayments,false);
+});
+test('unmounted fixed Stars module or disabled demo money gate change blocks current Mini App',()=>{
+ const sample=evidence();
+ sample.siteHtml='<div>Демо-режим · виртуальный баланс</div>'+
+  '<script src="https://telegram.org/js/telegram-web-app.js"></script>'+
+  '<script src="js/stars-fixed-market-v3.js"></script>'+
+  '<script src="js/app.js?v=20261106d"></script>';
+ sample.siteAppJs="api('load', { local });gameReady = true;"+
+  "if ('wpay' in d || 'wsend' in d) { haptic('warning'); return toast(NOT_YET, 'error'); }";
+ let report=evaluateSupporterReadiness(sample);
+ assert.ok(report.blockers.includes('miniapp_telegram_auth_bootstrap'));
+ sample.siteAppJs+='RUSTUP_STARS_FIXED_MARKET_V3.render(box);';
+ assert.equal(evaluateSupporterReadiness(sample).checks.find(x=>
+  x.id==='miniapp_telegram_auth_bootstrap')?.ok,true);
+ sample.siteAppJs=sample.siteAppJs.replace('return toast(NOT_YET, \'error\')',
+  'payActualMoney()');
+ report=evaluateSupporterReadiness(sample);
+ assert.ok(report.blockers.includes('miniapp_telegram_auth_bootstrap'));
 });
