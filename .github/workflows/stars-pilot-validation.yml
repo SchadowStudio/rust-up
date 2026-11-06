@@ -7,6 +7,7 @@ on:
       - 'payments/scripts/main-bot-stars-ops.*'
       - 'payments/scripts/refund-main-bot-stars.*'
       - 'payments/integration/telegram-stars/**'
+      - 'payments/integration/account-credit-ledger/canonical-game-balance-sync*'
       - '.github/workflows/stars-pilot-validation.yml'
   workflow_dispatch:
 jobs:
@@ -26,5 +27,7 @@ jobs:
           node --check payments/scripts/refund-main-bot-stars.mjs
       - name: Verify exact atomic pilot guard
         run: node --test payments/scripts/main-bot-stars-ops.test.mjs
+      - name: Verify canonical game mirror sync and rollback
+        run: node --test payments/integration/account-credit-ledger/canonical-game-balance-sync.test.mjs
       - name: Verify Stars API, receipts, refunds, and game ledger
         run: node payments/scripts/test-full-stars-offline-e2e.mjs
