@@ -112,3 +112,18 @@ test('refund reconciliation remains hard-disabled without explicit finance confi
   /reconciliation_disabled/
  );
 });
+
+test('refund refuses mismatched original credit amount without modifying balance',async()=>{
+ const f=fixture();
+ try{
+  f.game.prepare('UPDATE rustup_game_paid_receipts SET amount_minor=? WHERE order_id=?')
+   .run(99999,id);
+  const before=JSON.parse(f.game.prepare('SELECT state FROM accounts').get().state).balance;
+  await assert.rejects(
+   ()=>reconcileVerifiedStarsGameRefund(f.env,id,bot()),
+   /stars_game_refund_original_credit_conflict/
+  );
+  assert.equal(JSON.parse(f.game.prepare('SELECT state FROM accounts').get().state).balance,before);
+  assert.equal(f.game.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,0);
+ }finally{f.game.close();f.pay.close();}
+});
