@@ -34,6 +34,15 @@ try {
   $ownsToken=$true
   $data=$null;$auth=$null
  }
+ Write-Host '[RUST UP] Checking for competing Wrangler publishers...' -ForegroundColor Cyan
+ $global:LASTEXITCODE=0
+ node '.\payments\scripts\audit-worker-publishers.mjs'
+ $auditExit=$LASTEXITCODE
+ if($auditExit -eq 2){
+  Write-Warning 'Another Wrangler publisher or a missing Stars D1 binding was detected. Coordinate deployments: otherwise this upload may be overwritten.'
+ }elseif($auditExit -ne 0){
+  Write-Warning 'Cloudflare actor audit unavailable. Source-map and settings drift checks remain mandatory.'
+ }
  Write-Host '[RUST UP] Privately recover exact live supported-module Worker...' -ForegroundColor Cyan
  $global:LASTEXITCODE=0
  $log=@(node '.\payments\scripts\stage-current-verified-worker.mjs' --stage 2>&1)
