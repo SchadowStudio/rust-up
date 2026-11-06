@@ -39,9 +39,15 @@ try {
  node '.\payments\scripts\audit-worker-publishers.mjs'
  $auditExit=$LASTEXITCODE
  if($auditExit -eq 2){
-  Write-Warning 'Another Wrangler publisher or a missing Stars D1 binding was detected. Coordinate deployments: otherwise this upload may be overwritten.'
+  Write-Warning 'Another Wrangler publisher or a missing Stars D1 binding was detected.'
+  if($DeployWithPaymentsOff){
+   throw 'Competing Cloudflare deployments or missing finance configuration: no Worker upload until publishers are coordinated.'
+  }
  }elseif($auditExit -ne 0){
   Write-Warning 'Cloudflare actor audit unavailable. Source-map and settings drift checks remain mandatory.'
+  if($DeployWithPaymentsOff){
+   throw 'Cannot verify deployment ownership: live Worker upload blocked.'
+  }
  }
  Write-Host '[RUST UP] Privately recover exact live supported-module Worker...' -ForegroundColor Cyan
  $global:LASTEXITCODE=0
