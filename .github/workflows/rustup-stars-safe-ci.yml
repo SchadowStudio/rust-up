@@ -63,6 +63,10 @@ jobs:
       - name: Verify Cloudflare Worker publisher conflict audit without exposing identities
         run: |
           node --test payments/scripts/audit-worker-publishers.test.mjs
+      - name: Check live Worker source map and adapter presence without altering production
+        run: |
+          node --check payments/scripts/audit-current-live-worker.mjs
+          node --test payments/scripts/audit-current-live-worker.test.mjs
       - name: Verify read-only cross-D1 payment and game ledger reconciliation
         run: |
           node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
