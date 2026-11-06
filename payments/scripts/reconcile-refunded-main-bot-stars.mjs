@@ -128,7 +128,7 @@ async function snapshot(orderId){
  requireThat(players.results.length===1&&Number.isFinite(b.canonical)&&
   Number.isFinite(b.mirror)&&Math.abs(b.canonical-b.mirror)<0.000001,
   'game_account_unsynced');
- requireThat(b.canonical>=c.coin_cents/100,
+ if(!r)requireThat(b.canonical>=c.coin_cents/100,
   'refunded_game_coins_no_longer_available');
  requireThat(reversals.results.length<=1,'reversal_conflict');
  if(r)requireThat(r.receipt_id===c.receipt_id&&
@@ -161,13 +161,27 @@ export async function reconcile(orderId,{apply=false}={}){
   "AND NOT EXISTS(SELECT 1 FROM rustup_game_paid_refunds x "+
   "WHERE x.source=r.source AND x.order_id=r.order_id)";
  const result=await d1(GAME,sql,[Date.now(),orderId]);
- requireThat(result.meta?.changes===1,'game_reversal_not_applied_manual_review');
+ // D1/SQLite changes metadata is not authoritative when AFTER INSERT triggers
+ // update additional tables. Verify the durable receipt and both account
+ // balances instead, including a possible concurrent idempotent insert.
  const verified=await d1(GAME,
-  "SELECT receipt_id,coin_cents FROM rustup_game_paid_refunds WHERE source='stars_variable' AND order_id=?",[orderId]);
+  "SELECT receipt_id,coin_cents,telegram_user_id FROM rustup_game_paid_refunds WHERE source='stars_variable' AND order_id=?",[orderId]);
  requireThat(verified.results.length===1&&
   verified.results[0].receipt_id===state.receipt.receipt_id&&
+  verified.results[0].telegram_user_id===OWNER&&
   verified.results[0].coin_cents===state.receipt.coin_cents,
   'game_reversal_postcondition_failed_manual_review');
+ const after=await d1(GAME,
+  "SELECT a.v AS version,json_extract(a.state,'$.balance') canonical,u.balance mirror FROM accounts a JOIN users u ON a.id=u.id WHERE a.id=?",[OWNER]);
+ requireThat(after.results.length===1&&
+  Math.abs(after.results[0].canonical-after.results[0].mirror)<0.000001,
+  'game_reversal_account_postcondition_failed_manual_review');
+ // Only call the operation successful when this exact reversal is durable.
+ // A failed metadata check must never lead to a second provider refund.
+ const ledgerApplied=result.meta?.changes===1||
+  after.results[0].version>=state.balance.version+1;
+ requireThat(ledgerApplied,
+  'game_reversal_version_not_confirmed_manual_review');
  return {orderId,refundedByTelegram:true,telegramHistoryConfirmed:true,
   gameCreditReversal:'verified',coinsReversed:state.receipt.coin_cents/100,
   providerRefundCalls:0};
