@@ -49,7 +49,7 @@ function wrapper(sqlite){
 function fixture(){
  const game=new DatabaseSync(':memory:'),pay=new DatabaseSync(':memory:');
  game.exec('PRAGMA foreign_keys=ON;CREATE TABLE accounts(id INTEGER PRIMARY KEY,state TEXT NOT NULL,v INTEGER NOT NULL,updated INTEGER NOT NULL);'+
-  'CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL);');
+  'CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL,blocked INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0);');
  game.exec(readFileSync(new URL('./atomic-game-credit.sql',import.meta.url),'utf8'));
  game.prepare('INSERT INTO accounts VALUES(?,?,0,?)').run(user,'{"balance":10,"inventory":[]}',1);
  game.prepare('INSERT INTO users VALUES(?,?)').run(user,10);
