@@ -91,6 +91,8 @@
 
   panel.append(make('p','w-note',
    'Счёт создаёт Telegram. Зачисление возможно только после подтверждения платежа сервером.'));
+  panel.append(make('p','w-note',
+   'При пополнении: 1 ₽ = 1 игровая монета. Основной баланс в ₽ пересчитывается из игровых монет через курс USD/RUB — это другая величина. Историю зачисленных монет смотрите в «Мои пополнения».'));
   const help=make('a','rustup-stars-help','Поддержка: @rustuperhelp_bot');
   help.href='https://t.me/rustuperhelp_bot';panel.append(help);
   let confirmed=null,loading=false,seq=0;
