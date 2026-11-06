@@ -1,10 +1,12 @@
-// Read-only Stars deposit history for the EXACT original compiled RUST UP Worker.
+// Read-only Stars deposit history and operator-price quote for original compiled RUST UP Worker.
 // No invoices, conversion, payment acceptance, webhook interception or balance writes.
 // Preserve all original handlers (including scheduled) and named DO exports.
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {readStarsDepositHistory} from './deposit-history-readonly.mjs';
+import {quoteOwnerStarsReadOnly} from './stars-owner-price-preview.mjs';
 
 const PATH='/api/stars/variable/history';
+const QUOTE='/api/stars/variable/quote';
 const DENY='/api/stars/variable/';
 const MAX_BODY=4096;
 
@@ -38,7 +40,7 @@ export function wrapHistoryOnlyWorker(original,{
   ...original,
   async fetch(request,env,ctx){
    const path=new URL(request.url).pathname;
-   if(path!==PATH){
+   if(path!==PATH&&path!==QUOTE){
     if(path.startsWith(DENY))
      return json({ok:false,error:'not_found'},404);
     // Includes existing Telegram webhook, game, cron-related HTTP and admin.
@@ -75,6 +77,13 @@ export function wrapHistoryOnlyWorker(original,{
     identity=await verify(body?.initData,env?.BOT_TOKEN,Date.now(),86400);
    }catch {
     return json({ok:false,error:'telegram_auth_required'},401,permitted);
+   }
+   if(path===QUOTE){
+    try{
+     return json({ok:true,...quoteOwnerStarsReadOnly(body?.amountMinor)},200,permitted);
+    }catch{
+     return json({ok:false,error:'invalid_amount_or_range'},422,permitted);
+    }
    }
    if(!env?.DB?.prepare||!env?.PAYMENTS_DB?.prepare)
     return json({ok:false,error:'deposit_history_unavailable'},503,permitted);
