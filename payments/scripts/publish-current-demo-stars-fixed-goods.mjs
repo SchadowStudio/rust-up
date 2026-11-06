@@ -59,15 +59,24 @@ export function patchCurrentWalletApp(source){
 }
 export function patchCurrentWalletHtml(source){
  if(typeof source!=='string'||!source.includes('Демо-режим · виртуальный баланс')||
-    !source.includes('<script src="js/app.js?v=20261106d"></script>')||
-    !source.includes('<link rel="stylesheet" href="css/style.css?v=20261106d">')||
     !source.includes('telegram-web-app.js'))
   throw Error('expected_demo_website_version_changed');
+ // The website rotates the app/style cache suffix frequently (d, e, etc).
+ // Accept only the same reviewed 2026-11-06 site family, with the immutable
+ // backend game load and disabled real-money demo deposit guard checked in JS.
+ const lines=source.split('\n').map(line=>line.trim());
+ const styleTags=lines.filter(line=>
+  line.startsWith('<link rel="stylesheet" href="css/style.css?v=20261106')&&
+  line.endsWith('">'));
+ const appTags=lines.filter(line=>
+  line.startsWith('<script src="js/app.js?v=20261106')&&
+  line.endsWith('"></script>'));
+ if(styleTags.length!==1||appTags.length!==1)
+  throw Error('expected_demo_website_version_changed');
+ const style=styleTags[0],app=appTags[0];
  if(source.includes(MODULE_TAG)&&source.includes(STYLE_TAG))return source;
  if(source.includes('stars-fixed-market-v3.js')||source.includes('stars-fixed-market-v3.css'))
   throw Error('conflicting_stars_website_assets');
- const style='<link rel="stylesheet" href="css/style.css?v=20261106d">';
- const app='<script src="js/app.js?v=20261106d"></script>';
  exactlyOnce(source,style);exactlyOnce(source,app);
  return source.replace(style,style+'\n  '+STYLE_TAG)
   .replace(app,'  '+MODULE_TAG+'\n  '+app);

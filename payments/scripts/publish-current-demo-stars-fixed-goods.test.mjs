@@ -24,7 +24,8 @@ const html=()=>[
  '<link rel="stylesheet" href="css/style.css?v=20261106d">',
  '<script src="https://telegram.org/js/telegram-web-app.js"></script>',
  '</head><body><div>Демо-режим · виртуальный баланс</div>',
- '<script src="js/app.js?v=20261106d"></script></body></html>'
+ '<script src="js/app.js?v=20261106d"></script>',
+ '</body></html>'
 ].join('\n');
 test('current server-backed demo wallet gets one independent fixed-goods panel',()=>{
  const result=patchCurrentWalletApp(app());
@@ -53,8 +54,17 @@ test('current 2026-11-06 website receives only fixed Stars assets, not game cred
  assert.match(result,/stars-fixed-market-v3\.js\?v=20261106fixed1/);
  assert.match(result,/Демо-режим · виртуальный баланс/);
  assert.equal(patchCurrentWalletHtml(result),result);
+ for(const version of ['20261106d','20261106e','20261106f']){
+  const changed=html().replaceAll('20261106d',version);
+  const patched=patchCurrentWalletHtml(changed);
+  assert.ok(patched.includes('js/stars-fixed-market-v3.js?v=20261106fixed1'));
+  assert.ok(patched.includes('js/app.js?v='+version));
+  assert.ok(patched.includes('css/style.css?v='+version));
+ }
  assert.throws(()=>patchCurrentWalletHtml(html().replace(
   'js/app.js?v=20261106d','js/app.js?v=unknown')),/version_changed/);
+ assert.throws(()=>patchCurrentWalletHtml(html().replace(
+  'css/style.css?v=20261106d','css/style.css?v=unknown')),/version_changed/);
 });
 test('shop module still requires signed Telegram initData, terms and server checkout gate',()=>{
  const js=readFileSync(new URL('../frontend/telegram-miniapp/stars-fixed-market-v3.js',
