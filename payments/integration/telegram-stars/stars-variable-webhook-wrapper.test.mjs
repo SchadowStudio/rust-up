@@ -96,14 +96,14 @@ test('non-acknowledged variable event also fails closed with 503',async()=>{
  assert.equal(r.status,503);
  assert.deepEqual(f.calls,[]);
 });
-test('checkout remains unavailable without an audited server pricing function',async()=>{
+test('checkout route rejects untrusted Origin before payment processing',async()=>{
  const f=fixture();
  const input=new Request(HOST+'/api/stars/variable/checkout',{
   method:'POST',headers:{'content-type':'application/json'},
   body:'{}'
  });
  const denied=await f.wrapper.fetch(input,f.env,{});
- assert.equal(denied.status,503);
+ assert.equal(denied.status,403);
  assert.deepEqual(f.calls,[]);
 });
 
@@ -206,7 +206,7 @@ test('checkout routing passes only a server-side quote freezer to authenticated 
  assert.equal((await response.json()).simulated,true);
  assert.deepEqual(seen,['api','freeze']);
 });
-test('checkout never reaches original bot or Telegram when no trusted pricing supplied',async()=>{
+test('checkout never reaches original bot or Telegram without valid authenticated Origin',async()=>{
  let hit=0;
  const wrapped=wrapCurrentStarsWebhook({
   fetch:async()=>{hit++;return new Response('original');}
@@ -214,7 +214,21 @@ test('checkout never reaches original bot or Telegram when no trusted pricing su
  const response=await wrapped.fetch(new Request(HOST+'/api/stars/variable/checkout',{
   method:'POST',body:'{}'
  }),{},null);
- assert.equal(response.status,503);
- assert.equal((await response.json()).error,'checkout_not_configured');
+ assert.equal(response.status,403);
+ assert.equal((await response.json()).error,'origin_rejected');
  assert.equal(hit,0);
+});
+
+test('server calculator is wired by default and route still rejects unverified Telegram identity',async()=>{
+ const wrapped=wrapCurrentStarsWebhook({
+  fetch:async()=>{throw Error('unexpected old bot');}
+ });
+ const allowed='https://mini.rustup.example';
+ const response=await wrapped.fetch(new Request(HOST+'/api/stars/variable/checkout',{
+  method:'POST',headers:{origin:allowed,'content-type':'application/json'},
+  body:JSON.stringify({initData:'forged',amountMinor:10000,
+   requestId:'123e4567-e89b-42d3-a456-426614174001'})
+ }),{APP_URL:allowed+'/',BOT_TOKEN:'123456789:'+('a'.repeat(30))},null);
+ assert.equal(response.status,401);
+ assert.equal((await response.json()).error,'telegram_auth_required');
 });
