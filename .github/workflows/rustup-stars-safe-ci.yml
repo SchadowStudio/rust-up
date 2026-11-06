@@ -52,6 +52,9 @@ jobs:
       - name: Test isolated atomic Stars settlement journal and independent Telegram receipt checks
         run: |
           node --test payments/integration/account-credit-ledger/atomic-game-credit.test.mjs payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs payments/integration/account-credit-ledger/frozen-game-coin-quote.test.mjs payments/integration/account-credit-ledger/trusted-rub-usd.test.mjs payments/integration/account-credit-ledger/verified-stars-game-refund.test.mjs
+      - name: Verify read-only cross-D1 payment and game ledger reconciliation
+        run: |
+          node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
       - name: Verify account import guard without enabling money
         run: |
           node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs
