@@ -133,3 +133,22 @@ test('1 RUB is exactly 1 Coin with no USD-rate dependency',async()=>{
   assert.equal(stored.rub_per_usd_minor,null);
  }finally{f.close();}
 });
+
+test('reject an invoice before any quote write when the game balance would exceed cap',async()=>{
+ const f=setup();
+ try{
+  f.game.prepare('UPDATE accounts SET state=? WHERE id=?')
+   .run(JSON.stringify({balance:999999.5}),USER);
+  f.game.prepare('UPDATE users SET balance=? WHERE id=?')
+   .run(999999.5,USER);
+  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote()),
+   /game_balance_cap_exceeded/);
+  assert.equal(f.pay.prepare('SELECT count(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
+  f.game.prepare('UPDATE accounts SET state=? WHERE id=?')
+   .run(JSON.stringify({balance:999900}),USER);
+  f.game.prepare('UPDATE users SET balance=? WHERE id=?')
+   .run(999900,USER);
+  const accepted=await freezeVerifiedStarsGameQuote(f.env,quote());
+  assert.equal(accepted.coinCents,10000);
+ }finally{f.close();}
+});
