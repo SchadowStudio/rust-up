@@ -1,6 +1,8 @@
 -- RUST UP GAME D1: atomic exactly-once account balance credit journal.
--- DO NOT apply or wire to live wagering until verified paid-order quotes,
--- refund reversals, account restrictions and release approval are complete.
+-- The additive schema can be staged with the release gate at 0 after a
+-- guarded D1 preflight. NEVER enable its release gate or wire actual wagering
+-- until receipt verification, refund controls, account eligibility and lawful
+-- operator approval have been independently established.
 -- This schema contains NO payment provider secrets and never self-activates.
 -- One INSERT into rustup_game_paid_receipts changes both the unique journal
 -- and accounts.state.balance inside the SAME SQLite transaction.
