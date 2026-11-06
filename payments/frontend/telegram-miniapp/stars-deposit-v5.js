@@ -138,8 +138,12 @@
       throw {status:503};
     window.Telegram.WebApp.openInvoice(data.invoiceUrl,result=>{
       if(!panel.isConnected)return;
-      if(result==='paid')summary.textContent='Оплата выполнена. Ожидается подтверждение сервера.';
-      else if(result==='cancelled')summary.textContent='Оплата отменена.';
+      if(result==='paid'){
+       summary.textContent='Telegram сообщил об оплате. Проверяем подтверждение сервера и зачисление.';
+       // A client callback is NOT a receipt. Always load the signed,
+       // cross-database history; no optimistic balance changes.
+       if(!historyButton.disabled)historyButton.click();
+      }else if(result==='cancelled')summary.textContent='Оплата отменена.';
       else summary.textContent='Платёж не подтверждён. Проверьте историю.';
     });
    }catch(e){if(panel.isConnected)summary.textContent=errorLabel(e);}
