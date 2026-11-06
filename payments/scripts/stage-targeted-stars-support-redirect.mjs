@@ -262,11 +262,21 @@ async function verify(token,dir,post=false){
   'PASS: source, payment flags, bindings and current deployment unchanged.');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- const mode=process.argv[2],dir=process.argv[3];
- const token=process.env.CLOUDFLARE_API_TOKEN;
- if(!token||token.length<15)fail('cloudflare_token_required');
- if(mode==='--stage')await prepare(token);
- else if(mode==='--verify'&&dir)await verify(token,dir);
- else if(mode==='--postverify'&&dir)await verify(token,dir,true);
- else fail('usage: --stage | --verify <folder> | --postverify <folder>');
+ try{
+  const mode=process.argv[2],dir=process.argv[3];
+  const token=process.env.CLOUDFLARE_API_TOKEN;
+  if(!token||token.length<15)fail('cloudflare_token_required');
+  if(mode==='--stage')await prepare(token);
+  else if(mode==='--verify'&&dir)await verify(token,dir);
+  else if(mode==='--postverify'&&dir)await verify(token,dir,true);
+  else fail('usage: --stage | --verify <folder> | --postverify <folder>');
+ }catch(error){
+  // Deliberately print only our fixed diagnostic code, never request bodies,
+  // credentials, source bundles, environment variables or raw API failures.
+  const message=String(error?.message||'unexpected_failure');
+  const code=message.startsWith('targeted_wrapper_patch_')?
+   message:'stage_operation_failed';
+  console.log('RUST UP STAGING BLOCKED: '+code);
+  process.exitCode=1;
+ }
 }
