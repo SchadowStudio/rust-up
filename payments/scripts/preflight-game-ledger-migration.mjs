@@ -13,10 +13,22 @@ const FLAGS=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
 const REQUIRED_ACCOUNTS=['id','state','v','updated'];
 const REQUIRED_USERS=['id','balance','blocked','banned'];
 const paymentControls=['master','stars','crypto'];
+const EXPECTED_JOURNAL=Object.freeze({
+ rustup_game_paid_release_control:'table',
+ rustup_game_paid_receipts:'table',
+ rustup_game_paid_receipts_by_user:'index',
+ rustup_game_paid_receipts_preflight:'trigger',
+ rustup_game_paid_receipts_apply:'trigger',
+ rustup_game_paid_refunds:'table',
+ rustup_game_paid_refunds_by_user:'index',
+ rustup_game_paid_refunds_verify:'trigger',
+ rustup_game_paid_refunds_preflight:'trigger',
+ rustup_game_paid_refunds_apply:'trigger'
+});
 
 export function assessGameLedgerMigration({
  accountColumns,userColumns,oldJournalObjects,bindings,controls,
- paidOrderCount,accountConsistency,backupAvailable
+ paidOrderCount,accountConsistency,backupAvailable,releaseControl=null
 }={}){
  if(!Array.isArray(accountColumns)||!Array.isArray(userColumns)||
     !Array.isArray(oldJournalObjects)||!Array.isArray(bindings)||
@@ -31,6 +43,12 @@ export function assessGameLedgerMigration({
  const schemaValid=REQUIRED_ACCOUNTS.every(n=>names(accountColumns).has(n))&&
   REQUIRED_USERS.every(n=>names(userColumns).has(n));
  const emptyJournal=oldJournalObjects.length===0;
+ const installed=oldJournalObjects.length===Object.keys(EXPECTED_JOURNAL).length&&
+  oldJournalObjects.every(x=>EXPECTED_JOURNAL[x.name]===x.type);
+ const locked=installed&&releaseControl?.enabled===0&&
+  releaseControl.approval_reference==null&&
+  releaseControl.reviewed_at_ms==null;
+ const gateOn=installed&&releaseControl?.enabled===1;
  const bindingsMap=new Map(bindings.map(x=>[x.name,x]));
  if(bindingsMap.size!==bindings.length)throw Error('duplicate_live_worker_binding');
  const gameDb=bindingsMap.get('DB');
@@ -44,7 +62,8 @@ export function assessGameLedgerMigration({
   controls.some(c=>c.channel===n&&c.enabled===0));
  const blockers=[
   ...(!schemaValid?['game_account_schema_drift']:[]),
-  ...(!emptyJournal?['partial_or_existing_paid_journal_requires_manual_review']:[]),
+  ...(!emptyJournal&&!installed?['partial_or_unknown_paid_journal_requires_review']:[]),
+  ...(installed&&!locked?['installed_paid_journal_gate_not_verified_off']:[]),
   ...(!bothDatabasesBound?['correct_two_d1_bindings_required']:[]),
   ...(!flagsOff?['live_worker_payment_flags_not_all_off']:[]),
   ...(!controlsOff?['database_payment_controls_not_all_off']:[]),
@@ -54,7 +73,10 @@ export function assessGameLedgerMigration({
  return {
   mode:'READ_ONLY_GAME_LEDGER_MIGRATION_PREFLIGHT',
   readOnly:true,changesApplied:false,chargesEnabled:false,
-  safeToPrepareMigration:blockers.length===0,
+  safeToPrepareMigration:blockers.length===0&&emptyJournal,
+  installedAndLocked:blockers.length===0&&locked,
+  journalInstallationState:emptyJournal?'ABSENT':locked?'INSTALLED_LOCKED':
+   gateOn?'INSTALLED_GATE_ON':'PARTIAL_OR_UNVERIFIED',
   sourceTablesPresent:schemaValid,journalAbsent:emptyJournal,
   bothDatabasesBound,flagsOff,controlsOff,backupAvailable,
   accountCount:accountConsistency.accountCount,
@@ -103,7 +125,7 @@ export async function inspectGameLedgerPreflight(token,fetchImpl=fetch){
   paidOrders,consistency,bookmark]=await Promise.all([
   query(token,GAME,'PRAGMA table_info(accounts)',fetchImpl),
   query(token,GAME,'PRAGMA table_info(users)',fetchImpl),
-  query(token,GAME,"SELECT name FROM sqlite_master WHERE name LIKE 'rustup_game_paid_%' ORDER BY name",fetchImpl),
+  query(token,GAME,"SELECT name,type FROM sqlite_master WHERE name LIKE 'rustup_game_paid_%' ORDER BY name",fetchImpl),
   get(token,p+'/workers/scripts/rustup-bot/settings',fetchImpl),
   query(token,PAYMENTS,'SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel',fetchImpl),
   query(token,PAYMENTS,"SELECT COUNT(*) AS n FROM rustup_stars_variable_orders WHERE status IN ('paid','refunded','checkout_approved','manual_review')",fetchImpl),
@@ -121,8 +143,15 @@ export async function inspectGameLedgerPreflight(token,fetchImpl=fetch){
   get(token,p+'/d1/database/'+GAME+'/time_travel/bookmark',fetchImpl)
  ]);
  const row=consistency[0];
+ let releaseControl=null;
+ if(oldJournalObjects.some(x=>x.name==='rustup_game_paid_release_control')){
+  const rows=await query(token,GAME,
+   'SELECT enabled,approval_reference,reviewed_at_ms FROM rustup_game_paid_release_control WHERE id=1',
+   fetchImpl);
+  releaseControl=rows.length===1?rows[0]:null;
+ }
  return assessGameLedgerMigration({
-  accountColumns,userColumns,oldJournalObjects,
+  accountColumns,userColumns,oldJournalObjects,releaseControl,
   bindings:settings?.bindings||[],controls,
   paidOrderCount:paidOrders[0]?.n,
   accountConsistency:{
@@ -139,7 +168,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  .then(report=>{
   console.log(JSON.stringify(report,null,2));
   console.log('READ ONLY: schema, balances, payment flags and D1 restore bookmark checked.');
-  if(!report.safeToPrepareMigration)process.exitCode=2;
+  if(report.blockers.length)process.exitCode=2;
  })
  .catch(error=>{
   console.error('GAME LEDGER PREFLIGHT BLOCKED:',
