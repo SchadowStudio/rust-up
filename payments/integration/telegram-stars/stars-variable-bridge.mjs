@@ -23,7 +23,7 @@ export function pilotStarsUserAllowed(env,userId){
  const ids=new Set();
  for(const value of values){
   const id=value.trim();
-  if(!/^[1-9]\\d{0,15}$/.test(id)||!Number.isSafeInteger(Number(id))||
+  if(!/^[1-9]\d{0,15}$/.test(id)||!Number.isSafeInteger(Number(id))||
      ids.has(id))return false;
   ids.add(id);
  }
@@ -32,8 +32,8 @@ export function pilotStarsUserAllowed(env,userId){
 export function pilotStarsAmountAllowed(env,amountStars,now=Date.now()){
  const raw=env?.STARS_VARIABLE_PILOT_MAX_STARS;
  const expiry=env?.STARS_VARIABLE_PILOT_EXPIRES_AT_MS;
- if(typeof raw!=='string'||! /^[1-9]\\d?$/.test(raw)||
-    typeof expiry!=='string'||! /^\\d{13}$/.test(expiry))return false;
+ if(typeof raw!=='string'||! /^[1-9]\d?$/.test(raw)||
+    typeof expiry!=='string'||! /^\d{13}$/.test(expiry))return false;
  const limit=Number(raw),end=Number(expiry);
  return Number.isSafeInteger(amountStars)&&amountStars>=1&&
   limit<=10&&amountStars<=limit&&
