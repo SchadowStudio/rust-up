@@ -27,8 +27,17 @@ try{
   $ownToken=$true
   $auth=$null;$output=$null
  }
- Run 'Verify currently published Worker against prior known-safe source map'{
-  node '.\payments\scripts\verify-stars-webhook-only-live.mjs' "$StageFolder"
+ $base=(Resolve-Path -LiteralPath $StageFolder).Path
+ $previous=$base+'-refund-preflight'
+ $baseline=$base+'-deployed-285f2656'
+ if(!(Test-Path -LiteralPath $baseline)){
+  Run 'Verify published Worker against previous verified refund-stage bundle'{
+   node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$previous"
+  }
+  Copy-Item -LiteralPath $previous -Destination $baseline -Recurse -ErrorAction Stop
+ }
+ Run 'Verify immutable published Worker baseline against Cloudflare'{
+  node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$baseline"
  }
  Run 'Prepare refund-aware modules without modifying deployed Worker'{
   node '.\payments\scripts\prepare-stars-refund-upgrade.mjs' "$StageFolder"
