@@ -18,6 +18,7 @@ async function api(path,method='GET',body){
  headers:{authorization:'Bearer '+token,...(body?{'content-type':'application/json'}:{})},
  ...(body?{body:JSON.stringify(body)}:{})});
  if(!res.ok)throw Error('cloudflare_http_'+res.status);
+ if(path.endsWith('/content/v2'))return await res.text();
  const obj=await res.json();
  if(obj.success!==true)throw Error('cloudflare_api_error');
  return obj.result;
@@ -69,6 +70,9 @@ async function activate(){
  const blockers=[];
  if(!approved)blockers.push('reviewed_paid_game_release_record_required');
  if(!live.checkoutDisabled)blockers.push('existing_checkout_must_be_off');
+ if(!live.databaseSwitches.some(x=>x.channel==='master'&&x.enabled===0)||
+    !live.databaseSwitches.some(x=>x.channel==='stars'&&x.enabled===0))
+  blockers.push('payment_switches_not_in_safe_initial_state');
  if(!live.databaseSwitches.some(x=>x.channel==='crypto'&&x.enabled===0))
   blockers.push('crypto_must_remain_off');
  for(const name of ['BOT_TOKEN','WEBHOOK_SECRET']){
@@ -95,6 +99,8 @@ async function activate(){
  }
  const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string')blockers.push('live_version_unknown');
+ // A two-invoice limit is not installed yet. Do not claim exactly two charges.
+ blockers.push('atomic_two_invoice_limit_not_installed');
  // The existing live code checks account binding and refund readiness before
  // invoicing, but a release requires an independently reviewed ledger and
  // reliable undo. A self-attested CLI flag is deliberately insufficient.
