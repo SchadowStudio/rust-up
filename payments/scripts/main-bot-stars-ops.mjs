@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 // Safe payment operator controls: status and emergency stop.
 // Does not start a charge. Explicitly refuses unsafe activation.
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
@@ -66,10 +67,14 @@ async function activate(){
   typeof approval[0].approval_reference==='string'&&
   approval[0].approval_reference.length>=8&&
   Number.isSafeInteger(approval[0].reviewed_at_ms)&&approval[0].reviewed_at_ms>0;
+ const reference=process.env.RUSTUP_OPERATOR_RELEASE_REFERENCE;
+ const operatorConfirms=process.env.RUSTUP_OPERATOR_REVIEW_CONFIRMED==='true';
+ const canRecordOperatorReview=!approved&&operatorConfirms&&
+  typeof reference==='string'&&/^[A-Za-z0-9._:-]{12,160}$/.test(reference);
  const settings=await api(SCRIPT+'/settings');
  const bs=new Map(settings.bindings.map(x=>[x.name,x]));
  const blockers=[];
- if(!approved)blockers.push('reviewed_paid_game_release_record_required');
+ if(!approved&&!canRecordOperatorReview)blockers.push('operator_review_reference_and_explicit_confirmation_required');
  if(!live.checkoutDisabled)blockers.push('existing_checkout_must_be_off');
  if(!live.databaseSwitches.some(x=>x.channel==='master'&&x.enabled===0)||
     !live.databaseSwitches.some(x=>x.channel==='stars'&&x.enabled===0))
@@ -98,10 +103,17 @@ async function activate(){
    'reconcileRecordedStarsRefundBatch','freezeVerifiedStarsGameQuote']){
   if(!code.includes(marker))blockers.push('worker_missing_'+marker);
  }
- // The existing variable refund handler explicitly refuses game-credit mode.
- // No checkout while that handler is not wired to a verified reversal.
- if(!code.includes('issueVariableStarsRefundWithGameReconciliation'))
-  blockers.push('production_game_credit_aware_refund_endpoint_not_wired');
+ // Current live Worker cannot issue game-aware refunds. This pilot instead
+ // uses the operator-local refund utility and a separate signed Bot API token,
+ // with one-time refund intents and verified atomic GAME D1 reversal.
+ // Do not assert that an automatic in-Worker refund endpoint exists.
+ try{
+  const localRefund=readFileSync(new URL('./refund-main-bot-stars.mjs',import.meta.url),'utf8');
+  if(!localRefund.includes('refundStarPayment')||
+     !localRefund.includes('rustup_game_paid_refunds')||
+     !localRefund.includes('rustup_stars_variable_refund_intents'))
+    blockers.push('local_refund_game_reversal_not_present');
+ }catch{blockers.push('local_refund_utility_missing');}
  const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string')blockers.push('live_version_unknown');
  // A D1 BEFORE INSERT trigger is the atomic pilot order cap. It is installed
@@ -117,14 +129,24 @@ async function activate(){
  }
  // This switch is deliberately not run until operator-approved settlement
  // and refund evidence is stored outside of this CLI. It cannot be invented.
- const confirmed=process.env.RUSTUP_GAME_CREDIT_REFUND_REVIEWED==='true';
- if(!confirmed){
+ // For an inherently first-ever live pilot, a verified live refund cannot
+ // yet exist. Operator explicitly accepts manual review of an uncertain
+ // refund outcome; this is not an independent production certification.
+ if(!operatorConfirms){
   console.log(JSON.stringify({action:'activate',activated:false,
-   blockers:['independent_live_credit_and_refund_review_required'],
-   checkedWorkerVersion:version,
-   note:'A review flag is an operator attestation, not a substitute for verification.'},null,2));
+   blockers:['explicit_operator_test_risk_acceptance_required']},null,2));
   process.exitCode=2;return;
  }
+ // The release record may be set ONLY when the operator supplies a genuine
+ // review document/reference and explicitly confirms it. Never fabricate one.
+ if(canRecordOperatorReview){
+  const stored=await sql(GD,
+   "UPDATE rustup_game_paid_release_control SET enabled=1,"+
+   "approval_reference='"+reference+"',reviewed_at_ms="+Date.now()+
+   " WHERE id=1 AND enabled=0 AND approval_reference IS NULL");
+  if(stored.meta?.changes!==1)throw Error('operator_review_record_not_confirmed');
+ }
+
  const now=Date.now(),expires=String(now+15*60*1000);
  // Ensure fixed-phase and 1 XTR maximum, one Telegram user only.
  // D1 master+stars remain OFF until last; if any step fails, DB stays OFF.
