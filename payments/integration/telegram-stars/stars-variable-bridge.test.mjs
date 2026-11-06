@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHmac} from 'node:crypto';
-import {variableStarsApi,variableStarsWebhook} from './stars-variable-bridge.mjs';
+import {variableStarsApi,variableStarsWebhook,pilotStarsUserAllowed} from './stars-variable-bridge.mjs';
 import {quoteVariableStars} from './variable-stars.mjs';
 
 const bot='123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
@@ -102,4 +102,36 @@ test('signed Mini App quote uses the selected 1.83 RUB/Star rate, without chargi
  assert.equal(q.rateDenominator,1000);
  assert.equal(q.checkoutEnabled,false);
  assert.equal(q.creditedToGame,false);
+});
+
+test('pilot Stars access is explicitly configured server-side, not inferred from player or browser input',()=>{
+ const pilot={STARS_VARIABLE_PILOT_USER_IDS:'123456,7390606911'};
+ assert.equal(pilotStarsUserAllowed(pilot,123456),true);
+ assert.equal(pilotStarsUserAllowed(pilot,7390606911),true);
+ assert.equal(pilotStarsUserAllowed(pilot,123457),false);
+ for(const raw of [undefined,'','0','123456,123456',
+  '123456,unknown','123456,,7390606911',
+  '123456, 7390606911, 0',
+  Array(11).fill('123456').join(',')]){
+  assert.equal(pilotStarsUserAllowed({STARS_VARIABLE_PILOT_USER_IDS:raw},123456),false);
+ }
+ assert.equal(pilotStarsUserAllowed(pilot,NaN),false);
+});
+test('ordinary player cannot see payable quote or reach checkout without pilot allowlist',async()=>{
+ const pay={
+  ...env,
+  STARS_PAYMENT_ENABLED:'true',
+  STARS_VARIABLE_TOPUP_ENABLED:'true',
+  PAYMENT_PRODUCTION_ENABLED:'true',
+  STARS_VARIABLE_PILOT_USER_IDS:'7390606911'
+ };
+ const quote=await variableStarsApi(req('quote',{amountMinor:10000}),pay);
+ assert.equal(quote.status,200);
+ assert.equal((await quote.json()).checkoutEnabled,false);
+ const buy=await variableStarsApi(req('checkout',{
+  amountMinor:10000,
+  requestId:'66c5e3f1-21ca-4331-9cf4-ea46f0f4e3f1'
+ }),pay,async()=>{throw Error('unexpected_telegram_invoice');});
+ assert.equal(buy.status,503);
+ assert.equal((await buy.json()).error,'topup_checkout_disabled');
 });
