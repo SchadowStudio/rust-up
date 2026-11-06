@@ -251,7 +251,7 @@ test('transient database failure cannot be acknowledged as a paid receipt',async
     result:url.endsWith('/createInvoiceLink')?'https://t.me/$db-retry':true}}});
   const order=await createVariableStarsCheckout(env,{
     verifiedTelegramUserId:12345,amountMinor:15000,requestId,now,fetchImpl:bot,
-    freezeQuote:db.freezeQuote
+    freezeQuote:base.freezeQuote
   });
   const invoice_payload='v:'+order.orderId;
   await handleVariableStarsUpdate({pre_checkout_query:{id:'query-retry',from:{id:12345},
