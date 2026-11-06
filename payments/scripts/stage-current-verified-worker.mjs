@@ -72,7 +72,8 @@ export function parseSupportedLiveWorker(body,contentType=''){
   files.set(layout.names[i],source);
  }
  if(layout.original===BASE13&&
-    !/from\\s*['\"]\\.\\/brand\\.js['\"]/.test(files.get('worker.js')))
+    !files.get('worker.js').includes("from './brand.js'")&&
+    !files.get('worker.js').includes('from "./brand.js"'))
   fail('current_brand_module_import_missing');
  if(!files.get('worker.js').includes('export default {')||
     !files.get('worker.js').includes('async function onUpdate(upd, env)')||
