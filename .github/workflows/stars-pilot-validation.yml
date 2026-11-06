@@ -1,0 +1,30 @@
+name: RUST UP Stars pilot offline validation
+on:
+  push:
+    branches:
+      - feature/rustup-payment-admin-controls
+    paths:
+      - 'payments/scripts/main-bot-stars-ops.*'
+      - 'payments/scripts/refund-main-bot-stars.*'
+      - 'payments/integration/telegram-stars/**'
+      - '.github/workflows/stars-pilot-validation.yml'
+  workflow_dispatch:
+jobs:
+  offline-payment-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate operator scripts syntax
+        run: |
+          node --check payments/scripts/main-bot-stars-ops.mjs
+          node --check payments/scripts/refund-main-bot-stars.mjs
+      - name: Verify exact atomic pilot guard
+        run: node --test payments/scripts/main-bot-stars-ops.test.mjs
+      - name: Verify Stars API, receipts, refunds, and game ledger
+        run: node payments/scripts/test-full-stars-offline-e2e.mjs
