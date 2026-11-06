@@ -35,13 +35,16 @@ export function wrapCurrentStarsWebhook(original,{
  return {
   ...original,
   async scheduled(controller,env,ctx){
-   // Keep the original game's scheduled jobs fully intact.
-   if(typeof original.scheduled==='function')
-    await original.scheduled.call(original,controller,env,ctx);
-   // An already-verified paid order is processed only if all the
-   // settlement/ledger/operator gates are independently enabled.
-   // Refund reconciliation has an independent gate: never activate it
-   // merely because invoice or settlement switches are enabled.
+   // Independent jobs must not suppress one another: a failure in the
+   // original game cron or refund reconciliation must never starve paid
+   // orders waiting for verified, exactly-once balance delivery.
+   const failures=[];
+   if(typeof original.scheduled==='function'){
+    try {await original.scheduled.call(original,controller,env,ctx);}
+    catch {failures.push('original_game_cron_requires_retry');}
+   }
+   // Reversal and delivery are independently guarded, and are attempted
+   // separately. A failure is still surfaced after the other job runs.
    if(env?.PAYMENT_PRODUCTION_ENABLED==='true'&&
       env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED==='true'&&
       env?.PAYMENT_WALLET_STRICT_MODE==='true'){
@@ -51,15 +54,14 @@ export function wrapCurrentStarsWebhook(original,{
       console.error('RUST UP Stars refund reconciliation needs operator review',
        summary.manualReview);
     }catch{
-     throw Error('stars_refund_reconciliation_scheduler_requires_review');
+     failures.push('stars_refund_reconciliation_scheduler_requires_review');
     }
    }
-   if(!settlementWorkerAllowed(env))return;
-   try{await settlePaidStars(env);}
-   catch{
-    // The durable queue retains the leased job for a later retry.
-    throw Error('stars_delivery_scheduler_requires_retry');
+   if(settlementWorkerAllowed(env)){
+    try {await settlePaidStars(env);}
+    catch {failures.push('stars_delivery_scheduler_requires_retry');}
    }
+   if(failures.length)throw Error(failures.join(';'));
   },
   async fetch(request,env,ctx){
    const url=new URL(request.url);
