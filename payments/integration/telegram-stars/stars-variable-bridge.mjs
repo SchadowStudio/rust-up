@@ -6,6 +6,7 @@ import {quoteVariableStars,createVariableStarsCheckout,handleVariableStarsUpdate
  from './variable-stars.mjs';
 import {verifiedTelegramInitData} from './telegram-initdata.mjs';
 import {isPaymentEnabled} from './payment-controls.mjs';
+import {readStarsDepositHistory} from './deposit-history-readonly.mjs';
 
 const ROOT='/api/stars/variable/';
 const ROUTES=new Set(['quote','checkout','history']);
@@ -105,12 +106,10 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
  }
  if(action==='history'){
   try{
-   const data=await env.PAYMENTS_DB.prepare(
-    'SELECT id,requested_amount_minor,price_stars,status,created_at_ms,paid_at_ms '+
-    'FROM rustup_stars_variable_orders WHERE telegram_user_id=? '+
-    'ORDER BY created_at_ms DESC LIMIT 50'
-   ).bind(identity.userId).all();
-   return json({ok:true,orders:data?.results||[]},200,allowed);
+   // A Telegram receipt alone is NOT a player-balance credit. Always
+   // cross-check the independently journaled game credit and refund.
+   const history=await readStarsDepositHistory(env,identity.userId);
+   return json({ok:true,...history},200,allowed);
   }catch{return json({ok:false,error:'history_unavailable'},503,allowed);}
  }
  return json({ok:false,error:'not_found'},404,allowed);
