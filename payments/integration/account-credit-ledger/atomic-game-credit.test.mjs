@@ -6,11 +6,15 @@ import {readFileSync} from 'node:fs';
 const schema=readFileSync(new URL('./atomic-game-credit.sql',import.meta.url),'utf8');
 const orderId='123e4567-e89b-42d3-a456-426614174000';
 
-function fixture(balance=10,mirror=true){
+function fixture(balance=10,mirror=true,enableLedger=true){
  const db=new DatabaseSync(':memory:');
  db.exec('CREATE TABLE accounts(id INTEGER PRIMARY KEY,state TEXT NOT NULL,v INTEGER NOT NULL,updated INTEGER NOT NULL);');
  db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY,balance REAL,blocked INTEGER NOT NULL DEFAULT 0,banned INTEGER NOT NULL DEFAULT 0);');
  db.exec(schema);
+ if(enableLedger)db.prepare(
+  'UPDATE rustup_game_paid_release_control '+
+  'SET enabled=1,approval_reference=?,reviewed_at_ms=? WHERE id=1'
+ ).run('offline-unit-test-approval-only',1794000000000);
  db.prepare('INSERT INTO accounts VALUES(?,?,?,?)').run(123456789,JSON.stringify({
   balance,inventory:['old-item'],history:[{kind:'existing'}]
  }),3,1);
@@ -22,6 +26,18 @@ function credit(db,{order=orderId,charge='tg-charge-12345678',user=123456789,coi
  '(source,order_id,receipt_id,telegram_user_id,amount_minor,coin_cents,created_at_ms) VALUES(?,?,?,?,?,?,?)')
   .run('stars_variable',order,charge,user,amount,coinCents,1794000000000);
 }
+test('the migration is locked OFF by default and no receipt can create money',()=>{
+ const db=fixture(10,true,false);
+ try {
+  assert.equal(db.prepare('SELECT enabled FROM rustup_game_paid_release_control').get().enabled,0);
+  assert.throws(()=>credit(db),/rustup_paid_credit_release_disabled/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM rustup_game_paid_receipts').get().n,0);
+  assert.equal(JSON.parse(db.prepare('SELECT state FROM accounts').get().state).balance,10);
+  db.prepare('UPDATE rustup_game_paid_release_control SET enabled=1').run();
+  assert.throws(()=>credit(db),/rustup_paid_credit_release_disabled/);
+ }finally{db.close();}
+});
+
 test('one receipt atomically credits canonical account and users.balance mirror',()=>{
  const db=fixture();
  try{
