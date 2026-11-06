@@ -16,7 +16,8 @@ const MODULES=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
  'verified-stars-game-refund.mjs',
  'freeze-verified-stars-game-quote.mjs'];
 const FILES=['worker.stars-webhook-only-entry.mjs',
- 'wrangler.stars-webhook-only.toml'];
+ 'wrangler.stars-webhook-only.toml',
+ 'RUSTUP-STARS-WEBHOOK-ONLY-STAGE.json'];
 function refuse(reason){throw Error('refund_upgrade_prepare_'+reason);}
 export async function prepareRefundUpgrade(input){
  const base=await fs.realpath(path.resolve(input));
