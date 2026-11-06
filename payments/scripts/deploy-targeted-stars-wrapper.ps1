@@ -20,7 +20,7 @@ try {
   git pull --ff-only origin feature/rustup-payment-admin-controls
  }
  Run 'Verify targeted wrapper and settlement safety' {
-  node --test '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\integration\telegram-stars\stars-delivery-queue.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-credit.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs'
+  node --test '.\payments\scripts\stage-targeted-stars-wrapper.test.mjs' '.\payments\integration\telegram-stars\stars-variable-webhook-wrapper.test.mjs' '.\payments\integration\telegram-stars\stars-delivery-queue.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-credit.test.mjs' '.\payments\integration\account-credit-ledger\verified-stars-game-refund.test.mjs'
  }
  if([string]::IsNullOrWhiteSpace($env:CLOUDFLARE_API_TOKEN)){
   $authOutput=@(npx --yes wrangler auth token --json 2>$null)
