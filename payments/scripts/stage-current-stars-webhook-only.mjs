@@ -152,16 +152,37 @@ export function extractCurrentModules(raw){
   reject('original_live_bot_hash_changed');
  return sources;
 }
+// Transient Cloudflare API 429/5xx responses must not force a deploy.
+ // Retry read-only requests only; every source/version/security check still runs.
+export async function readCloudflareWithRetry(url,token,{raw=false,
+ fetchImpl=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+ for(let attempt=0;attempt<4;attempt++){
+  let r;
+  try{
+   r=await fetchImpl(url,{
+    method:'GET',headers:{authorization:'Bearer '+token},
+    redirect:'error',signal:AbortSignal.timeout(25000)
+   });
+  }catch(e){
+   if(attempt===3)reject('cloudflare_read_network_unavailable');
+   await sleep(800*2**attempt);
+   continue;
+  }
+  if(!r.ok){
+   if(![429,500,502,503,504].includes(r.status)||attempt===3)
+    reject('cloudflare_read_'+r.status);
+   await sleep(800*2**attempt);
+   continue;
+  }
+  if(raw)return r.text();
+  const data=await r.json();
+  if(data?.success!==true)reject('cloudflare_result_invalid');
+  return data.result;
+ }
+ reject('cloudflare_read_exhausted');
+}
 async function get(token,suffix,raw=false){
- const r=await fetch(API+suffix,{
-  method:'GET',headers:{authorization:'Bearer '+token},
-  redirect:'error',signal:AbortSignal.timeout(25000)
- });
- if(!r.ok)reject('cloudflare_read_'+r.status);
- if(raw)return r.text();
- const data=await r.json();
- if(data?.success!==true)reject('cloudflare_result_invalid');
- return data.result;
+ return readCloudflareWithRetry(API+suffix,token,{raw});
 }
 async function live(token){
  if(typeof token!=='string'||token.length<15)
