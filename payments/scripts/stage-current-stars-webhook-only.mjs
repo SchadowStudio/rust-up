@@ -32,6 +32,10 @@ const MANIFEST='RUSTUP-STARS-WEBHOOK-ONLY-STAGE.json';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 
 const RELOCATIONS=Object.freeze({
+ 'stars-variable-webhook-wrapper.mjs':[
+  "from '../account-credit-ledger/verified-stars-game-refund.mjs'",
+  "from './verified-stars-game-refund.mjs'"
+ ],
  'stars-delivery-queue.mjs':[
   "from '../account-credit-ledger/verified-stars-game-credit.mjs'",
   "from './verified-stars-game-credit.mjs'"
