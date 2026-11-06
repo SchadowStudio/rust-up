@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {webhookEntry,webhookOffConfig,extractCurrentModules,verifyLiveStarsOwnerRate}
+import {webhookEntry,webhookOffConfig,extractCurrentModules,verifyLiveStarsOwnerRate,flattenVerifiedSettlementImport}
  from './stage-current-stars-webhook-only.mjs';
 
 const gates=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
@@ -90,6 +90,20 @@ test('altered price, toggled gate, missing cron or wrong D1 refuses a build',()=
 });
 test('garbled or missing live Worker source map fails, no source is invented',()=>{
  assert.throws(()=>extractCurrentModules(''),/stars_|owner_quote_/);
+});
+test('private Worker recovery safely flattens only two reviewed fulfillment imports',()=>{
+ const queue=readFileSync(new URL('../integration/telegram-stars/stars-delivery-queue.mjs',import.meta.url),'utf8');
+ const credit=readFileSync(new URL('../integration/account-credit-ledger/verified-stars-game-credit.mjs',import.meta.url),'utf8');
+ const stagedQueue=flattenVerifiedSettlementImport('stars-delivery-queue.mjs',queue);
+ const stagedCredit=flattenVerifiedSettlementImport('verified-stars-game-credit.mjs',credit);
+ assert.ok(stagedQueue.includes("from './verified-stars-game-credit.mjs'"));
+ assert.ok(stagedCredit.includes("from './stars.mjs'"));
+ assert.doesNotMatch(stagedQueue,/from '\.\.\/account-credit-ledger\//);
+ assert.doesNotMatch(stagedCredit,/from '\.\.\/telegram-stars\//);
+ assert.equal(flattenVerifiedSettlementImport('payment-controls.mjs','original'),
+  'original');
+ assert.throws(()=>flattenVerifiedSettlementImport('stars-delivery-queue.mjs','unrelated'),
+  /unexpected_paid_credit_import_layout/);
 });
 test('staging script has no deploy, no money writes or automatic checkout',()=>{
  const source=readFileSync(new URL('./stage-current-stars-webhook-only.mjs',import.meta.url),'utf8');
