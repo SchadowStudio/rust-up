@@ -24,7 +24,8 @@ const html=()=>[
  '<link rel="stylesheet" href="css/style.css?v=20261106d">',
  '<script src="https://telegram.org/js/telegram-web-app.js"></script>',
  '</head><body><div>Демо-режим · виртуальный баланс</div>',
- '<script src="js/app.js?v=20261106d"></script></body></html>'
+ '<script src="js/app.js?v=20261106d"></script>',
+ '</body></html>'
 ].join('\n');
 test('current server-backed demo wallet gets one independent fixed-goods panel',()=>{
  const result=patchCurrentWalletApp(app());
