@@ -29,15 +29,16 @@ async function query(db,sql){
     !Array.isArray(rows[0].results))throw Error('Incomplete D1 response');
  return rows[0].results;
 }
-const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,refundMarkers]=await Promise.all([
+const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,refundMarkers,accountMirrors]=await Promise.all([
  req('/workers/scripts/'+WORKER+'/deployments'),
  req('/workers/scripts/'+WORKER+'/settings'),
  query(PAY,'SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel'),
  query(GAME,'SELECT enabled FROM rustup_game_paid_release_control WHERE id=1'),
  query(PAY,'SELECT status,COUNT(*) total FROM rustup_stars_variable_orders GROUP BY status'),
- query(PAY,"SELECT o.id,o.status,o.price_stars,CASE WHEN q.order_id IS NOT NULL THEN 1 ELSE 0 END frozen,COALESCE(j.state,'none') delivery FROM rustup_stars_variable_orders o LEFT JOIN rustup_stars_variable_credit_quotes q ON q.order_id=o.id LEFT JOIN rustup_stars_variable_delivery_jobs j ON j.order_id=o.id ORDER BY o.created_at_ms LIMIT 100"),
- query(GAME,"SELECT r.order_id,r.coin_cents,CASE WHEN f.order_id IS NULL THEN 0 ELSE 1 END reversed FROM rustup_game_paid_receipts r LEFT JOIN rustup_game_paid_refunds f ON f.source=r.source AND f.order_id=r.order_id WHERE r.source='stars_variable' LIMIT 100"),
- query(PAY,"SELECT order_id,outcome FROM rustup_stars_refund_reconciliation_done LIMIT 100")
+ query(PAY,"SELECT o.id,o.status,o.price_stars,q.coin_cents AS frozen_coin_cents,COALESCE(j.state,'none') delivery FROM rustup_stars_variable_orders o LEFT JOIN rustup_stars_variable_credit_quotes q ON q.order_id=o.id LEFT JOIN rustup_stars_variable_delivery_jobs j ON j.order_id=o.id ORDER BY o.created_at_ms LIMIT 100"),
+ query(GAME,"SELECT r.order_id,r.coin_cents,f.coin_cents AS reversed_coin_cents FROM rustup_game_paid_receipts r LEFT JOIN rustup_game_paid_refunds f ON f.source=r.source AND f.order_id=r.order_id WHERE r.source='stars_variable' LIMIT 100"),
+ query(PAY,"SELECT order_id,outcome FROM rustup_stars_refund_reconciliation_done LIMIT 100"),
+ query(GAME,"SELECT a.id,CAST(json_extract(a.state,'$.balance') AS REAL) canonical,u.balance mirror FROM accounts a JOIN users u ON u.id=a.id WHERE EXISTS (SELECT 1 FROM rustup_game_paid_receipts r WHERE r.telegram_user_id=a.id AND r.source='stars_variable') LIMIT 100")
 ]);
 const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
 const vars=Object.fromEntries((settings?.bindings||[]).filter(x=>x.type==='plain_text')
@@ -53,11 +54,13 @@ if(refundMarkers.length!==markerMap.size)blockers.push('Duplicate Stars refund m
 for(const order of orderLedger){
  const receipt=receiptMap.get(order.id);
  const marker=markerMap.get(order.id);
- if(order.status==='paid'&&order.frozen!==1)
+ if(order.status==='paid'&&!(order.frozen_coin_cents>0))
   blockers.push('Paid order has no frozen quote');
+ if(receipt&&receipt.coin_cents!==order.frozen_coin_cents)
+  blockers.push('Game credit differs from immutable frozen quote');
  if(order.status==='paid'&&order.delivery==='delivered'&&!receipt)
   blockers.push('Delivery marked delivered without game receipt');
- if(order.status==='refunded'&&receipt&&receipt.reversed!==1)
+ if(order.status==='refunded'&&receipt&&receipt.reversed_coin_cents!==receipt.coin_cents)
   blockers.push('Refunded order has game credit but no reversal');
  if(order.status==='refunded'&&receipt&&marker!=='reversed')
   blockers.push('Refunded order reversal missing terminal marker');
@@ -70,13 +73,22 @@ for(const receipt of gameReceipts){
  if(!orderLedger.some(x=>x.id===receipt.order_id))
   blockers.push('Game receipt missing matching Stars order');
 }
+for(const row of accountMirrors){
+ if(!Number.isFinite(row.canonical)||!Number.isFinite(row.mirror)||
+    Math.abs(row.canonical-row.mirror)>0.000001)
+  blockers.push('Existing credited game account balance mirror mismatch');
+}
+if(orders.reduce((n,x)=>n+x.total,0)>orderLedger.length||
+   gameReceipts.length>=100||refundMarkers.length>=100||accountMirrors.length>=100)
+ blockers.push('Audit pagination incomplete: more than 100 records');
 const accounting={ordersChecked:orderLedger.length,
+ creditedAccountsChecked:accountMirrors.length,
  gameReceiptsChecked:gameReceipts.length,
- refundedReceipts:gameReceipts.filter(x=>x.reversed===1).length,
+ refundedReceipts:gameReceipts.filter(x=>x.reversed_coin_cents===x.coin_cents).length,
  refundedOrderCount:orderLedger.filter(x=>x.status==='refunded').length,
  refundMarkersChecked:refundMarkers.length,
  allHistoricalEntriesConsistent:!blockers.some(x=>
- /order|receipt|refund|delivery|marker|quote/i.test(x))
+ /order|receipt|refund|delivery|marker|quote|account|audit|credit/i.test(x))
 };
 if(version!==VERSION)blockers.push('Worker version changed: re-review update');
 for(const key of ['STARS_PAYMENT_ENABLED','STARS_VARIABLE_TOPUP_ENABLED']){
