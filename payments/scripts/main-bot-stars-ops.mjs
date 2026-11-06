@@ -45,16 +45,52 @@ async function report(){
   warning:'No guarantee of exactly two paid invoices or automatic refund.'};
 }
 async function stop(){
- // Disable the shared DB switch first: checkout refuses to proceed.
+ // Shut down every new checkout immediately, even with pending refund work.
  await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars','crypto')");
- try{await sql(PD,'UPDATE rustup_stars_pilot_guard SET enabled=0 WHERE id=1');}catch{/* Guard might not yet be installed. */}
+ try{await sql(PD,'UPDATE rustup_stars_pilot_guard SET enabled=0 WHERE id=1');}
+ catch{/* Pilot guard has not been installed on pre-pilot workers. */}
+ const orders=await sql(PD,
+  "SELECT id,status FROM rustup_stars_variable_orders WHERE "+
+  "status IN ('paid','checkout_approved','refunded') ORDER BY created_at_ms DESC LIMIT 50");
+ const unresolved=[];
+ for(const order of orders){
+  if(!/^[0-9a-f-]{36}$/i.test(order.id)){
+   unresolved.push('invalid_order_id');continue;
+  }
+  if(order.status!=='refunded'){unresolved.push(order.id);continue;}
+  const [paidCredit,undone]=await Promise.all([
+   sql(GD,"SELECT COUNT(*) AS c FROM rustup_game_paid_receipts "+
+    "WHERE source='stars_variable' AND order_id='"+order.id+"'"),
+   sql(GD,"SELECT COUNT(*) AS c FROM rustup_game_paid_refunds "+
+    "WHERE source='stars_variable' AND order_id='"+order.id+"'")
+  ]);
+  if(paidCredit[0]?.c===1&&undone[0]?.c!==1)unresolved.push(order.id);
+ }
+ const flagged=await sql(PD,
+  "SELECT COUNT(*) AS c FROM rustup_stars_variable_refund_intents WHERE state IN ('pending','manual_review')");
+ if(flagged[0]?.c>0)unresolved.push('refund_intents_need_review');
+ const closingNames=unresolved.length===0?flags:[
+  'STARS_PAYMENT_ENABLED','STARS_VARIABLE_TOPUP_ENABLED',
+  'STARS_VARIABLE_CHECKOUT_RELEASE_APPROVED'
+ ];
  const failed=[];
- for(const name of flags){
+ for(const name of closingNames){
   try{await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text:'false'});}
   catch(e){failed.push(name);}
  }
+ if(unresolved.length===0&&failed.length===0){
+  await sql(GD,'UPDATE rustup_game_paid_release_control SET enabled=0 WHERE id=1');
+ }
  const result=await report();
- console.log(JSON.stringify({action:'stop',...result,failedFlagWrites:failed},null,2));
+ console.log(JSON.stringify({action:'stop',
+  checkoutDisabled:result.checkoutDisabled,
+  allFinancialRuntimeGatesDisabled:unresolved.length===0&&failed.length===0,
+  existingPaymentsNeedReconciliation:unresolved,
+  failedFlagWrites:failed,
+  note:unresolved.length>0?
+   'New payments OFF. Reconciliation gates remain active for outstanding receipts/refunds.':
+   'Pilot closed; every payment gate disabled after final reconciliation.'
+ },null,2));
  if(!result.checkoutDisabled||failed.length)process.exitCode=2;
 }
 
