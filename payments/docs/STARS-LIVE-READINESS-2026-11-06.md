@@ -30,3 +30,13 @@ Scope: Telegram-only Mini App Stars deposits to the existing RUST UP player bala
 **DO NOT** enable payment Worker variables or game release gate based solely on this report. No real invoices or game credits were initiated by these checks.
 
 References: https://core.telegram.org/bots/payments-stars and https://telegram.org/tos/bot-developers
+
+## Follow-up: Telegram authentication and gateway fixes (same date)
+
+- Live Telegram bot restored: `/start` and `/stats` respond.
+- Mini-App bot-token HMAC fixed to include Telegram's optional `signature` field; 56/56 local tests passed. Verified deployed Worker version `24ca912d-76fc-4695-a2a4-bbe2020164da`.
+- In the real Mini App, the server-side preview calculated 100 RUB as 55 Stars. This was **not** a real payment.
+- Further source fix committed: change shared Telegram Bot API `redirect: 'error'` to `redirect: 'manual'` to avoid Cloudflare Workers failures when creating invoices or independently checking confirmed Stars charges. The manual mode does **not** follow untrusted 3xx responses; the client fails closed. Added redirect regression test.
+- Safe live patch prepared at `payments/scripts/release-live-stars-gateway-fix.ps1`; **not yet deployed** as of this entry. The patch verifies current live bundle, Worker version and settings before publishing.
+- Latest production read-only verification: GAME release gate disabled and no approval reference; runtime payment switches master/stars/crypto all disabled; variable orders, frozen quotes, delivery jobs and unmatched receipt records all zero. All payment Worker flags still off.
+- Existing compliance/eligibility and end-to-end actual charge/refund blockers above remain; a successful technical patch is not approval to switch payments on.
