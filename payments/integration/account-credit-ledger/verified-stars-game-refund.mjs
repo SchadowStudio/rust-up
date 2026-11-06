@@ -106,8 +106,11 @@ export async function reconcileRecordedStarsRefundBatch(env,{
  // Only payments with a documented provider refund are eligible. Never infer
  // a refund merely because an invoice was cancelled or a user requested one.
  const rows=await env.PAYMENTS_DB.prepare(
-  'SELECT id FROM rustup_stars_variable_orders '+
-  "WHERE status='refunded' ORDER BY paid_at_ms ASC,id ASC LIMIT ?"
+  'SELECT o.id FROM rustup_stars_variable_orders o '+
+  "WHERE o.status='refunded' AND NOT EXISTS ("+
+  'SELECT 1 FROM rustup_stars_refund_reconciliation_done d '+
+  'WHERE d.order_id=o.id) '+
+  'ORDER BY o.paid_at_ms ASC,o.id ASC LIMIT ?'
  ).bind(maxBatch).all();
  if(!Array.isArray(rows?.results))
   throw Error('stars_refund_batch_database_unavailable');
@@ -122,7 +125,22 @@ export async function reconcileRecordedStarsRefundBatch(env,{
    }else if(result?.refunded===true&&
       result?.gameCreditHadBeenApplied===false){
     summary.noGameCredit++;
-   }else summary.manualReview++;
+   }else {summary.manualReview++;continue;}
+   // Record terminal success durably. A write failure leaves the order
+   // eligible for a retry; the game ledger itself remains idempotent.
+   const terminal=result.gameCreditReversed===true?
+    'reversed':'no_game_credit';
+   const marked=await env.PAYMENTS_DB.prepare(
+    'INSERT OR IGNORE INTO rustup_stars_refund_reconciliation_done '+
+    '(order_id,outcome,completed_at_ms) VALUES(?,?,?)'
+   ).bind(row.id,terminal,Date.now()).run();
+   if(marked?.meta?.changes!==1){
+    const existing=await env.PAYMENTS_DB.prepare(
+     'SELECT outcome FROM rustup_stars_refund_reconciliation_done WHERE order_id=?'
+    ).bind(row.id).first();
+    if(existing?.outcome!==terminal)
+     throw Error('stars_refund_terminal_marker_conflict');
+   }
   }catch{
    // Never skip uncertainty silently or mutate the game ledger as a fallback.
    summary.manualReview++;
