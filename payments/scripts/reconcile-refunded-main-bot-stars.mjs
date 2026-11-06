@@ -178,9 +178,8 @@ export async function reconcile(orderId,{apply=false}={}){
   'game_reversal_account_postcondition_failed_manual_review');
  // Only call the operation successful when this exact reversal is durable.
  // A failed metadata check must never lead to a second provider refund.
- const ledgerApplied=result.meta?.changes===1||
-  after.results[0].version>=state.balance.version+1;
- requireThat(ledgerApplied,
+ const versionAdvanced=after.results[0].version>state.balance.version;
+ requireThat(versionAdvanced,
   'game_reversal_version_not_confirmed_manual_review');
  return {orderId,refundedByTelegram:true,telegramHistoryConfirmed:true,
   gameCreditReversal:'verified',coinsReversed:state.receipt.coin_cents/100,
