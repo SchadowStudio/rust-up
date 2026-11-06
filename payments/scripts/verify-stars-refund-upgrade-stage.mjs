@@ -12,6 +12,7 @@ export const STAGE_SOURCES=Object.freeze([
  'deposit-history-readonly.mjs','stars-owner-price-preview.mjs',
  'stars-history-only-wrapper.mjs','stars-variable-webhook-wrapper.mjs',
  'stars-variable-bridge.mjs','variable-stars.mjs','stars.mjs',
+ 'stars-payment-support.mjs',
  'payment-controls.mjs','stars-delivery-queue.mjs',
  'verified-stars-game-credit.mjs','verified-stars-game-refund.mjs',
  'freeze-verified-stars-game-quote.mjs',
