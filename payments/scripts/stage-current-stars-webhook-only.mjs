@@ -22,12 +22,43 @@ const CURRENT=['worker.live-compiled-original.mjs','telegram-initdata.mjs',
  'deposit-history-readonly.mjs','stars-owner-price-preview.mjs',
  'stars-history-only-wrapper.mjs','worker.history-only-compiled-entry.mjs'];
 const ADDONS=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
- 'variable-stars.mjs','stars.mjs','payment-controls.mjs'];
+ 'variable-stars.mjs','stars.mjs','payment-controls.mjs',
+ 'stars-delivery-queue.mjs','verified-stars-game-credit.mjs'];
 const ENTRY='worker.stars-webhook-only-entry.mjs';
 const BUNDLE='worker.stars-webhook-only.bundle.js';
 const CONFIG='wrangler.stars-webhook-only.toml';
 const MANIFEST='RUSTUP-STARS-WEBHOOK-ONLY-STAGE.json';
 const sha=x=>createHash('sha256').update(x).digest('hex');
+
+const RELOCATIONS=Object.freeze({
+ 'stars-delivery-queue.mjs':[
+  "from '../account-credit-ledger/verified-stars-game-credit.mjs'",
+  "from './verified-stars-game-credit.mjs'"
+ ],
+ 'verified-stars-game-credit.mjs':[
+  "from '../telegram-stars/stars.mjs'",
+  "from './stars.mjs'"
+ ]
+});
+// Keep original security-sensitive source unchanged in GitHub; only flatten
+// the two exact relative imports inside the private staging directory.
+export function flattenVerifiedSettlementImport(name,source){
+ if(typeof source!=='string')reject('invalid_addon_source');
+ const replacement=RELOCATIONS[name];
+ if(!replacement)return source;
+ if(source.split(replacement[0]).length!==2)
+  reject('unexpected_paid_credit_import_layout_'+name);
+ if(source.includes(replacement[1]))
+  reject('duplicate_flattened_paid_credit_import_'+name);
+ return source.replace(replacement[0],replacement[1]);
+}
+async function addonSource(name){
+ const root=name==='verified-stars-game-credit.mjs'?
+  path.join(ROOT,'payments','integration','account-credit-ledger'):SRC;
+ return flattenVerifiedSettlementImport(name,
+  await fs.readFile(path.join(root,name),'utf8'));
+}
+
 function reject(message){throw Error('stars_webhook_stage_'+message);}
 
 export function webhookEntry(){
@@ -179,7 +210,7 @@ async function check(dir,current,requireBundle=false){
  sources.set(ENTRY,webhookEntry());
  sources.set(CONFIG,current.config);
  for(const name of ADDONS)
-  sources.set(name,await fs.readFile(path.join(SRC,name),'utf8'));
+  sources.set(name,await addonSource(name));
  for(const [name,value] of sources)
   if(await fs.readFile(path.join(dir,name),'utf8')!==value)
    reject('staged_source_changed_'+name);
@@ -189,6 +220,8 @@ async function check(dir,current,requireBundle=false){
      !code.includes('wrapHistoryOnlyWorker')||
      !code.includes('wrapCurrentStarsWebhook')||
      !code.includes('variableStarsWebhook')||
+     !code.includes('runVariableStarsDeliveryQueue')||
+     !code.includes('deliverVerifiedVariableStarsCredit')||
      !code.includes('/api/stars/variable/quote')||
      !code.includes('/api/stars/variable/history')||
      !code.includes('refDeposit'))
@@ -211,8 +244,7 @@ export async function stageStarsWebhookOnly(token,folder=null){
  for(const [name,content] of current.modules)
   await putOnce(path.join(dir,name),content);
  for(const name of ADDONS)
-  await putOnce(path.join(dir,name),
-   await fs.readFile(path.join(SRC,name),'utf8'));
+  await putOnce(path.join(dir,name),await addonSource(name));
  await putOnce(path.join(dir,ENTRY),webhookEntry());
  await putOnce(path.join(dir,CONFIG),current.config);
  await putOnce(path.join(dir,MANIFEST),
