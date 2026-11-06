@@ -29,12 +29,15 @@ async function query(db,sql){
     !Array.isArray(rows[0].results))throw Error('Incomplete D1 response');
  return rows[0].results;
 }
-const [deploy,settings,paymentControls,release,orders]=await Promise.all([
+const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,refundMarkers]=await Promise.all([
  req('/workers/scripts/'+WORKER+'/deployments'),
  req('/workers/scripts/'+WORKER+'/settings'),
  query(PAY,'SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel'),
  query(GAME,'SELECT enabled FROM rustup_game_paid_release_control WHERE id=1'),
- query(PAY,'SELECT status,COUNT(*) total FROM rustup_stars_variable_orders GROUP BY status')
+ query(PAY,'SELECT status,COUNT(*) total FROM rustup_stars_variable_orders GROUP BY status'),
+ query(PAY,"SELECT o.id,o.status,o.price_stars,CASE WHEN q.order_id IS NOT NULL THEN 1 ELSE 0 END frozen,COALESCE(j.state,'none') delivery FROM rustup_stars_variable_orders o LEFT JOIN rustup_stars_variable_credit_quotes q ON q.order_id=o.id LEFT JOIN rustup_stars_variable_delivery_jobs j ON j.order_id=o.id ORDER BY o.created_at_ms LIMIT 100"),
+ query(GAME,"SELECT r.order_id,r.coin_cents,CASE WHEN f.order_id IS NULL THEN 0 ELSE 1 END reversed FROM rustup_game_paid_receipts r LEFT JOIN rustup_game_paid_refunds f ON f.source=r.source AND f.order_id=r.order_id WHERE r.source='stars_variable' LIMIT 100"),
+ query(PAY,"SELECT order_id,outcome FROM rustup_stars_refund_reconciliation_done LIMIT 100")
 ]);
 const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
 const vars=Object.fromEntries((settings?.bindings||[]).filter(x=>x.type==='plain_text')
@@ -43,6 +46,38 @@ const secrets=new Set((settings?.bindings||[]).filter(x=>x.type==='secret_text')
  .map(x=>x.name));
 const channel=Object.fromEntries(paymentControls.map(x=>[x.channel,x.enabled]));
 const blockers=['Pilot secret values are masked; read-only API cannot prove pilot checkout readiness'];
+const receiptMap=new Map(gameReceipts.map(x=>[x.order_id,x]));
+const markerMap=new Map(refundMarkers.map(x=>[x.order_id,x.outcome]));
+if(gameReceipts.length!==receiptMap.size)blockers.push('Duplicate Stars game receipts detected');
+if(refundMarkers.length!==markerMap.size)blockers.push('Duplicate Stars refund markers detected');
+for(const order of orderLedger){
+ const receipt=receiptMap.get(order.id);
+ const marker=markerMap.get(order.id);
+ if(order.status==='paid'&&order.frozen!==1)
+  blockers.push('Paid order has no frozen quote');
+ if(order.status==='paid'&&order.delivery==='delivered'&&!receipt)
+  blockers.push('Delivery marked delivered without game receipt');
+ if(order.status==='refunded'&&receipt&&receipt.reversed!==1)
+  blockers.push('Refunded order has game credit but no reversal');
+ if(order.status==='refunded'&&receipt&&marker!=='reversed')
+  blockers.push('Refunded order reversal missing terminal marker');
+ if(order.status==='refunded'&&!receipt&&marker&&marker!=='no_game_credit')
+  blockers.push('Refunded no-credit order has inconsistent marker');
+ if(order.status==='refunded'&&order.delivery==='pending')
+  blockers.push('Refunded order is still pending delivery');
+}
+for(const receipt of gameReceipts){
+ if(!orderLedger.some(x=>x.id===receipt.order_id))
+  blockers.push('Game receipt missing matching Stars order');
+}
+const accounting={ordersChecked:orderLedger.length,
+ gameReceiptsChecked:gameReceipts.length,
+ refundedReceipts:gameReceipts.filter(x=>x.reversed===1).length,
+ refundedOrderCount:orderLedger.filter(x=>x.status==='refunded').length,
+ refundMarkersChecked:refundMarkers.length,
+ allHistoricalEntriesConsistent:!blockers.some(x=>
+ /order|receipt|refund|delivery|marker|quote/i.test(x))
+};
 if(version!==VERSION)blockers.push('Worker version changed: re-review update');
 for(const key of ['STARS_PAYMENT_ENABLED','STARS_VARIABLE_TOPUP_ENABLED']){
  if(vars[key]!=='true')blockers.push(key+' is OFF');
@@ -78,6 +113,7 @@ const report={
  starsRateRubPerStar:Number(vars.STARS_RUB_MINOR_PER_STAR_NUM)/
   Number(vars.STARS_RUB_MINOR_PER_STAR_DEN)/100,
  channels:channel,gameReleaseApproved:release[0]?.enabled===1,
+ historicalAccounting:accounting,
  ordersByStatus:orders,offlineTestsPassed:offlinePassed,
  liveOneStarPilotReady:false,
  secretValuesVerified:false,
