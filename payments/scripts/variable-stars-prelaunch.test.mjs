@@ -24,7 +24,7 @@ function fixture(){
   paymentTables:['rustup_stars_variable_orders','rustup_payment_settings',
    'rustup_stars_refund_intents','rustup_stars_receipt_incidents',
    'rustup_stars_variable_refund_intents'],
-  gameTables:['accounts','grants'],
+  gameTables:['accounts','users'],
   controls:[{channel:'master',enabled:0},{channel:'stars',enabled:0},
    {channel:'crypto',enabled:0}],
   paymentCounts:[
@@ -36,7 +36,7 @@ function fixture(){
   gameCounts:[{name:'account_rows',n:4}],
   workerText:'telegram_payment_charge_id variable_stars_checkout_disabled RUSTUP_STRICT_ACCOUNT_IMPORT_V1',
   siteHtml:'<script src="https://telegram.org/js/telegram-web-app.js?64"></script>'+
-   '<script src="js/stars-deposit-v5.js?v=20261105deposit1"></script>',
+   '<script src="js/stars-deposit-v5.js?v=20261106depositstatus1"></script>',
   workerVersion:'example-read-only'
  };
 }
@@ -54,6 +54,14 @@ test('accepts price intentionally deferred; never converts a passing offline che
  assert.ok(result.blockers.includes('production_settlement_adapter_verified'));
  assert.ok(result.checks.find(x=>x.id==='all_hard_payment_flags_off').ok);
  assert.equal(JSON.stringify(result).includes('BOT_TOKEN'),false);
+});
+test('current atomic paid receipt and refund journal are detected, without authorizing checkout',()=>{
+ const f=fixture();
+ f.gameTables.push('rustup_game_paid_receipts','rustup_game_paid_refunds',
+  'rustup_game_paid_release_control');
+ const r=evaluateVariableStarsPrelaunch(f);
+ assert.equal(r.checks.find(x=>x.id==='game_has_payment_booking_journal_schema').ok,true);
+ assert.equal(r.readyToAcceptRealPayments,false);
 });
 test('state drift and unresolved refunds block safe readiness',()=>{
  const x=fixture();
