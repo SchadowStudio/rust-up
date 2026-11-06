@@ -114,7 +114,10 @@ function main(){
   if(JSON.stringify(changed)!==
      JSON.stringify(['js/app.js','index.html',JS,CSS].sort()))
    throw Error('unexpected_website_file_change');
-  git(site,'diff','--cached','--check');
+  // Existing public app.js uses CRLF. Git normally flags an added CR as
+  // trailing whitespace even though it is the file's preserved EOL style.
+  // Accept only the CR at EOL; still reject added trailing spaces/tabs.
+  git(site,'-c','core.whitespace=cr-at-eol','diff','--cached','--check');
   git(site,'commit','-m','Add Telegram Stars deposit/status panel to existing wallet in disabled-money mode');
   git(site,'push','origin','main');
   console.log('PASS: Stars deposit UI published; live payment acceptance NOT enabled.');
