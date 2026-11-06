@@ -40,7 +40,11 @@ function targetedPatch(code){
  if(segment.split(BEFORE).length!==2)fail('compiled_gateway_changed');
  if(code.split(BEFORE).length!==2)fail('other_unexpected_gateway_call');
  const patched=code.slice(0,head)+segment.replace(BEFORE,AFTER)+code.slice(next);
- if(patched.replace(AFTER,BEFORE)!==code||patched.split(AFTER).length!==2)
+ // Another handler already uses redirect: "manual". Verify ONLY this
+ // provider function; replacing the first global match would be incorrect.
+ const patchedSegment=patched.slice(head,head+segment.length-BEFORE.length+AFTER.length);
+ if(patchedSegment.split(AFTER).length!==2||
+    code.slice(0,head)+patchedSegment.replace(AFTER,BEFORE)+code.slice(next)!==code)
   fail('patch_not_strictly_one_condition');
  return patched;
 }
@@ -138,7 +142,14 @@ async function verify(token,input,post){
  }else{
   if(live.version!==VERSION||hash(live.code)!==manifest.liveHash)
    fail('live_worker_drift_before_release');
-  const original=patched.replace(AFTER,BEFORE);
+  // Reverse the change inside telegramApi only, preserving the pre-existing
+  // redirect: "manual" in the independent payment-support handler.
+  const begin=patched.indexOf(MARKER);
+  const end=patched.indexOf('\n__name(telegramApi',begin);
+  if(begin<0||end<begin)fail('staged_provider_function_missing');
+  const segment=patched.slice(begin,end);
+  if(segment.split(AFTER).length!==2)fail('staged_provider_redirect_ambiguous');
+  const original=patched.slice(0,begin)+segment.replace(AFTER,BEFORE)+patched.slice(end);
   if(hash(original)!==manifest.liveHash)fail('not_exact_single_condition_patch');
   console.log('PASS: current Worker unchanged; single-option patch ready; all gates OFF.');
  }
