@@ -27,7 +27,9 @@ async function api(path,method='GET',body){
 async function sql(db,statement){
  const r=await api(BASE+'/d1/database/'+db+'/query','POST',{sql:statement});
  if(!Array.isArray(r)||!Array.isArray(r[0]?.results))throw Error('D1 query failed');
- return r[0].results;
+ const rows=r[0].results;
+ Object.defineProperty(rows,'meta',{value:r[0].meta});
+ return rows;
 }
 async function report(){
  const [rows,release,settings]=await Promise.all([
@@ -139,18 +141,19 @@ async function activate(){
  }
  // The release record may be set ONLY when the operator supplies a genuine
  // review document/reference and explicitly confirms it. Never fabricate one.
- if(canRecordOperatorReview){
-  const stored=await sql(GD,
-   "UPDATE rustup_game_paid_release_control SET enabled=1,"+
-   "approval_reference='"+reference+"',reviewed_at_ms="+Date.now()+
-   " WHERE id=1 AND enabled=0 AND approval_reference IS NULL");
-  if(stored.meta?.changes!==1)throw Error('operator_review_record_not_confirmed');
- }
-
  const now=Date.now(),expires=String(now+15*60*1000);
  // Ensure fixed-phase and 1 XTR maximum, one Telegram user only.
  // D1 master+stars remain OFF until last; if any step fails, DB stays OFF.
+ let operatorRecordCreated=false;
  try{
+  if(canRecordOperatorReview){
+   const stored=await sql(GD,
+    "UPDATE rustup_game_paid_release_control SET enabled=1,"+
+    "approval_reference='"+reference+"',reviewed_at_ms="+Date.now()+
+    " WHERE id=1 AND enabled=0 AND approval_reference IS NULL");
+   if(stored.meta?.changes!==1)throw Error('operator_review_record_not_confirmed');
+   operatorRecordCreated=true;
+  }
  // Install atomic purchase limit BEFORE enabling ANY financial gate.
  // This limits total checkout orders rather than relying on a browser counter.
  await sql(PD,`CREATE TABLE IF NOT EXISTS rustup_stars_pilot_guard(
@@ -201,6 +204,18 @@ async function activate(){
  }catch(e){
   try{await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars')");await sql(PD,"UPDATE rustup_stars_pilot_guard SET enabled=0 WHERE id=1");}
   catch{console.error('CRITICAL: emergency DB checkout shutdown failed');}
+  // Do not withdraw a release while a charge/order may already be in flight:
+  // the settlement cron must remain able to reconcile that payment.
+  if(operatorRecordCreated){
+   try{
+    const existing=await sql(PD,
+     'SELECT COUNT(*) AS count FROM rustup_stars_variable_orders');
+    if(existing[0]?.count===0)await sql(GD,
+     "UPDATE rustup_game_paid_release_control SET enabled=0,"+
+     "approval_reference=NULL,reviewed_at_ms=NULL WHERE id=1 AND approval_reference='"+
+     reference+"'");
+   }catch{console.error('REVIEW REQUIRED: approval rollback inconclusive');}
+  }
   console.error('Activation failed; D1 checkout shut. '+String(e.message||e));
   process.exitCode=1;
  }
