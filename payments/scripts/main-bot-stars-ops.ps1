@@ -1,6 +1,6 @@
 # Main bot RUST UP Stars operator operations.
 # activate: refuse unsafe activation; status: read live; stop: emergency checkout shutdown.
-param([Parameter(Mandatory=$true)][ValidateSet('activate','status','stop')][string]$Action)
+param([Parameter(Mandatory=$true)][ValidateSet('activate','custom','status','stop')][string]$Action)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $root
