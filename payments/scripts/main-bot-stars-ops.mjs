@@ -18,11 +18,75 @@ async function api(path,method='GET',body){
  const res=await fetch(path,{method,redirect:'manual',signal:AbortSignal.timeout(25000),
  headers:{authorization:'Bearer '+token,...(body?{'content-type':'application/json'}:{})},
  ...(body?{body:JSON.stringify(body)}:{})});
- if(!res.ok)throw Error('cloudflare_http_'+res.status);
+ if(!res.ok){
+  let detail='';
+  try{const issue=await res.json();detail=(issue.errors||[])
+   .map(x=>String(x.code||'')+':'+String(x.message||''))
+   .join(';').slice(0,280);}catch{}
+  throw Error('cloudflare_http_'+res.status+' '+method+' '+new URL(path).pathname+' '+detail);
+ }
  if(path.endsWith('/content/v2'))return await res.text();
  const obj=await res.json();
  if(obj.success!==true)throw Error('cloudflare_api_error');
  return obj.result;
+}
+
+// Update the EXISTING plain_text finance switches using the supported
+// multipart Worker settings PATCH, not the /secrets endpoint (10053).
+// Explicit inherit entries protect the bot token, D1, cron-related and other
+// bindings against accidental replacement or loss.
+async function updateRuntimeBindings(values){
+ const updates=new Map(Object.entries(values));
+ const current=await api(SCRIPT+'/settings');
+ if(!Array.isArray(current?.bindings)||current.bindings.length<10)
+  throw Error('worker_bindings_unavailable');
+ const original=new Map(current.bindings.map(x=>[x.name,x]));
+ for(const [name,value] of updates){
+  const prior=original.get(name);
+  if(!prior||prior.type!=='plain_text'||!['true','false'].includes(value))
+   throw Error('worker_plain_text_binding_mismatch_'+name);
+ }
+ const changed=[...updates].filter(([name,value])=>original.get(name)?.text!==value);
+ if(!changed.length)return {changed:0};
+ const names=Array.from(original.keys());
+ if(new Set(names).size!==names.length)throw Error('duplicate_worker_bindings');
+ const bindings=current.bindings.map(b=>
+  updates.has(b.name)?{name:b.name,type:'plain_text',text:updates.get(b.name)}:
+  {name:b.name,type:'inherit'}
+ );
+ const body=new FormData();
+ body.set('settings',new Blob([JSON.stringify({bindings})],{type:'application/json'}),'settings.json');
+ const response=await fetch(SCRIPT+'/settings',{
+  method:'PATCH',redirect:'manual',signal:AbortSignal.timeout(30000),
+  headers:{authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN},body
+ });
+ if(!response.ok){
+  let errors='';
+  try{const parsed=await response.json();
+   errors=(parsed.errors||[]).map(x=>String(x.code||'')+':'+String(x.message||'')).join(';').slice(0,300);
+  }catch{}
+  throw Error('worker_settings_patch_http_'+response.status+' '+errors);
+ }
+ const responseJson=await response.json();
+ if(responseJson.success!==true)throw Error('worker_settings_patch_rejected');
+ const verified=await api(SCRIPT+'/settings');
+ const latest=new Map(verified.bindings.map(x=>[x.name,x]));
+ if(latest.size!==original.size||
+   names.some(name=>!latest.has(name))||
+   [...updates].some(([name,value])=>latest.get(name)?.text!==value)||
+   [...original].some(([name,b])=>
+    !updates.has(name)&&latest.get(name)?.type!==b.type))
+  throw Error('worker_bindings_after_patch_inconsistent');
+ return {changed:changed.length};
+}
+async function updateRuntimeSecrets(values){
+ const settings=await api(SCRIPT+'/settings');
+ const lookup=new Map(settings.bindings.map(x=>[x.name,x]));
+ for(const [name,value] of Object.entries(values)){
+  if(lookup.get(name)?.type!=='secret_text')
+   throw Error('worker_secret_binding_mismatch_'+name);
+  await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text:value});
+ }
 }
 async function sql(db,statement){
  const r=await api(BASE+'/d1/database/'+db+'/query','POST',{sql:statement});
@@ -74,10 +138,18 @@ async function stop(){
   'STARS_VARIABLE_CHECKOUT_RELEASE_APPROVED'
  ];
  const failed=[];
+ const latest=await api(SCRIPT+'/settings');
+ const lookup=new Map(latest.bindings.map(x=>[x.name,x]));
+ const plain={},secrets={};
  for(const name of closingNames){
-  try{await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text:'false'});}
-  catch(e){failed.push(name);}
+  const type=lookup.get(name)?.type;
+  if(type==='plain_text')plain[name]='false';
+  else if(type==='secret_text')secrets[name]='false';
+  else failed.push(name);
  }
+ // Existing payments remain journalable when the cleanup is still pending.
+ try{await updateRuntimeBindings(plain);}catch(e){failed.push('plain_text:'+String(e.message||e));}
+ try{await updateRuntimeSecrets(secrets);}catch(e){failed.push('secret_text:'+String(e.message||e));}
  if(unresolved.length===0&&failed.length===0){
   await sql(GD,'UPDATE rustup_game_paid_release_control SET enabled=0 WHERE id=1');
  }
@@ -219,16 +291,23 @@ async function activate(){
  if(installed.length!==1)throw Error('atomic_pilot_order_trigger_unconfirmed');
  await sql(PD,`UPDATE rustup_stars_pilot_guard SET enabled=1,owner_id=7390606911,max_orders=2,phase='fixed' WHERE id=1 AND enabled=0`);
 
-  for(const [name,text] of [
-   ['STARS_VARIABLE_PILOT_USER_IDS','7390606911'],
-   ['STARS_VARIABLE_PILOT_MAX_STARS','1'],
-   ['STARS_VARIABLE_PILOT_EXPIRES_AT_MS',expires],
-   ['STARS_VARIABLE_PILOT_PHASE','fixed'],
-   ['STARS_FIXED_PRODUCTS_ENABLED','false'],
-   ...flags.map(name=>[name,'true'])
-  ]){
-   await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text});
-  }
+  await updateRuntimeSecrets({
+   STARS_VARIABLE_PILOT_USER_IDS:'7390606911',
+   STARS_VARIABLE_PILOT_MAX_STARS:'1',
+   STARS_VARIABLE_PILOT_EXPIRES_AT_MS:expires,
+   STARS_VARIABLE_PILOT_PHASE:'fixed',
+   STARS_GAME_CREDIT_SETTLEMENT_ENABLED:'true',
+   STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED:'true',
+   STARS_VARIABLE_CHECKOUT_RELEASE_APPROVED:'true'
+  });
+  // These are existing plain_text bindings, not secrets.
+  const plain=Object.fromEntries(flags.filter(n=>
+   !['STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
+     'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED',
+     'STARS_VARIABLE_CHECKOUT_RELEASE_APPROVED'].includes(n))
+   .map(n=>[n,'true']));
+  plain.STARS_FIXED_PRODUCTS_ENABLED='false';
+  await updateRuntimeBindings(plain);
   await sql(PD,"UPDATE rustup_payment_settings SET enabled=1,updated_at_ms="+now+
     ",updated_by=7390606911 WHERE channel IN ('master','stars')");
   const after=await report();
