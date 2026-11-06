@@ -19,6 +19,7 @@ function fixture(){
  const mock=async(url,options)=>{
   assert.match(url,/sendMessage$/);
   assert.equal(options.method,'POST');
+  assert.equal(options.redirect,'manual');
   const body=JSON.parse(options.body);
   assert.equal(body.chat_id,12345678);
   assert.match(body.text,/Ticket #987654321/);
@@ -55,5 +56,19 @@ test('forged update ID collision refuses to acknowledge support as a different u
   await assert.rejects(()=>handleStarsSupportCommand(f.payload,f.env,f.mock),
    /stars_support_ticket_conflict/);
   assert.equal(f.sent,0);
+ }finally{f.db.close();}
+});
+
+test('support rejects redirects without sending data to another endpoint',async()=>{
+ const f=fixture();
+ let calls=0;
+ try{
+  await assert.rejects(()=>handleStarsSupportCommand(f.payload,f.env,async(url,options)=>{
+   calls++;
+   assert.equal(options.redirect,'manual');
+   return {ok:false,status:302,headers:{get:()=> 'https://untrusted.example'}};
+  }),/telegram_gateway_unavailable/);
+  assert.equal(calls,1);
+  assert.equal(f.db.prepare('SELECT count(*) AS n FROM rustup_stars_support_requests').get().n,1);
  }finally{f.db.close();}
 });
