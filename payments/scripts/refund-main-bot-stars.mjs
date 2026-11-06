@@ -43,8 +43,10 @@ async function verifyTelegram(order,refunded=false){
   for(const tx of r.transactions){
    if(tx.id!==order.telegram_charge_id)continue;
    if(refunded){
-    if(tx.amount===-order.price_stars&&tx.receiver?.type==='user'&&
-     tx.receiver.user?.id===USER)seen=true;
+    // Telegram Stars outgoing refunds have positive amount, receiver=user,
+    // and reuse the original charge ID; source=user is the incoming payment.
+    if(tx.amount===order.price_stars&&tx.source==null&&
+       tx.receiver?.type==='user'&&tx.receiver.user?.id===USER)seen=true;
    }else{
     assert(tx.amount===order.price_stars&&tx.source?.type==='user'&&
      tx.source.user?.id===USER&&
