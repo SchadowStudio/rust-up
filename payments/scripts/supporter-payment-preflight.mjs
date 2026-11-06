@@ -60,7 +60,7 @@ export function evaluateSupporterReadiness(x){
  const moduleLinked=x.siteHtml.includes('js/stars-fixed-market-v3.js');
  const legacyMount=x.siteHtml.includes('20261105telegramauth2')&&
   !x.siteHtml.includes("sessionStorage.setItem('rustup_tg'");
- const newWalletMount=/js\\/app\\.js\\?v=[^"]+/.test(x.siteHtml)&&
+ const newWalletMount=x.siteHtml.includes('js/app.js?v=')&&
   x.siteHtml.includes('Демо-режим · виртуальный баланс')&&
   x.siteAppJs.includes('RUSTUP_STARS_FIXED_MARKET_V3.render(box)')&&
   x.siteAppJs.includes("api('load', { local })")&&
