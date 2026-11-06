@@ -9,6 +9,14 @@ const flags=[
  'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'PAYMENT_WALLET_STRICT_MODE'
 ];
+const settlementFlags=['STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
+ 'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED'];
+const gameTables=['rustup_game_paid_receipts','rustup_game_paid_refunds',
+ 'rustup_game_paid_release_control'];
+const gameTriggers=['rustup_game_paid_receipts_preflight',
+ 'rustup_game_paid_receipts_apply','rustup_game_paid_refunds_preflight',
+ 'rustup_game_paid_refunds_verify','rustup_game_paid_refunds_apply'];
+const gameGate={enabled:0,approval_reference:null,reviewed_at_ms:null};
 const variables=[
  'STARS_MIN_RUB_MINOR','STARS_MAX_RUB_MINOR',
  'STARS_RUB_MINOR_PER_STAR_NUM','STARS_RUB_MINOR_PER_STAR_DEN'
@@ -17,7 +25,9 @@ const knownSources=[
  'stars-variable-bridge.mjs','variable-stars.mjs',
  'worker.stars-variable-entry.mjs'
 ];
-const tables=['rustup_stars_variable_orders','rustup_payment_settings'];
+const tables=['rustup_stars_variable_orders','rustup_payment_settings',
+ 'rustup_stars_variable_credit_quotes','rustup_stars_variable_delivery_jobs',
+ 'rustup_stars_refund_reconciliation_done'];
 function settings(withQuote=false){
  const bindings=[
   {name:'DB',type:'d1',id:STATS},
@@ -26,7 +36,8 @@ function settings(withQuote=false){
    text:'https://ttzoomrust-hub.github.io/rust-up/'},
   {name:'BOT_TOKEN',type:'secret_text'},
   {name:'WEBHOOK_SECRET',type:'secret_text'},
-  ...flags.map(name=>({name,type:'plain_text',text:'false'}))
+  ...flags.map(name=>({name,type:'plain_text',text:'false'})),
+  ...settlementFlags.map(name=>({name,type:'plain_text',text:'false'}))
  ];
  if(withQuote){
   const nums=['100','100000000','300','1'];
@@ -38,6 +49,7 @@ function settings(withQuote=false){
 function audit(override={}){
  return evaluateStarsActivation({
   settings:settings(),tables,sourceNames:knownSources,
+  gameTables,gameTriggers,gameGate,
   liveVersion:'test-version',...override
  });
 }
@@ -121,4 +133,20 @@ test('wallet top-up readiness does not require unrelated supporter badge module'
  assert.equal(report.pricePreviewReady,true);
  assert.equal(report.realPaymentActivationReady,false);
  assert.equal(report.gameCreditConnected,false);
+});
+
+test('missing credit/refund settlement flags fail readiness closed',()=>{
+ const live=settings(true);
+ live.bindings=live.bindings.filter(x=>!settlementFlags.includes(x.name));
+ const report=audit({settings:live});
+ assert.equal(report.safeCurrentMode,false);
+ assert.ok(report.blockers.includes('settlement_flags_explicitly_off'));
+ assert.equal(report.realPaymentActivationReady,false);
+});
+test('missing production triggers and release gate fail audit closed',()=>{
+ const noTrigger=audit({gameTriggers:[]});
+ assert.ok(noTrigger.blockers.includes('game_paid_credit_refund_triggers'));
+ const noGate=audit({gameGate:null});
+ assert.equal(noGate.safeCurrentMode,false);
+ assert.ok(noGate.blockers.includes('game_paid_release_gate_off'));
 });
