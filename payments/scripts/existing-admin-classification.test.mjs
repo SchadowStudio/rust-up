@@ -30,7 +30,7 @@ test('reads existing numeric admins and @usernames plus FIRST_ADMIN without a se
  const f=fixture();
  try{
   const raw=f.run();
-  assert.deepEqual(raw,{
+  assert.deepEqual({...raw},{
    account_count:5,known_admin_accounts:3,legacy_admin_accounts:2,
    first_admin_accounts:1,review_accounts:2,
    admin_review_accounts:1,regular_review_accounts:1
