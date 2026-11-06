@@ -52,28 +52,100 @@ async function stop(){
  console.log(JSON.stringify({action:'stop',...result,failedFlagWrites:failed},null,2));
  if(!result.checkoutDisabled||failed.length)process.exitCode=2;
 }
+
+// Real activation, not a dummy toggle. This requires a pre-existing,
+// independently reviewed paid-game release record: never create approval
+// references or silently waive the release review.
+async function activate(){
+ const live=await report();
+ const approval=await sql(GD,
+  'SELECT enabled,approval_reference,reviewed_at_ms FROM rustup_game_paid_release_control WHERE id=1');
+ const approved=approval.length===1&&approval[0].enabled===1&&
+  typeof approval[0].approval_reference==='string'&&
+  approval[0].approval_reference.length>=8&&
+  Number.isSafeInteger(approval[0].reviewed_at_ms)&&approval[0].reviewed_at_ms>0;
+ const settings=await api(SCRIPT+'/settings');
+ const bs=new Map(settings.bindings.map(x=>[x.name,x]));
+ const blockers=[];
+ if(!approved)blockers.push('reviewed_paid_game_release_record_required');
+ if(!live.checkoutDisabled)blockers.push('existing_checkout_must_be_off');
+ if(!live.databaseSwitches.some(x=>x.channel==='crypto'&&x.enabled===0))
+  blockers.push('crypto_must_remain_off');
+ for(const name of ['BOT_TOKEN','WEBHOOK_SECRET']){
+  if(bs.get(name)?.type!=='secret_text')blockers.push('bot_binding_missing_'+name);
+ }
+ for(const name of ['DB','PAYMENTS_DB']){
+  if(bs.get(name)?.type!=='d1')blockers.push('database_binding_missing_'+name);
+ }
+ if(bs.get('STARS_FIXED_PRODUCTS_ENABLED')?.text!=='false')
+  blockers.push('fixed_products_must_remain_off');
+ const [counts,source,deploy]=await Promise.all([
+  sql(PD,"SELECT (SELECT count(*) FROM rustup_stars_variable_orders) AS orders,(SELECT count(*) FROM rustup_stars_receipt_incidents) AS incidents,(SELECT count(*) FROM rustup_stars_variable_delivery_jobs WHERE state IN ('retry','manual_review','leased')) AS failures"),
+  api(SCRIPT+'/content/v2'),
+  api(SCRIPT+'/deployments')
+ ]);
+ if(counts.length!==1||Object.values(counts[0]).some(n=>n!==0))
+  blockers.push('unreconciled_or_existing_stars_orders');
+ const code=typeof source==='string'?source:'';
+ for(const marker of ['function pilotStarsUserAllowed(','function pilotStarsAmountAllowed(',
+   'function pilotStarsPhaseAllowed(','async function variableStarsWebhook(',
+   'async function variableStarsApi(','runVariableStarsDeliveryQueue',
+   'reconcileRecordedStarsRefundBatch','freezeVerifiedStarsGameQuote']){
+  if(!code.includes(marker))blockers.push('worker_missing_'+marker);
+ }
+ const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
+ if(typeof version!=='string')blockers.push('live_version_unknown');
+ // The existing live code checks account binding and refund readiness before
+ // invoicing, but a release requires an independently reviewed ledger and
+ // reliable undo. A self-attested CLI flag is deliberately insufficient.
+ if(blockers.length){
+  console.log(JSON.stringify({action:'activate',activated:false,blockers},null,2));
+  process.exitCode=2;return;
+ }
+ // This switch is deliberately not run until operator-approved settlement
+ // and refund evidence is stored outside of this CLI. It cannot be invented.
+ const confirmed=process.env.RUSTUP_GAME_CREDIT_REFUND_REVIEWED==='true';
+ if(!confirmed){
+  console.log(JSON.stringify({action:'activate',activated:false,
+   blockers:['independent_live_credit_and_refund_review_required'],
+   checkedWorkerVersion:version,
+   note:'A review flag is an operator attestation, not a substitute for verification.'},null,2));
+  process.exitCode=2;return;
+ }
+ const now=Date.now(),expires=String(now+15*60*1000);
+ // Ensure fixed-phase and 1 XTR maximum, one Telegram user only.
+ // D1 master+stars remain OFF until last; if any step fails, DB stays OFF.
+ try{
+  for(const [name,text] of [
+   ['STARS_VARIABLE_PILOT_USER_IDS','7390606911'],
+   ['STARS_VARIABLE_PILOT_MAX_STARS','1'],
+   ['STARS_VARIABLE_PILOT_EXPIRES_AT_MS',expires],
+   ['STARS_VARIABLE_PILOT_PHASE','fixed'],
+   ['STARS_FIXED_PRODUCTS_ENABLED','false'],
+   ...flags.map(name=>[name,'true'])
+  ]){
+   await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text});
+  }
+  await sql(PD,"UPDATE rustup_payment_settings SET enabled=1,updated_at_ms="+now+
+    ",updated_by=7390606911 WHERE channel IN ('master','stars')");
+  const after=await report();
+  if(after.checkoutDisabled)throw Error('stars_checkout_not_open');
+  console.log(JSON.stringify({action:'activate',activated:true,phase:'fixed',
+   maxStars:1,onlyUserId:'7390606911',expiresAtMs:expires,
+   cryptoEnabled:false,refundable:'Requires transaction-by-transaction evidence and operator-approved refund',
+   note:'Stop via -Action stop; any successful charge requires manual reconciliation and refund.'},null,2));
+ }catch(e){
+  try{await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars')");}
+  catch{console.error('CRITICAL: emergency DB checkout shutdown failed');}
+  console.error('Activation failed; D1 checkout shut. '+String(e.message||e));
+  process.exitCode=1;
+ }
+}
 async function main(){
  const action=process.argv[2];
  if(action==='status')console.log(JSON.stringify(await report(),null,2));
  else if(action==='stop')await stop();
- else if(action==='activate'){
-  const current=await report();
-  const blockers=[];
-  if(!current.gameReleaseEnabled)blockers.push('game_paid_release_control.enabled=0');
-  for(const item of current.databaseSwitches){
-   if((item.channel==='master'||item.channel==='stars')&&item.enabled!==1)
-    blockers.push('payment_settings.'+item.channel+'.enabled=0');
-  }
-  for(const item of current.workerFlags){
-   if(!item.configured)blockers.push('worker_binding_missing:'+item.name);
-   else if(item.explicitlyOff)blockers.push('worker_binding_disabled:'+item.name);
-  }
-  blockers.push('atomic_two_purchase_limit_not_verified');
-  blockers.push('live_credit_and_refund_reconciliation_not_verified');
-  console.log(JSON.stringify({action:'activate',activated:false,
-   reason:'production_payment_release_not_verified',blockers,
-   next:'Do not turn on payment flags without an atomic purchase limit and verified game credit/refund.'},null,2));
-  process.exitCode=2;
- }else throw Error('Usage: status | stop | activate');
+ else if(action==='activate')await activate();
+ else throw Error('Usage: status | stop | activate');
 }
 main().catch(e=>{console.error('RUST UP PAYMENT OPS: '+String(e.message||e));process.exitCode=1;});
