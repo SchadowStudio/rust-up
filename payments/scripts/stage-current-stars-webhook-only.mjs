@@ -25,7 +25,8 @@ const ADDONS=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
  'variable-stars.mjs','stars.mjs','payment-controls.mjs',
  'stars-delivery-queue.mjs','verified-stars-game-credit.mjs',
  'verified-stars-game-refund.mjs',
- 'freeze-verified-stars-game-quote.mjs'];
+ 'freeze-verified-stars-game-quote.mjs',
+ 'trusted-rub-usd.mjs','frozen-game-coin-quote.mjs'];
 const ENTRY='worker.stars-webhook-only-entry.mjs';
 const BUNDLE='worker.stars-webhook-only.bundle.js';
 const CONFIG='wrangler.stars-webhook-only.toml';
@@ -37,7 +38,9 @@ const RELOCATIONS=Object.freeze({
   ["from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs'",
    "from './freeze-verified-stars-game-quote.mjs'"],
   ["from '../account-credit-ledger/verified-stars-game-refund.mjs'",
-   "from './verified-stars-game-refund.mjs'"]
+   "from './verified-stars-game-refund.mjs'"],
+  ["from '../account-credit-ledger/trusted-rub-usd.mjs'",
+   "from './trusted-rub-usd.mjs'"]
  ],
  'stars-delivery-queue.mjs':[
   "from '../account-credit-ledger/verified-stars-game-credit.mjs'",
@@ -71,7 +74,8 @@ export function flattenVerifiedSettlementImport(name,source){
 }
 async function addonSource(name){
  const root=['verified-stars-game-credit.mjs','verified-stars-game-refund.mjs',
-  'freeze-verified-stars-game-quote.mjs'].includes(name)?
+  'freeze-verified-stars-game-quote.mjs',
+  'trusted-rub-usd.mjs','frozen-game-coin-quote.mjs'].includes(name)?
   path.join(ROOT,'payments','integration','account-credit-ledger'):SRC;
  let value=await fs.readFile(path.join(root,name),'utf8');
  value=flattenVerifiedSettlementImport(name,value);
