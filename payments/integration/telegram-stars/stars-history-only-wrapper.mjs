@@ -75,7 +75,13 @@ export function wrapHistoryOnlyWorker(original,{
    let identity;
    try {
     identity=await verify(body?.initData,env?.BOT_TOKEN,Date.now(),86400);
-   }catch {
+   }catch (error) {
+    // Diagnose only a fixed, non-sensitive reason category. Never log initData,
+    // user IDs, hashes, token material or the incoming request body.
+    const reason=error?.message==='expired_telegram_auth'?'expired':
+      error?.message==='invalid_telegram_user'?'user':
+      error?.message==='invalid_telegram_auth'?'signature_or_format':'other';
+    console.warn('rustup_stars_auth_denied',path===QUOTE?'quote':'history',reason);
     return json({ok:false,error:'telegram_auth_required'},401,permitted);
    }
    if(path===QUOTE){
