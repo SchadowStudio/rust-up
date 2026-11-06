@@ -24,7 +24,8 @@ const CURRENT=['worker.live-compiled-original.mjs','telegram-initdata.mjs',
 const ADDONS=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
  'variable-stars.mjs','stars.mjs','payment-controls.mjs',
  'stars-delivery-queue.mjs','verified-stars-game-credit.mjs',
- 'verified-stars-game-refund.mjs'];
+ 'verified-stars-game-refund.mjs',
+ 'freeze-verified-stars-game-quote.mjs'];
 const ENTRY='worker.stars-webhook-only-entry.mjs';
 const BUNDLE='worker.stars-webhook-only.bundle.js';
 const CONFIG='wrangler.stars-webhook-only.toml';
@@ -33,8 +34,10 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 
 const RELOCATIONS=Object.freeze({
  'stars-variable-webhook-wrapper.mjs':[
-  "from '../account-credit-ledger/verified-stars-game-refund.mjs'",
-  "from './verified-stars-game-refund.mjs'"
+  ["from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs'",
+   "from './freeze-verified-stars-game-quote.mjs'"],
+  ["from '../account-credit-ledger/verified-stars-game-refund.mjs'",
+   "from './verified-stars-game-refund.mjs'"]
  ],
  'stars-delivery-queue.mjs':[
   "from '../account-credit-ledger/verified-stars-game-credit.mjs'",
@@ -55,14 +58,20 @@ export function flattenVerifiedSettlementImport(name,source){
  if(typeof source!=='string')reject('invalid_addon_source');
  const replacement=RELOCATIONS[name];
  if(!replacement)return source;
- if(source.split(replacement[0]).length!==2)
-  reject('unexpected_paid_credit_import_layout_'+name);
- if(source.includes(replacement[1]))
-  reject('duplicate_flattened_paid_credit_import_'+name);
- return source.replace(replacement[0],replacement[1]);
+ const pairs=Array.isArray(replacement[0])?replacement:[replacement];
+ let output=source;
+ for(const [from,to] of pairs){
+  if(output.split(from).length!==2)
+   reject('unexpected_paid_credit_import_layout_'+name);
+  if(output.includes(to))
+   reject('duplicate_flattened_paid_credit_import_'+name);
+  output=output.replace(from,to);
+ }
+ return output;
 }
 async function addonSource(name){
- const root=['verified-stars-game-credit.mjs','verified-stars-game-refund.mjs'].includes(name)?
+ const root=['verified-stars-game-credit.mjs','verified-stars-game-refund.mjs',
+  'freeze-verified-stars-game-quote.mjs'].includes(name)?
   path.join(ROOT,'payments','integration','account-credit-ledger'):SRC;
  let value=await fs.readFile(path.join(root,name),'utf8');
  value=flattenVerifiedSettlementImport(name,value);
@@ -259,6 +268,7 @@ async function check(dir,current,requireBundle=false){
      !code.includes('runVariableStarsDeliveryQueue')||
      !code.includes('deliverVerifiedVariableStarsCredit')||
      !code.includes('reconcileRecordedStarsRefundBatch')||
+     !code.includes('freezeVerifiedStarsGameQuote')||
      !code.includes('/api/stars/variable/quote')||
      !code.includes('/api/stars/variable/history')||
      !code.includes('refDeposit'))
