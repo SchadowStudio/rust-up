@@ -11,6 +11,25 @@ import {readStarsDepositHistory} from './deposit-history-readonly.mjs';
 const ROOT='/api/stars/variable/';
 const ROUTES=new Set(['quote','checkout','history']);
 const MAX_BODY=4096;
+// Explicit server-only pilot allowlist. Neither query parameters nor Mini App
+// request bodies may authorize payment access. This remains separate from
+// all production, settlement, refund and database release controls.
+export function pilotStarsUserAllowed(env,userId){
+ if(!Number.isSafeInteger(userId)||userId<=0)return false;
+ const raw=env?.STARS_VARIABLE_PILOT_USER_IDS;
+ if(typeof raw!=='string'||raw.length<1||raw.length>256)return false;
+ const values=raw.split(',');
+ if(values.length<1||values.length>10)return false;
+ const ids=new Set();
+ for(const value of values){
+  const id=value.trim();
+  if(!/^[1-9]\\d{0,15}$/.test(id)||!Number.isSafeInteger(Number(id))||
+     ids.has(id))return false;
+  ids.add(id);
+ }
+ return ids.has(String(userId));
+}
+
 // A concrete server-side quote freezer and audited settlement/reversal gates
 // are mandatory. Configuration flags alone do not establish pricing authority.
 function json(payload,status=200,origin=null){
@@ -79,8 +98,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
  }catch{return json({ok:false,error:'telegram_auth_required'},401,allowed);}
  if(!env?.PAYMENTS_DB)
   return json({ok:false,error:'payment_database_missing'},503,allowed);
- const enabled=await mayAcceptVariable(env,
-  typeof freezeQuote==='function');
+ const enabled=pilotStarsUserAllowed(env,identity.userId)&&
+  await mayAcceptVariable(env,typeof freezeQuote==='function');
  if(action==='quote'){
   try{
    const quote=quoteVariableStars(body?.amountMinor,env);
@@ -126,7 +145,11 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
    update?.message?.successful_payment?.invoice_payload;
  if(typeof payload!=='string'||!payload.startsWith('v:'))return false;
  if(!env?.PAYMENTS_DB)throw Error('payment_database_missing');
- const enabled=await mayAcceptVariable(env,true);
+ // A paid receipt must still be journaled even after pilot permission is
+ // revoked. Only new pre-checkout approvals need the allowlist.
+ const pilotAllowed=!update?.pre_checkout_query||
+  pilotStarsUserAllowed(env,update.pre_checkout_query.from?.id);
+ const enabled=pilotAllowed&&await mayAcceptVariable(env,true);
  const outcome=await handleVariableStarsUpdate(
   update,paymentEnv(env,enabled),fetchImpl
  );
