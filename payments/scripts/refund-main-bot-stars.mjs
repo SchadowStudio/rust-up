@@ -58,6 +58,50 @@ async function verifyTelegram(order,refunded=false){
  assert(complete,'stars_history_incomplete');
  assert(seen,refunded?'refund_evidence_not_yet_visible':'original_charge_unverified');
 }
+async function refundPreflight(orderId){
+ assert(ID.test(orderId),'order_uuid_required');
+ const {rows:orders}=await d1(PAY,
+  "SELECT id,telegram_user_id,requested_amount_minor,price_stars,status,"+
+  "telegram_charge_id,paid_at_ms FROM rustup_stars_variable_orders "+
+  "WHERE id='"+orderId+"'");
+ assert(orders.length===1,'order_not_found');
+ const order=orders[0];
+ assert(order.telegram_user_id===USER,'refund_not_pilot_owner');
+ const [quotes,credits,existing,previous,state]=await Promise.all([
+  d1(PAY,"SELECT coin_cents,amount_minor,telegram_user_id FROM rustup_stars_variable_credit_quotes WHERE order_id='"+orderId+"'"),
+  d1(GAME,"SELECT receipt_id,coin_cents FROM rustup_game_paid_receipts WHERE source='stars_variable' AND order_id='"+orderId+"'"),
+  d1(PAY,"SELECT state FROM rustup_stars_variable_refund_intents WHERE order_id='"+orderId+"'"),
+  d1(GAME,"SELECT order_id FROM rustup_game_paid_refunds WHERE source='stars_variable' AND order_id='"+orderId+"'"),
+  d1(GAME,"SELECT a.v,u.balance AS mirror,json_extract(a.state,'$.balance') AS canonical FROM accounts a JOIN users u ON a.id=u.id WHERE a.id="+USER)
+ ]);
+ const blockers=[];
+ if(order.status!=='paid'||!CHARGE.test(order.telegram_charge_id))
+  blockers.push('order_not_confirmed_paid');
+ if(quotes.rows.length!==1||quotes.rows[0].telegram_user_id!==USER||
+    quotes.rows[0].amount_minor!==order.requested_amount_minor)
+  blockers.push('frozen_quote_mismatch');
+ if(credits.rows.length!==1||quotes.rows.length!==1||
+    credits.rows[0].coin_cents!==quotes.rows[0].coin_cents||
+    credits.rows[0].receipt_id!==order.telegram_charge_id)
+  blockers.push('game_credit_receipt_mismatch');
+ if(existing.rows.length||previous.rows.length)
+  blockers.push('refund_started_or_already_reversed');
+ if(state.rows.length!==1||!Number.isFinite(state.rows[0].canonical)||
+    !Number.isFinite(state.rows[0].mirror))
+  blockers.push('game_account_unavailable');
+ else{
+  if(Math.abs(state.rows[0].canonical-state.rows[0].mirror)>=0.000001)
+   blockers.push('game_account_balance_mirror_unsynced');
+  if(quotes.rows.length===1&&state.rows[0].canonical<quotes.rows[0].coin_cents/100)
+   blockers.push('game_credit_not_available_for_reversal');
+ }
+ return {action:'preflight',orderId,ok:blockers.length===0,
+  paidStars:order.price_stars,creditedCoins:quotes.rows[0]?.coin_cents/100,
+  accountVersion:state.rows[0]?.v,
+  ...(state.rows.length===1?{canonicalCoins:state.rows[0].canonical,
+    mirrorCoins:state.rows[0].mirror}:{}),
+  blockers};
+}
 async function refund(orderId){
  assert(ID.test(orderId),'order_uuid_required');
  const {rows}=await d1(PAY,
@@ -164,11 +208,20 @@ async function refund(orderId){
  }
 }
 async function main(){
- const id=process.argv[2],phrase=process.argv[3];
- assert(ID.test(id||'')&&phrase==='REFUND '+id,
-  'Usage: node refund-main-bot-stars.mjs UUID "REFUND UUID"');
+ const mode=process.argv[2];
+ const id=mode==='--preflight'?process.argv[3]:process.argv[2];
+ assert(ID.test(id||''),'order_uuid_required');
  assert(typeof process.env.CLOUDFLARE_API_TOKEN==='string'&&
   process.env.CLOUDFLARE_API_TOKEN.length>20,'cloudflare_token_required');
+ const preflight=await refundPreflight(id);
+ if(mode==='--preflight'){
+  console.log(JSON.stringify(preflight,null,2));
+  if(!preflight.ok)process.exitCode=2;
+  return;
+ }
+ assert(process.argv[3]==='REFUND '+id,
+  'Usage: node refund-main-bot-stars.mjs UUID "REFUND UUID"');
+ assert(preflight.ok,'refund_preflight_blocked_'+preflight.blockers.join('_'));
  await refund(id);
 }
 main().catch(e=>{console.error('MAIN BOT STARS REFUND:',String(e.message||e));
