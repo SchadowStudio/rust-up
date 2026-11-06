@@ -94,6 +94,9 @@ async function refund(orderId){
  const {rows:existing}=await d1(PAY,
   "SELECT state FROM rustup_stars_variable_refund_intents WHERE order_id='"+orderId+"'");
  assert(existing.length===0,'refund_already_reserved_do_not_retry');
+ const currentBot=await telegram('getMe',{});
+ assert(currentBot?.username?.toLowerCase()==='rustuper_bot',
+  'wrong_bot_token_must_be_rustuper_bot');
  await verifyTelegram(o,false);
  // Atomic unique insert: this one-time lock is written BEFORE the provider call.
  const now=Date.now();
