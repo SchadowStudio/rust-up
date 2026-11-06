@@ -5,6 +5,7 @@ const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const CHARGE='secret-charge-private-01';
 const USER=123456789;
 const flags=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
+ 'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
  'PAYMENT_WALLET_STRICT_MODE','STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
  'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED'];
@@ -24,7 +25,11 @@ function fixture(){
    telegram_user_id:USER,amount_minor:100000,coin_cents:62500}],
   refunds:[],incidents:[{value:0}],refundIntents:[],
   controls:['master','stars','crypto'].map(channel=>({channel,enabled:0})),
-  bindings:flags.map(name=>({name,type:'plain_text',text:'false'})),
+  bindings:[
+   {name:'DB',type:'d1',id:'9b0b533f-540a-4a25-a429-70ca8bd4e23d'},
+   {name:'PAYMENTS_DB',type:'d1',id:'06079270-a227-466a-9991-abd4201ec5f6'},
+   ...flags.map(name=>({name,type:'plain_text',text:'false'}))
+  ],
   gameReleaseControl:{enabled:0,approval_reference:null,reviewed_at_ms:null}
  };
 }
@@ -42,6 +47,41 @@ test('matching records show consistency without claiming authorization to charge
  for(const secret of [ORDER,CHARGE,String(USER)])
   assert.equal(serialized.includes(secret),false);
 });
+test('fixed-product checkout, refunds and variable credits must all be explicitly OFF',()=>{
+ for(const flag of ['STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
+  'STARS_VARIABLE_CREDIT_LEDGER_READY']){
+  const data=fixture();
+  data.bindings.find(b=>b.name===flag).text='true';
+  const report=evaluateStarsSettlementSnapshot(data);
+  assert.equal(report.allChecksPass,false);
+  assert.ok(report.blockers.includes('payments_not_safely_disabled'));
+ }
+});
+
+test('missing, incorrect or repeated D1 bindings cannot pass settlement audit',()=>{
+ for(const issue of ['missing','different_database']){
+  const data=fixture();
+  const found=data.bindings.find(b=>b.name==='PAYMENTS_DB');
+  if(issue==='missing')data.bindings=data.bindings.filter(b=>b!==found);
+  else found.id='incorrect-payment-database';
+  const report=evaluateStarsSettlementSnapshot(data);
+  assert.equal(report.databasesCorrect,false);
+  assert.ok(report.blockers.includes('game_or_payments_database_binding_incorrect'));
+ }
+ const repeated=fixture();
+ repeated.bindings.push({...repeated.bindings.find(b=>b.name==='DB')});
+ assert.throws(()=>evaluateStarsSettlementSnapshot(repeated),
+  /reconciliation_invalid_or_duplicate_worker_binding/);
+});
+
+test('a settlement-specific release flag unexpectedly ON is not safe',()=>{
+ const data=fixture();
+ data.bindings.find(b=>b.name==='STARS_GAME_CREDIT_SETTLEMENT_ENABLED').text='true';
+ const result=evaluateStarsSettlementSnapshot(data);
+ assert.equal(result.allChecksPass,false);
+ assert.ok(result.blockers.includes('payments_not_safely_disabled'));
+});
+
 test('records paid without credit, without immutable quote, or missing receipt',()=>{
  const x=fixture();x.credits=[];x.quotes=[];x.orders[0].telegram_charge_id=null;
  const s=evaluateStarsSettlementSnapshot(x);
