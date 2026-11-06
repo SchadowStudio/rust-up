@@ -23,7 +23,8 @@ const CURRENT=['worker.live-compiled-original.mjs','telegram-initdata.mjs',
  'stars-history-only-wrapper.mjs','worker.history-only-compiled-entry.mjs'];
 const ADDONS=['stars-variable-webhook-wrapper.mjs','stars-variable-bridge.mjs',
  'variable-stars.mjs','stars.mjs','payment-controls.mjs',
- 'stars-delivery-queue.mjs','verified-stars-game-credit.mjs'];
+ 'stars-delivery-queue.mjs','verified-stars-game-credit.mjs',
+ 'verified-stars-game-refund.mjs'];
 const ENTRY='worker.stars-webhook-only-entry.mjs';
 const BUNDLE='worker.stars-webhook-only.bundle.js';
 const CONFIG='wrangler.stars-webhook-only.toml';
@@ -36,6 +37,10 @@ const RELOCATIONS=Object.freeze({
   "from './verified-stars-game-credit.mjs'"
  ],
  'verified-stars-game-credit.mjs':[
+  "from '../telegram-stars/stars.mjs'",
+  "from './stars.mjs'"
+ ],
+ 'verified-stars-game-refund.mjs':[
   "from '../telegram-stars/stars.mjs'",
   "from './stars.mjs'"
  ]
@@ -53,10 +58,16 @@ export function flattenVerifiedSettlementImport(name,source){
  return source.replace(replacement[0],replacement[1]);
 }
 async function addonSource(name){
- const root=name==='verified-stars-game-credit.mjs'?
+ const root=['verified-stars-game-credit.mjs','verified-stars-game-refund.mjs'].includes(name)?
   path.join(ROOT,'payments','integration','account-credit-ledger'):SRC;
- return flattenVerifiedSettlementImport(name,
-  await fs.readFile(path.join(root,name),'utf8'));
+ let value=await fs.readFile(path.join(root,name),'utf8');
+ value=flattenVerifiedSettlementImport(name,value);
+ if(name==='verified-stars-game-refund.mjs'){
+  const from="from './verified-stars-game-credit.mjs'";
+  // This relative import is valid after the private flattening step.
+  if(value.split(from).length!==2)reject('unexpected_refund_credit_import');
+ }
+ return value;
 }
 
 function reject(message){throw Error('stars_webhook_stage_'+message);}
@@ -243,6 +254,7 @@ async function check(dir,current,requireBundle=false){
      !code.includes('variableStarsWebhook')||
      !code.includes('runVariableStarsDeliveryQueue')||
      !code.includes('deliverVerifiedVariableStarsCredit')||
+     !code.includes('reconcileRecordedStarsRefundBatch')||
      !code.includes('/api/stars/variable/quote')||
      !code.includes('/api/stars/variable/history')||
      !code.includes('refDeposit'))
