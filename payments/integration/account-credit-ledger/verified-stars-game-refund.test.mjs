@@ -27,7 +27,7 @@ test('independent refund evidence matches positive outgoing Stars charge and Tel
  for(const bad of [
   {...tx,amount:534},
   {...tx,receiver:{type:'user',user:{id:user+1}}},
-  {...tx,source:{type:'user',user:{id:user}}},
+  {...tx,source:{type:'user',transaction_type:'invoice_payment',user:{id:user}}},
   {...tx,amount:-535}
  ]){
   await assert.rejects(
@@ -203,7 +203,7 @@ test('automatic refund discovery marks independently verified provider refund wi
  try{
   f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='paid' WHERE id=?").run(id);
   const original={id:tx.id,amount:535,date:1793999999,
-   source:{type:'user',user:{id:user}}};
+   source:{type:'user',transaction_type:'invoice_payment',user:{id:user}}};
   const env={...f.env,PAYMENT_PRODUCTION_ENABLED:'true'};
   const found=await discoverVerifiedStarsRefunds(env,{
    fetchImpl:bot([original,tx])
@@ -224,7 +224,7 @@ test('automatic refund discovery rejects forged or mismatched Stars refund evide
   f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='paid' WHERE id=?").run(id);
   const env={...f.env,PAYMENT_PRODUCTION_ENABLED:'true'};
   const original={id:tx.id,amount:535,date:1793999999,
-   source:{type:'user',user:{id:user}}};
+   source:{type:'user',transaction_type:'invoice_payment',user:{id:user}}};
   for(const forged of [
    {...tx,amount:534},{...tx,receiver:{type:'user',user:{id:user+1}}},
    {...tx,date:1793999998}
