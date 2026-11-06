@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-import {freezeVerifiedStarsGameQuote} from './freeze-verified-stars-game-quote.mjs';
+import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from './freeze-verified-stars-game-quote.mjs';
 
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const USER=123456789;
@@ -111,5 +111,23 @@ test('frozen quotes reject direct SQL UPDATE and DELETE',async()=>{
   assert.equal(f.pay.prepare(
    'SELECT coin_cents FROM rustup_stars_variable_credit_quotes'
   ).get().coin_cents,150);
+ }finally{f.close();}
+});
+
+test('1 RUB is exactly 1 Coin with no USD-rate dependency',async()=>{
+ assert.deepEqual(calculateRubCoinOneToOne({amountMinor:183}),
+  {coinCents:183,rubPerUsdMinor:null});
+ assert.deepEqual(calculateRubCoinOneToOne({amountMinor:10000}),
+  {coinCents:10000,rubPerUsdMinor:null});
+ assert.throws(()=>calculateRubCoinOneToOne({amountMinor:0}),/amount_invalid/);
+ const f=setup();
+ try{
+  const quoteResult=await freezeVerifiedStarsGameQuote(f.env,quote());
+  assert.deepEqual(quoteResult,{orderId:ORDER,amountMinor:10000,coinCents:10000});
+  const stored=f.pay.prepare(
+   'SELECT coin_cents,rub_per_usd_minor FROM rustup_stars_variable_credit_quotes'
+  ).get();
+  assert.equal(stored.coin_cents,10000);
+  assert.equal(stored.rub_per_usd_minor,null);
  }finally{f.close();}
 });
