@@ -214,8 +214,8 @@ export async function reconcileRecordedStarsRefundBatch(env,{
       !['paid','refunded'].includes(order.status)){
     result.review++;continue;
    }
-   result.detected++;
    if(order.status==='refunded')continue;
+   result.detected++;
    const applied=await env.PAYMENTS_DB.prepare(
     "UPDATE rustup_stars_variable_orders SET status='refunded' "+
     "WHERE id=? AND status='paid' AND telegram_charge_id=? "+
