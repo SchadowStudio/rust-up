@@ -4,10 +4,17 @@
 // accept coinCents or a conversion rate from Telegram Mini App input.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validInt=(n,min,max)=>Number.isSafeInteger(n)&&n>=min&&n<=max;
+// Direct owner-defined exchange: 1 RUB = 1 RUST-UP Coin.
+// amountMinor is kopecks; coinCents is hundredths of a Coin.
+export function calculateRubCoinOneToOne({amountMinor}){
+ if(!validInt(amountMinor,100,100000000))
+  throw Error('stars_rub_coin_amount_invalid');
+ return {coinCents:amountMinor,rubPerUsdMinor:null};
+}
 
 export async function freezeVerifiedStarsGameQuote(env,{
  orderId,verifiedTelegramUserId,amountMinor,now=Date.now()
-},calculateEntitlement){
+},calculateEntitlement=calculateRubCoinOneToOne){
  if(!env?.PAYMENTS_DB?.prepare||!env?.DB?.prepare||
     typeof calculateEntitlement!=='function'||
     !UUID.test(orderId||'')||
@@ -64,6 +71,8 @@ export async function freezeVerifiedStarsGameQuote(env,{
   orderId,telegramUserId:verifiedTelegramUserId,amountMinor
  });
  if(!validInt(entitlement?.coinCents,1,100000000)||
+    !(entitlement?.rubPerUsdMinor===null&&
+      entitlement.coinCents===amountMinor)&&
     !validInt(entitlement?.rubPerUsdMinor,100,100000))
   throw Error('stars_quote_freezer_pricing_unavailable');
  const values=[orderId,verifiedTelegramUserId,amountMinor,
