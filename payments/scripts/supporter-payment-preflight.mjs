@@ -19,7 +19,8 @@ const validIds=s=>typeof s==='string'&&s.split(',').some(id=>
 export function evaluateSupporterReadiness(x){
  if(!x||!Array.isArray(x.bindings)||!Array.isArray(x.tables)||
    !Array.isArray(x.products)||!Array.isArray(x.controls)||
-   !Array.isArray(x.incidents)||typeof x.siteHtml!=='string')
+   !Array.isArray(x.incidents)||typeof x.siteHtml!=='string'||
+   typeof x.siteAppJs!=='string')
   throw Error('incomplete_live_readiness_evidence');
  const bindings=new Map(x.bindings.map(v=>[v.name,v]));
  const flags=FLAGS.map(name=>bindings.get(name)?.text);
@@ -51,11 +52,21 @@ export function evaluateSupporterReadiness(x){
   'https://ttzoomrust-hub.github.io/rust-up/';
  const botReady=['BOT_TOKEN','WEBHOOK_SECRET'].every(name=>
   bindings.get(name)?.type==='secret_text');
- const siteReady=x.siteHtml.includes(
-  '<script src="https://telegram.org/js/telegram-web-app.js?64"></script>')&&
-  x.siteHtml.includes('20261105telegramauth2')&&
-  x.siteHtml.includes('js/stars-fixed-market-v3.js')&&
+ // Current website (2026-11-06) conditionally loads the OFFICIAL Telegram
+ // SDK inside the native Mini App and uses signed initData against /api/game.
+ // The old 2026-11-05 frontend loaded it statically. Both are acceptable
+ // ONLY with the reviewed fixed-goods asset and corresponding safe mount.
+ const sdk=x.siteHtml.includes('telegram.org/js/telegram-web-app.js');
+ const moduleLinked=x.siteHtml.includes('js/stars-fixed-market-v3.js');
+ const legacyMount=x.siteHtml.includes('20261105telegramauth2')&&
   !x.siteHtml.includes("sessionStorage.setItem('rustup_tg'");
+ const newWalletMount=/js\\/app\\.js\\?v=[^"]+/.test(x.siteHtml)&&
+  x.siteHtml.includes('Демо-режим · виртуальный баланс')&&
+  x.siteAppJs.includes('RUSTUP_STARS_FIXED_MARKET_V3.render(box)')&&
+  x.siteAppJs.includes("api('load', { local })")&&
+  x.siteAppJs.includes('gameReady = true;')&&
+  x.siteAppJs.includes("if ('wpay' in d || 'wsend' in d) { haptic('warning'); return toast(NOT_YET, 'error'); }");
+ const siteReady=sdk&&moduleLinked&&(legacyMount||newWalletMount);
  const controlsOff=['master','stars','crypto'].every(c=>
   x.controls.some(row=>row.channel===c&&row.enabled===0))&&
   x.controls.length===3;
@@ -113,9 +124,11 @@ export async function inspectSupporterReadiness(token,fetchImpl=fetch){
   api(token,d1,'SELECT channel,enabled FROM rustup_payment_settings',fetchImpl),
   api(token,d1,"SELECT COUNT(*) AS value FROM rustup_stars_receipt_incidents UNION ALL SELECT COUNT(*) AS value FROM rustup_stars_refund_intents WHERE state<>'completed'",fetchImpl),
   fetchImpl(SITE,{
+   method:'GET',redirect:'error',signal:AbortSignal.timeout(25000)}),
+  fetchImpl(SITE+'js/app.js',{
    method:'GET',redirect:'error',signal:AbortSignal.timeout(25000)})
  ];
- const [settings,tables,products,controls,incidents,site]=await Promise.all(requests);
+ const [settings,tables,products,controls,incidents,site,siteApp]=await Promise.all(requests);
  const termsRoute=await fetchImpl('https://rustup-bot.ttzoomrust.workers.dev/api/stars/terms',{
   method:'POST',redirect:'error',cache:'no-store',
   headers:{origin:new URL(SITE).origin,'content-type':'application/json'},
@@ -126,7 +139,7 @@ export async function inspectSupporterReadiness(token,fetchImpl=fetch){
  try{const body=await termsRoute.json();
   termsRouteAuthenticated=termsRoute.status===401&&
    body?.error==='telegram_auth_required';}catch{}
- if(!site.ok)throw Error('public_miniapp_unavailable');
+ if(!site.ok||!siteApp.ok)throw Error('public_miniapp_unavailable');
  const rows=q=>{
   if(!Array.isArray(q)||!Array.isArray(q[0]?.results))
    throw Error('unknown_cloudflare_d1_response');
@@ -135,7 +148,8 @@ export async function inspectSupporterReadiness(token,fetchImpl=fetch){
  return evaluateSupporterReadiness({
   bindings:settings?.bindings,tables:rows(tables).map(x=>x.name),
   products:rows(products),controls:rows(controls),incidents:rows(incidents),
-  termsRouteAuthenticated,siteHtml:await site.text()
+  termsRouteAuthenticated,siteHtml:await site.text(),
+  siteAppJs:await siteApp.text()
  });
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))
