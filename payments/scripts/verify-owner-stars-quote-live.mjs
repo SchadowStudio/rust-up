@@ -26,7 +26,7 @@ const REQUIRED=[
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const fail=code=>{throw Error('owner_quote_release_'+code);};
 
-export function checkOwnerQuoteSource(raw,originalHash=ORIGINAL_HASH){
+export function checkOwnerQuoteSource(raw,originalHash=ORIGINAL_HASH,stageHashes=null){
  if(typeof raw!=='string'||raw.length<100000||raw.length>25000000)
   fail('compiled_source_missing');
  const boundary=raw.split(/\r?\n/,1)[0].trim();
@@ -68,6 +68,11 @@ export function checkOwnerQuoteSource(raw,originalHash=ORIGINAL_HASH){
  if(originals.some(x=>typeof x.source!=='string'))fail('invalid_module_source');
  if(hash(originals[0].source)!==originalHash)
   fail('original_bot_hash_changed');
+ if(stageHashes!==null){
+  for(const source of originals)
+   if(hash(source.source)!==stageHashes[source.name])
+    fail('deployed_source_different_from_reviewed_stage_'+source.name);
+ }
  if(!originals.find(x=>x.name==='stars-owner-price-preview.mjs').source
    .includes('rubMinorPerStar:183'))
   fail('compiled_operator_rate_wrong');
@@ -130,13 +135,10 @@ export async function checkLiveOwnerQuote(token,stageFolder){
  const a=verifyOwnerQuoteSettings({
   settings,schedules,version,versionId,manifest:m,ownerRate:owner
  });
- const b=checkOwnerQuoteSource(raw);
- for(const name of REQUIRED){
-  const expected=name==='worker.live-compiled-original.mjs'?
-   ORIGINAL_HASH:hash(await fs.readFile(path.join(directory,name),'utf8'));
-  if(typeof expected!=='string')fail('missing_stage_hash');
- }
- return {...a,...b,realCheckoutEnabled:false,gameBalanceModified:false};
+ const stageHashes=Object.fromEntries(await Promise.all(REQUIRED.map(async name=>
+  [name,hash(await fs.readFile(path.join(directory,name),'utf8'))])));
+ const b=checkOwnerQuoteSource(raw,ORIGINAL_HASH,stageHashes);
+ return {...a,...b,realCheckoutEnabled:false};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const folder=process.argv[2];
