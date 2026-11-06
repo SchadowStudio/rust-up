@@ -57,7 +57,7 @@ test('current 2026-11-06 website receives only fixed Stars assets, not game cred
  for(const version of ['20261106d','20261106e','20261106f']){
   const changed=html().replaceAll('20261106d',version);
   const patched=patchCurrentWalletHtml(changed);
-  assert.match(patched,/stars-fixed-market-v3\\.js\\?v=20261106fixed1/);
+  assert.ok(patched.includes('js/stars-fixed-market-v3.js?v=20261106fixed1'));
   assert.ok(patched.includes('js/app.js?v='+version));
   assert.ok(patched.includes('css/style.css?v='+version));
  }
