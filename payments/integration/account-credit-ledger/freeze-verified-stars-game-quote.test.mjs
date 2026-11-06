@@ -31,6 +31,7 @@ function setup(){
   .run('test-only-reviewed',NOW);
  pay.exec(readFileSync(new URL('../telegram-stars/variable-migration.sql',import.meta.url),'utf8'));
  pay.exec(readFileSync(new URL('./variable-stars-credit-quote.sql',import.meta.url),'utf8'));
+ pay.exec(readFileSync(new URL('../telegram-stars/variable-stars-credit-quote-immutable.sql',import.meta.url),'utf8'));
  pay.prepare('INSERT INTO rustup_stars_variable_orders '+
   '(id,telegram_user_id,client_request_id,requested_amount_minor,'+
   'price_stars,rate_num,rate_den,status,created_at_ms,expires_at_ms) '+
@@ -94,5 +95,21 @@ test('invalid pricing refuses to freeze and cannot create an invoice',async()=>{
   await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote()),
    /unconfigured/);
   assert.equal(f.pay.prepare('SELECT COUNT(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
+ }finally{f.close();}
+});
+
+test('frozen quotes reject direct SQL UPDATE and DELETE',async()=>{
+ const f=setup();
+ try{
+  await freezeVerifiedStarsGameQuote(f.env,quote(),calc);
+  assert.throws(()=>f.pay.prepare(
+   'UPDATE rustup_stars_variable_credit_quotes SET coin_cents=999 WHERE order_id=?'
+  ).run(ORDER),/rustup_stars_frozen_quote_immutable/);
+  assert.throws(()=>f.pay.prepare(
+   'DELETE FROM rustup_stars_variable_credit_quotes WHERE order_id=?'
+  ).run(ORDER),/rustup_stars_frozen_quote_immutable/);
+  assert.equal(f.pay.prepare(
+   'SELECT coin_cents FROM rustup_stars_variable_credit_quotes'
+  ).get().coin_cents,150);
  }finally{f.close();}
 });
