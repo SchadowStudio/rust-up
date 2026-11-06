@@ -44,7 +44,7 @@ function fixture(){
   TG_STARS_BOT_TOKEN:'123456789:'+('a'.repeat(30))};
  return {env,game,pay,close(){game.close();pay.close();}};
 }
-const price=async()=>({coinCents:150,rubPerUsdMinor:9500});
+const price=async()=>({coinCents:10000,rubPerUsdMinor:null});
 function makeFreeze(env,calculator=price){
  return args=>freezeVerifiedStarsGameQuote(
   {...env,DB:env.DB,PAYMENTS_DB:env.PAYMENTS_DB},args,calculator
@@ -62,7 +62,7 @@ test('simulated invoice is created only after immutable credit quote, with exact
    assert.equal(request.prices[0].amount,55);
    assert.match(request.payload,/^v:/);
    const row=f.pay.prepare('SELECT coin_cents,telegram_user_id FROM rustup_stars_variable_credit_quotes').get();
-   assert.equal(row.coin_cents,150);
+   assert.equal(row.coin_cents,10000);
    assert.equal(row.telegram_user_id,USER);
    return {ok:true,json:async()=>({ok:true,result:'https://t.me/$fake-offline-invoice'})};
   };
@@ -101,5 +101,24 @@ test('game ledger release disabled prevents invoice even if all worker flags ena
    freezeQuote:makeFreeze(f.env)
   }),/game_release_disabled/);
   assert.equal(sent,0);
+ }finally{f.close();}
+});
+
+test('default 1 RUB = 1 Coin pricing freezes exactly 100 Coins for 100 RUB',async()=>{
+ const f=fixture();
+ try{
+  const args={verifiedTelegramUserId:USER,amountMinor:10000,
+   requestId:REQUEST,now:NOW,
+   fetchImpl:async()=>({ok:true,json:async()=>({ok:true,
+    result:'https://t.me/$fake-offline-invoice'})}),
+   freezeQuote:makeFreeze(f.env,async({amountMinor})=>({
+    coinCents:amountMinor,rubPerUsdMinor:null
+   }))
+  };
+  await createVariableStarsCheckout({...f.env,DB:f.env.PAYMENTS_DB},args);
+  const stored=f.pay.prepare('SELECT coin_cents,rub_per_usd_minor '+
+   'FROM rustup_stars_variable_credit_quotes').get();
+  assert.equal(stored.coin_cents,10000);
+  assert.equal(stored.rub_per_usd_minor,null);
  }finally{f.close();}
 });
