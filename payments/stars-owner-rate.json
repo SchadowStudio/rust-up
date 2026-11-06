@@ -1,5 +1,5 @@
 {
-  "description": "Operator-selected reference rate from supplied TGSTARS/RUB table (1000 Stars = 1871.59 RUB). Not an official guaranteed Telegram settlement or redemption rate.",
+  "description": "Historical Telegram Stars/RUB reference example only; NOT an operator-approved conversion or guaranteed Telegram redemption rate.",
   "referenceDate": "2026-11-05",
   "rubPerStarDecimal": "1.87159",
   "starsPerReferenceLot": 1000,
@@ -10,5 +10,7 @@
   "STARS_RUB_MINOR_PER_STAR_DEN": "1000",
   "invoiceRounding": "ceil to whole Star",
   "liveCheckoutEnabled": false,
-  "gameWalletCreditEnabled": false
+  "gameWalletCreditEnabled": false,
+  "operatorApproved": false,
+  "approvalStatus": "PENDING_OWNER_RATE_SELECTION"
 }
