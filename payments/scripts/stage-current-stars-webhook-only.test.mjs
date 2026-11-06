@@ -91,13 +91,19 @@ test('altered price, toggled gate, missing cron or wrong D1 refuses a build',()=
 test('garbled or missing live Worker source map fails, no source is invented',()=>{
  assert.throws(()=>extractCurrentModules(''),/stars_|owner_quote_/);
 });
-test('private Worker recovery safely flattens only two reviewed fulfillment imports',()=>{
+test('private Worker recovery safely flattens reviewed settlement and refund imports',()=>{
  const queue=readFileSync(new URL('../integration/telegram-stars/stars-delivery-queue.mjs',import.meta.url),'utf8');
  const credit=readFileSync(new URL('../integration/account-credit-ledger/verified-stars-game-credit.mjs',import.meta.url),'utf8');
  const stagedQueue=flattenVerifiedSettlementImport('stars-delivery-queue.mjs',queue);
  const stagedCredit=flattenVerifiedSettlementImport('verified-stars-game-credit.mjs',credit);
  assert.ok(stagedQueue.includes("from './verified-stars-game-credit.mjs'"));
  assert.ok(stagedCredit.includes("from './stars.mjs'"));
+ const wrapper=readFileSync(new URL('../integration/telegram-stars/stars-variable-webhook-wrapper.mjs',import.meta.url),'utf8');
+ const refund=readFileSync(new URL('../integration/account-credit-ledger/verified-stars-game-refund.mjs',import.meta.url),'utf8');
+ assert.ok(flattenVerifiedSettlementImport('stars-variable-webhook-wrapper.mjs',wrapper)
+  .includes("from './verified-stars-game-refund.mjs'"));
+ assert.ok(flattenVerifiedSettlementImport('verified-stars-game-refund.mjs',refund)
+  .includes("from './stars.mjs'"));
  assert.doesNotMatch(stagedQueue,/from '\.\.\/account-credit-ledger\//);
  assert.doesNotMatch(stagedCredit,/from '\.\.\/telegram-stars\//);
  assert.equal(flattenVerifiedSettlementImport('payment-controls.mjs','original'),
