@@ -92,7 +92,7 @@
   panel.append(make('p','w-note',
    'Счёт создаёт Telegram. Зачисление возможно только после подтверждения платежа сервером.'));
   panel.append(make('p','w-note',
-   'При пополнении: 1 ₽ = 1 игровая монета. Основной баланс в ₽ пересчитывается из игровых монет через курс USD/RUB — это другая величина. Историю зачисленных монет смотрите в «Мои пополнения».'));
+   'Пополнение зачисляется на существующий игровой баланс по курсу, зафиксированному в заказе. Текущий баланс в ₽ может немного отличаться из-за округления и изменения USD/RUB.'));
   const help=make('a','rustup-stars-help','Поддержка: @rustuperhelp_bot');
   help.href='https://t.me/rustuperhelp_bot';panel.append(help);
   // Telegram's "paid" callback is not a game-credit receipt. Poll the
@@ -104,7 +104,7 @@
       !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(orderId))return;
    creditPolling=true;
    try{
-    for(let attempt=0;attempt<30&&panel.isConnected;attempt++){
+    for(let attempt=0;attempt<90&&panel.isConnected;attempt++){
      await new Promise(resolve=>setTimeout(resolve,2000));
      if(!panel.isConnected)break;
      let data;
