@@ -14,7 +14,7 @@ import {runVariableStarsDeliveryQueue} from './stars-delivery-queue.mjs';
 import {discoverVerifiedStarsRefunds,reconcileRecordedStarsRefundBatch}
  from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
-const USER=123456789,OTHER=987654321;
+const USER=7390606911,OTHER=987654321;
 const TOKEN='123456789:'+('a'.repeat(35));
 const SECRET='synthetic-local-webhook-only';
 const BASE='https://rustup-bot.ttzoomrust.workers.dev';
@@ -155,6 +155,16 @@ test('SIGNED TELEGRAM USER: invoice -> confirmed receipt -> one canonical game c
   const unauthorized=await variableStarsApi(apiRequest('quote',{amountMinor:AMOUNT},OTHER),
    f.env,f.fakeTelegram);
   assert.equal((await unauthorized.json()).checkoutEnabled,false);
+  const rejectedCheckout=await f.worker.fetch(apiRequest('checkout',{
+   amountMinor:AMOUNT,requestId:randomUUID()
+  },OTHER),f.env,{});
+  assert.equal(rejectedCheckout.status,503);
+  assert.equal(f.calls.invoice,0);
+  const overLimit=await f.worker.fetch(apiRequest('quote',{
+   amountMinor:AMOUNT*2
+  }),f.env,{});
+  assert.equal(overLimit.status,200);
+  assert.equal((await overLimit.json()).checkoutEnabled,false);
   const quoted=await f.worker.fetch(apiRequest('quote',{amountMinor:AMOUNT}),f.env,{});
   assert.equal(quoted.status,200);
   const preview=await quoted.json();
