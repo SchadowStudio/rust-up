@@ -50,6 +50,6 @@ test('migration cannot by itself alter the existing user balances',()=>{
   INSERT INTO accounts VALUES(1,'{"balance":129.09}',12229,99);
   INSERT INTO users VALUES(1,124.09);`);
   db.exec(ddl);
-  assert.deepEqual(db.prepare("SELECT json_extract(a.state,'$.balance') canonical,u.balance mirror FROM accounts a JOIN users u ON u.id=a.id").get(),{canonical:129.09,mirror:124.09});
+  assert.deepEqual({...db.prepare("SELECT json_extract(a.state,'$.balance') canonical,u.balance mirror FROM accounts a JOIN users u ON u.id=a.id").get()},{canonical:129.09,mirror:124.09});
  }finally{db.close();}
 });
