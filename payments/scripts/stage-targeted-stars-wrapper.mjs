@@ -29,7 +29,7 @@ const NAMES=[
  'verified-stars-game-refund.mjs',TARGET,ENTRY
 ];
 const sha=s=>createHash('sha256').update(s).digest('hex');
-const normal=s=>s.replace(/\r\n/g,'\n');
+const normal=s=>s.replace(/\r\n/g,'\n').trimEnd();
 function fail(message){throw Error('targeted_wrapper_patch_'+message);}
 export function parseWorker16(body){
  if(typeof body!=='string'||body.length<100000||body.length>25000000)
@@ -152,6 +152,7 @@ async function prepare(token){
   version:1,baselineVersion:VERSION,
   liveFingerprint:fingerprint(live.sources),
   metadataHash:live.metadataHash,
+  configHash:sha(config),
   originalSourceHashes:sourceHashes(live.sources),
   targetSourceHashes:sourceHashes(newSources),
   changedFiles:[TARGET],
@@ -186,15 +187,20 @@ async function verify(token,dir,post=false){
     !compiled.includes('wrapCurrentStarsWebhook')||
     !compiled.includes('refDeposit'))
   fail('compiled_worker_contract_invalid');
- if(await fs.readFile(path.join(folder,CONFIG),'utf8')===
-   '' )fail('config_empty');
+ const config=await fs.readFile(path.join(folder,CONFIG),'utf8');
+ if(!config||sha(config)!==data.configHash||
+    !config.includes('keep_vars = true')||
+    !config.includes('main = "./'+BUNDLE+'"'))
+  fail('staged_config_modified');
  console.log(post?'PASS: deployed targeted wrapper matched all 16 sources and preserved settings.':
   'PASS: source, payment flags, bindings and current deployment unchanged.');
 }
-const mode=process.argv[2],dir=process.argv[3];
-const token=process.env.CLOUDFLARE_API_TOKEN;
-if(!token||token.length<15)fail('cloudflare_token_required');
-if(mode==='--stage')await prepare(token);
-else if(mode==='--verify'&&dir)await verify(token,dir);
-else if(mode==='--postverify'&&dir)await verify(token,dir,true);
-else fail('usage: --stage | --verify <folder> | --postverify <folder>');
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ const mode=process.argv[2],dir=process.argv[3];
+ const token=process.env.CLOUDFLARE_API_TOKEN;
+ if(!token||token.length<15)fail('cloudflare_token_required');
+ if(mode==='--stage')await prepare(token);
+ else if(mode==='--verify'&&dir)await verify(token,dir);
+ else if(mode==='--postverify'&&dir)await verify(token,dir,true);
+ else fail('usage: --stage | --verify <folder> | --postverify <folder>');
+}
