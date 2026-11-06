@@ -78,6 +78,7 @@ jobs:
           node --check payments/scripts/stage-current-stars-webhook-only.mjs
           node --test payments/scripts/stage-current-stars-webhook-only.test.mjs
           node --check payments/scripts/stage-current-rustup-dark-release.mjs
+          node --check payments/scripts/test-live-stars-readiness.mjs
           node --test payments/scripts/stage-current-rustup-dark-release.test.mjs
           node --check payments/scripts/verify-stars-webhook-only-live.mjs
           node --test payments/scripts/verify-stars-webhook-only-live.test.mjs
