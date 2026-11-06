@@ -22,7 +22,8 @@ const SQL=Object.freeze({
  refunds:"SELECT source,order_id,receipt_id,telegram_user_id,coin_cents FROM rustup_game_paid_refunds ORDER BY refunded_at_ms DESC LIMIT 2001",
  incidents:"SELECT COUNT(*) AS value FROM rustup_stars_receipt_incidents",
  refundIntents:"SELECT state,COUNT(*) AS total FROM rustup_stars_variable_refund_intents GROUP BY state",
- controls:"SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel"
+ controls:"SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel",
+ releaseControl:"SELECT enabled,approval_reference,reviewed_at_ms FROM rustup_game_paid_release_control WHERE id=1"
 });
 const positive=n=>Number.isSafeInteger(n)&&n>0;
 const count=n=>Number.isSafeInteger(n)&&n>=0;
@@ -46,7 +47,7 @@ function okCount(value){
 }
 export function evaluateStarsSettlementSnapshot(snapshot){
  const {paymentTables,gameTables,orders,quotes,credits,refunds,
-  incidents,refundIntents,controls,bindings}=snapshot||{};
+  incidents,refundIntents,controls,bindings,gameReleaseControl=null}=snapshot||{};
  if(!Array.isArray(paymentTables)||!Array.isArray(gameTables)||
     !Array.isArray(orders)||!Array.isArray(quotes)||
     !Array.isArray(credits)||!Array.isArray(refunds)||
@@ -55,6 +56,10 @@ export function evaluateStarsSettlementSnapshot(snapshot){
   throw Error('reconciliation_incomplete_read_only_evidence');
  const ledgerReady=['rustup_game_paid_receipts','rustup_game_paid_refunds']
   .every(table=>gameTables.includes(table));
+ const gameLedgerGateOff=gameTables.includes('rustup_game_paid_release_control')&&
+  gameReleaseControl?.enabled===0&&
+  gameReleaseControl.approval_reference==null&&
+  gameReleaseControl.reviewed_at_ms==null;
  const paymentsReady=['rustup_stars_variable_orders',
   'rustup_stars_variable_credit_quotes','rustup_stars_variable_refund_intents',
   'rustup_stars_receipt_incidents','rustup_payment_settings']
@@ -130,6 +135,7 @@ export function evaluateStarsSettlementSnapshot(snapshot){
   incidentCount+unresolvedRefundIntents;
  const blockers=[
   ...(!ledgerReady?['game_journal_schema_not_installed']:[]),
+  ...(!gameLedgerGateOff?['game_ledger_release_gate_not_verifiably_off']:[]),
   ...(!paymentsReady?['payment_quote_or_refund_schema_missing']:[]),
   ...(!complete?['read_only_scan_incomplete_more_than_2000_rows']:[]),
   ...(!chargingOff||!controlsDisabled?['payments_not_safely_disabled']:[]),
@@ -140,6 +146,7 @@ export function evaluateStarsSettlementSnapshot(snapshot){
   readOnly:true,chargesCreated:false,balancesChanged:false,
   livePaymentApproval:false,gameCreditReleaseApproved:false,
   schema:{paymentReady:paymentsReady,gameLedgerReady:ledgerReady},
+  gameLedgerGateOff,
   coverageComplete:complete,
   paymentOrderCounts:counts,
   scanned:{orders:pay.size,frozenQuotes:frozen.size,
@@ -186,17 +193,19 @@ export async function inspectLiveStarsSettlement(token,fetchImpl=fetch){
   const present=(db===PAYMENTS?paymentTables:gameTables).includes(table);
   return present?query(token,db,name,fetchImpl):[];
  }
- const [orders,incidents,controls,quotes,refundIntents,credits,refunds]=
-  await Promise.all([
+ const [orders,incidents,controls,quotes,refundIntents,credits,refunds,
+  releaseRows]=await Promise.all([
    ...paymentRequired.map(name=>query(token,PAYMENTS,name,fetchImpl)),
    ...paymentOptional.map((name,i)=>maybeQuery(token,PAYMENTS,name,
     ['rustup_stars_variable_credit_quotes','rustup_stars_variable_refund_intents'][i])),
    ...gameOptional.map((name,i)=>maybeQuery(token,GAME,name,
-    ['rustup_game_paid_receipts','rustup_game_paid_refunds'][i]))
+    ['rustup_game_paid_receipts','rustup_game_paid_refunds'][i])),
+   maybeQuery(token,GAME,'releaseControl','rustup_game_paid_release_control')
   ]);
  return evaluateStarsSettlementSnapshot({
   paymentTables,gameTables,orders,quotes,credits,refunds,
-  incidents,refundIntents,controls,bindings:bindings?.bindings||[]
+  incidents,refundIntents,controls,bindings:bindings?.bindings||[],
+  gameReleaseControl:releaseRows.length===1?releaseRows[0]:null
  });
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
