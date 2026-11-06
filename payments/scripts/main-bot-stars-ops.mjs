@@ -207,6 +207,23 @@ async function activate(){
  if(counts.length!==1||Object.values(counts[0]).some(n=>n!==0))
   blockers.push('unreconciled_or_existing_stars_orders');
  const code=typeof source==='string'?source:'';
+ // Existing game app formerly wrote users.balance separately AFTER the
+ // canonical account CAS. A concurrent verified Stars credit could then be
+ // overwritten by the stale mirror value. Require the live hotfix and SQL
+ // trigger before any subsequent payment pilot release.
+ const legacyStaleMirror='UPDATE users SET balance = ? WHERE id = ?';
+ if(code.includes(legacyStaleMirror))blockers.push('legacy_game_balance_mirror_race_present');
+ if(!code.includes('rustup_canonical_balance_after_account_update'))
+  blockers.push('canonical_game_mirror_hotfix_missing');
+ const liveSyncTrigger=await sql(GD,
+  "SELECT name FROM sqlite_master WHERE type='trigger' AND name='rustup_canonical_balance_after_account_update'");
+ if(liveSyncTrigger.length!==1)blockers.push('atomic_game_mirror_trigger_not_installed');
+ const gameMirror=await sql(GD,
+  "SELECT COUNT(*) AS mismatched FROM accounts a JOIN users u ON u.id=a.id "+
+  "WHERE a.id=7390606911 AND "+
+  "ABS(CAST(json_extract(a.state,'$.balance') AS REAL)-CAST(u.balance AS REAL))>=0.000001");
+ if(gameMirror.length!==1||gameMirror[0].mismatched!==0)
+  blockers.push('pilot_game_account_balance_mirror_mismatch');
  for(const marker of ['function pilotStarsUserAllowed(','function pilotStarsAmountAllowed(',
    'function pilotStarsPhaseAllowed(','async function variableStarsWebhook(',
    'async function variableStarsApi(','runVariableStarsDeliveryQueue',
