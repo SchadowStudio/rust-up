@@ -41,6 +41,7 @@ function wrapper(sqlite){
    const stmt=sqlite.prepare(query);
    return {
     async first(){return stmt.get(...args)||null;},
+    async all(){return {results:stmt.all(...args)};},
     async run(){return {meta:{changes:stmt.run(...args).changes}};}
    };
   }};
