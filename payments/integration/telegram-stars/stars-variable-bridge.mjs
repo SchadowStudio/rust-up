@@ -41,6 +41,16 @@ export function pilotStarsAmountAllowed(env,amountStars,now=Date.now()){
   end>now&&end<=now+24*60*60*1000;
 }
 
+// Pilot sequence is operator-controlled: fixed 1 Star -> chosen amount -> refund.
+// "refund" stops new invoices; existing receipts still reach the journal.
+// A phase change is not evidence of settlement or refund completion.
+export function pilotStarsPhaseAllowed(env,amountStars){
+ const phase=env?.STARS_VARIABLE_PILOT_PHASE;
+ if(phase==='fixed')return amountStars===1;
+ if(phase==='custom')return Number.isSafeInteger(amountStars)&&amountStars>=1;
+ return false;
+}
+
 // A concrete server-side quote freezer and audited settlement/reversal gates
 // are mandatory. Configuration flags alone do not establish pricing authority.
 function json(payload,status=200,origin=null){
@@ -115,7 +125,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
   try{
    const quote=quoteVariableStars(body?.amountMinor,env);
    return json({ok:true,checkoutEnabled:enabled&&
-    pilotStarsAmountAllowed(env,quote.priceStars),...quote},200,allowed);
+    pilotStarsAmountAllowed(env,quote.priceStars)&&
+    pilotStarsPhaseAllowed(env,quote.priceStars),...quote},200,allowed);
   }catch(e){
    return json({ok:false,error:e?.message==='variable_stars_amount_out_of_bounds'
     ?'invalid_amount_or_range':'conversion_not_configured'},422,allowed);
@@ -126,7 +137,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
   let preview;
   try {preview=quoteVariableStars(body?.amountMinor,env);}
   catch{return json({ok:false,error:'invalid_checkout'},400,allowed);}
-  if(!pilotStarsAmountAllowed(env,preview.priceStars))
+  if(!pilotStarsAmountAllowed(env,preview.priceStars)||
+     !pilotStarsPhaseAllowed(env,preview.priceStars))
    return json({ok:false,error:'topup_checkout_disabled'},503,allowed);
   if(!Number.isSafeInteger(body?.amountMinor)||typeof body?.requestId!=='string')
    return json({ok:false,error:'invalid_checkout'},400,allowed);
@@ -166,7 +178,8 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
  // revoked. Only new pre-checkout approvals need the allowlist.
  const pilotAllowed=!update?.pre_checkout_query||
   (pilotStarsUserAllowed(env,update.pre_checkout_query.from?.id)&&
-   pilotStarsAmountAllowed(env,update.pre_checkout_query.total_amount));
+   pilotStarsAmountAllowed(env,update.pre_checkout_query.total_amount)&&
+   pilotStarsPhaseAllowed(env,update.pre_checkout_query.total_amount));
  const enabled=pilotAllowed&&await mayAcceptVariable(env,true);
  const outcome=await handleVariableStarsUpdate(
   update,paymentEnv(env,enabled),fetchImpl
