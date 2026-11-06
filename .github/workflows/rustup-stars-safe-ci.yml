@@ -67,6 +67,10 @@ jobs:
         run: |
           node --check payments/scripts/audit-current-live-worker.mjs
           node --test payments/scripts/audit-current-live-worker.test.mjs
+      - name: Check source-map-free exact compiled Worker recovery with original named exports
+        run: |
+          node --check payments/scripts/stage-current-compiled-worker.mjs
+          node --test payments/scripts/stage-current-compiled-worker.test.mjs
       - name: Verify read-only cross-D1 payment and game ledger reconciliation
         run: |
           node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
