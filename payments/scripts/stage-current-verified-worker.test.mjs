@@ -12,13 +12,16 @@ const a10=['money.js','broadcast.js','creator.js','gamedata.js',
 const a12=['money.js','broadcast.js','creator.js','gamedata.js',
  'progress.js','fairlib.js','modes.js','social.js','game.js','support.js',
  'admin.js','worker.js'];
+const a13=['money.js','broadcast.js','creator.js','gamedata.js',
+ 'progress.js','fairlib.js','modes.js','social.js','game.js','brand.js',
+ 'support.js','admin.js','worker.js'];
 const stars=['stars.mjs','telegram-initdata.mjs','payment-controls.mjs',
  'supporter-badge.mjs','stars-terms.mjs','stars-live-bridge.mjs',
  'refunds.mjs','stars-existing-worker-wrapper.mjs',
  'worker.stars-commerce-entry.mjs'];
 function code(name){
  const start=name==='worker.js'?
-  'export default {fetch(){}};async function onUpdate(upd, env) {}':
+  'import {brand} from "./brand.js"; export default {fetch(){}};async function onUpdate(upd, env) {}':
   name==='game.js'?
   'export async function withAccount(env, id, fn) {}\n'+
   'export async function creditAccount(env, id, coins, mutate) {}':
@@ -47,8 +50,8 @@ function env(){
  ]};
 }
 const schedule={schedules:[{cron:'* * * * *'}]};
-test('exact 10/12/19/21-module Worker layouts are supported',()=>{
- for(const original of [a10,a12]){
+test('exact 10/12/13/19/21/22-module Worker layouts are supported',()=>{
+ for(const original of [a10,a12,a13]){
   for(const addon of [[],stars]){
    const names=[...original,...addon];
    const parsed=parseSupportedLiveWorker(multi(names));
@@ -65,6 +68,30 @@ test('current 12-module Worker stages fairlib and social without rewriting game'
  assert.equal(out.files.get('game.js'),code('game.js'));
  assert.equal(out.layout.original.length,12);
 });
+test('exact current live 13-module layout preserves brand and game bot without rewriting',()=>{
+ const out=parseSupportedLiveWorker(multi(a13));
+ assert.deepEqual(out.layout.original,a13);
+ assert.equal(out.layout.activeStars,false);
+ assert.equal(out.files.get('brand.js'),code('brand.js'));
+ assert.equal(out.files.get('game.js'),code('game.js'));
+ assert.equal(out.files.get('worker.js'),code('worker.js'));
+ assert.equal(out.layout.original.length,13);
+ const withStars=parseSupportedLiveWorker(multi([...a13,...stars]));
+ assert.equal(withStars.layout.original.length,13);
+ assert.equal(withStars.layout.activeStars,true);
+});
+
+test('brand.js can only be accepted in exact observed order and when the Worker imports it',()=>{
+ const moved=[...a13];
+ moved.splice(moved.indexOf('brand.js'),1);
+ moved.splice(2,0,'brand.js');
+ assert.throws(()=>parseSupportedLiveWorker(multi(moved)),
+  /unreviewed_worker_module_layout/);
+ assert.throws(()=>parseSupportedLiveWorker(
+  multi(a13).replace('from \\"./brand.js\\"','from \\"./unrelated.js\\"')
+ ),/current_brand_module_import_missing/);
+});
+
 test('an altered module count, source map or bot/game contract fails closed',()=>{
  assert.throws(()=>parseSupportedLiveWorker(multi(a12.slice(1))),
   /unreviewed_worker_module_layout/);
