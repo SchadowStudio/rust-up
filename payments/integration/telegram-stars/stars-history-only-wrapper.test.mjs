@@ -94,17 +94,45 @@ test('forged user data, wrong origin and absent DBs are denied',async()=>{
   assert.equal((await c.json()).error,'deposit_history_unavailable');
  }finally{f.close();}
 });
-test('nonexistent quote/checkout cannot reach original game or payment logic',async()=>{
+test('server-authoritative 1.83 RUB per Star quote is read-only and exact',async()=>{
+ const f=db(),o=original();
+ try {
+  const wrapped=wrapHistoryOnlyWorker(o.worker);
+  for(const [amountMinor,want] of [[100,1],[183,1],[184,2],
+   [10000,55],[25050,137],[100000,547],[150000,820],
+   [100000000,546449]]){
+   const response=await wrapped.fetch(req('/api/stars/variable/quote',{
+    body:JSON.stringify({initData:initData(),amountMinor})
+   }),f.env,{});
+   assert.equal(response.status,200);
+   const data=await response.json();
+   assert.equal(data.priceStars,want);
+   assert.equal(data.requestedAmountMinor,amountMinor);
+   assert.equal(data.checkoutEnabled,false);
+   assert.equal(data.creditedToGame,false);
+   assert.equal(data.rateNumerator,183000);
+   assert.equal(data.rateDenominator,1000);
+  }
+  assert.deepEqual(o.calls,[]);
+  assert.equal(f.pay.prepare('SELECT COUNT(*) AS n FROM rustup_stars_variable_orders').get().n,0);
+ }finally{f.close();}
+});
+test('checkout is never reachable even when payment flags are set, bad quote fails closed',async()=>{
  const f=db(),o=original();
  try{
   const wrapped=wrapHistoryOnlyWorker(o.worker);
-  for(const p of ['/api/stars/variable/checkout','/api/stars/variable/quote',
-   '/api/stars/variable/other']){
+  for(const p of ['/api/stars/variable/checkout','/api/stars/variable/other']){
    const result=await wrapped.fetch(req(p),{
     ...f.env,STARS_PAYMENT_ENABLED:'true',
     PAYMENT_PRODUCTION_ENABLED:'true'
    },{});
    assert.equal(result.status,404);
+  }
+  for(const amountMinor of [0,-10,'10000',1.23,100000001,null]){
+   const res=await wrapped.fetch(req('/api/stars/variable/quote',{
+    body:JSON.stringify({initData:initData(),amountMinor})
+   }),f.env,{});
+   assert.equal(res.status,422);
   }
   assert.deepEqual(o.calls,[]);
  }finally{f.close();}
