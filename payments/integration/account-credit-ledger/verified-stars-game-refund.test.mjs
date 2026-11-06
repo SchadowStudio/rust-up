@@ -179,3 +179,19 @@ test('refund batch refuses unbounded and malformed database work',async()=>{
  await assert.rejects(()=>reconcileRecordedStarsRefundBatch(env,{maxBatch:1}),
   /stars_refund_batch_database_unavailable/);
 });
+
+test('progress migration is additive and skips completed refunds on next batch',async()=>{
+ const f=fixture();
+ try{
+  f.pay.exec(readFileSync(new URL('../telegram-stars/variable-stars-refund-reconciliation.sql',import.meta.url),'utf8'));
+  f.env.PAYMENT_PRODUCTION_ENABLED='true';
+  const first=await reconcileRecordedStarsRefundBatch(f.env,{fetchImpl:bot()});
+  assert.equal(first.reversed,1);
+  assert.equal(first.manualReview,0);
+  assert.equal(f.pay.prepare('SELECT COUNT(*) AS n FROM rustup_stars_refund_reconciliation_done').get().n,1);
+  const again=await reconcileRecordedStarsRefundBatch(f.env,{fetchImpl:bot()});
+  assert.equal(again.selected,0);
+  assert.equal(again.reversed,0);
+  assert.equal(f.game.prepare('SELECT COUNT(*) AS n FROM rustup_game_paid_refunds').get().n,1);
+ }finally{f.game.close();f.pay.close();}
+});
