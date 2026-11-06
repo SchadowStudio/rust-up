@@ -205,17 +205,21 @@ export async function inspectLiveStarsSettlement(token,fetchImpl=fetch){
  const paymentOptional=['quotes','refundIntents'];
  const gameOptional=['credits','refunds'];
  async function maybeQuery(db,name,table){
+  // Strictly three args: an extra token argument used to shift all fields,
+  // silently skipping every optional credit/refund/ledger-gate query.
+  if(![GAME,PAYMENTS].includes(db)||typeof table!=='string'||
+     !Object.hasOwn(SQL,name))throw Error('optional_payment_query_invalid_arguments');
   const present=(db===PAYMENTS?paymentTables:gameTables).includes(table);
   return present?query(token,db,name,fetchImpl):[];
  }
  const [orders,incidents,controls,quotes,refundIntents,credits,refunds,
   releaseRows]=await Promise.all([
    ...paymentRequired.map(name=>query(token,PAYMENTS,name,fetchImpl)),
-   ...paymentOptional.map((name,i)=>maybeQuery(token,PAYMENTS,name,
+   ...paymentOptional.map((name,i)=>maybeQuery(PAYMENTS,name,
     ['rustup_stars_variable_credit_quotes','rustup_stars_variable_refund_intents'][i])),
-   ...gameOptional.map((name,i)=>maybeQuery(token,GAME,name,
+   ...gameOptional.map((name,i)=>maybeQuery(GAME,name,
     ['rustup_game_paid_receipts','rustup_game_paid_refunds'][i])),
-   maybeQuery(token,GAME,'releaseControl','rustup_game_paid_release_control')
+   maybeQuery(GAME,'releaseControl','rustup_game_paid_release_control')
   ]);
  return evaluateStarsSettlementSnapshot({
   paymentTables,gameTables,orders,quotes,credits,refunds,
