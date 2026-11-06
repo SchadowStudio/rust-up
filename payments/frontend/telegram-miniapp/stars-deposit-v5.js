@@ -95,6 +95,42 @@
    'При пополнении: 1 ₽ = 1 игровая монета. Основной баланс в ₽ пересчитывается из игровых монет через курс USD/RUB — это другая величина. Историю зачисленных монет смотрите в «Мои пополнения».'));
   const help=make('a','rustup-stars-help','Поддержка: @rustuperhelp_bot');
   help.href='https://t.me/rustuperhelp_bot';panel.append(help);
+  // Telegram's "paid" callback is not a game-credit receipt. Poll the
+  // authenticated cross-D1 history for THIS order, then refresh the real
+  // game state. Never increase the browser balance optimistically.
+  let creditPolling=false;
+  async function waitForVerifiedGameCredit(orderId){
+   if(creditPolling||typeof orderId!=='string'||
+      !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(orderId))return;
+   creditPolling=true;
+   try{
+    for(let attempt=0;attempt<30&&panel.isConnected;attempt++){
+     await new Promise(resolve=>setTimeout(resolve,2000));
+     if(!panel.isConnected)break;
+     let data;
+     try{data=await request('history',{},AbortSignal.timeout(10000));}
+     catch{continue;}
+     const order=Array.isArray(data.orders)?
+       data.orders.find(item=>item.id===orderId):null;
+     if(!order)continue;
+     if(order.creditState==='credited_to_game'&&
+        order.creditedToGame===true&&
+        Number.isSafeInteger(order.creditedCoinCents)&&
+        order.creditedCoinCents>0){
+      summary.textContent='✅ Зачисление подтверждено. Обновляем игровой баланс…';
+      window.dispatchEvent(new Event('rustup:wallet-credit-confirmed'));
+      return;
+     }
+     if(['refund_reversed','refunded_no_game_credit','manual_review'].includes(order.creditState)){
+      summary.textContent='Зачисление не выполнено: '+(
+       depositCreditStatus[order.creditState]||'Проверьте историю');
+      return;
+     }
+    }
+    if(panel.isConnected)summary.textContent=
+      'Telegram оплату подтвердил, но зачисление ещё не подтверждено. Проверьте историю или обратитесь в поддержку.';
+   }finally{creditPolling=false;}
+  }
   let confirmed=null,loading=false,seq=0;
   function reset(){
    // Invalidate any quote still in flight when the player changes the amount.
@@ -138,6 +174,7 @@
     if(data.creditedToGame!==false||link.protocol!=='https:'||
        link.hostname!=='t.me'||!/^\/\$[A-Za-z0-9_-]{8,256}$/.test(link.pathname))
       throw {status:503};
+    const paidOrderId=data.orderId;
     window.Telegram.WebApp.openInvoice(data.invoiceUrl,result=>{
       if(!panel.isConnected)return;
       if(result==='paid'){
@@ -145,6 +182,7 @@
        // A client callback is NOT a receipt. Always load the signed,
        // cross-database history; no optimistic balance changes.
        if(!historyButton.disabled)historyButton.click();
+       void waitForVerifiedGameCredit(paidOrderId);
       }else if(result==='cancelled')summary.textContent='Оплата отменена.';
       else summary.textContent='Платёж не подтверждён. Проверьте историю.';
     });
