@@ -28,7 +28,12 @@ export async function handleStarsSupportCommand(update,env,fetchImpl=fetch){
   '. Bitte bewahre deine Telegram-Transaktions-ID auf. '+
   'Für weitere Angaben sende /payissue mit Beschreibung und Ticketnummer. '+
   'Ein Refund wird geprüft, aber nicht automatisch ausgelöst.';
+ // Cloudflare Workers supports only redirect: 'follow' or 'manual'.
+ // The shared Telegram client uses 'error', which throws before any request
+ // in Workers. 'manual' never follows a cross-origin redirect; a 3xx remains
+ // non-ok and the shared client rejects it, preserving Telegram retry.
+ const fetchNoRedirect=(url,options)=>fetchImpl(url,{...options,redirect:'manual'});
  await telegramApi({TG_STARS_BOT_TOKEN:env.BOT_TOKEN},'sendMessage',
-  {chat_id:chat,text:msg},fetchImpl);
+  {chat_id:chat,text:msg},fetchNoRedirect);
  return true;
 }
