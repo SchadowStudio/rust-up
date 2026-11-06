@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne} from './freeze-verified-stars-game-quote.mjs';
+import {freezeVerifiedStarsGameQuote,calculateRubCoinOneToOne,calculateRubGameCredit} from './freeze-verified-stars-game-quote.mjs';
 
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const USER=123456789;
@@ -92,8 +92,7 @@ test('invalid pricing refuses to freeze and cannot create an invoice',async()=>{
    await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),
     async()=>bad),/pricing_unavailable/);
   }
-  // An omitted calculator now intentionally uses the trusted 1 RUB = 1 Coin
-  // default. Explicitly invalid injection must still fail closed.
+  // A missing explicit pricing function must fail closed.
   await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),null),
    /unconfigured/);
   assert.equal(f.pay.prepare('SELECT COUNT(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
@@ -116,15 +115,19 @@ test('frozen quotes reject direct SQL UPDATE and DELETE',async()=>{
  }finally{f.close();}
 });
 
-test('1 RUB is exactly 1 Coin with no USD-rate dependency',async()=>{
+test('historical 1:1 helper remains explicit, but paid RUB converts to displayed game units',async()=>{
  assert.deepEqual(calculateRubCoinOneToOne({amountMinor:183}),
   {coinCents:183,rubPerUsdMinor:null});
  assert.deepEqual(calculateRubCoinOneToOne({amountMinor:10000}),
   {coinCents:10000,rubPerUsdMinor:null});
  assert.throws(()=>calculateRubCoinOneToOne({amountMinor:0}),/amount_invalid/);
+ assert.deepEqual(calculateRubGameCredit({amountMinor:183,rubPerUsdMinor:8000}),
+  {coinCents:114,rubPerUsdMinor:8000});
+ assert.deepEqual(calculateRubGameCredit({amountMinor:732,rubPerUsdMinor:8000}),
+  {coinCents:457,rubPerUsdMinor:8000});
  const f=setup();
  try{
-  const quoteResult=await freezeVerifiedStarsGameQuote(f.env,quote());
+  const quoteResult=await freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne);
   assert.deepEqual(quoteResult,{orderId:ORDER,amountMinor:10000,coinCents:10000});
   const stored=f.pay.prepare(
    'SELECT coin_cents,rub_per_usd_minor FROM rustup_stars_variable_credit_quotes'
@@ -141,14 +144,14 @@ test('reject an invoice before any quote write when the game balance would excee
    .run(JSON.stringify({balance:99999999.5}),USER);
   f.game.prepare('UPDATE users SET balance=? WHERE id=?')
    .run(99999999.5,USER);
-  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote()),
+  await assert.rejects(()=>freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne),
    /game_balance_cap_exceeded/);
   assert.equal(f.pay.prepare('SELECT count(*) n FROM rustup_stars_variable_credit_quotes').get().n,0);
   f.game.prepare('UPDATE accounts SET state=? WHERE id=?')
    .run(JSON.stringify({balance:99999900}),USER);
   f.game.prepare('UPDATE users SET balance=? WHERE id=?')
    .run(99999900,USER);
-  const accepted=await freezeVerifiedStarsGameQuote(f.env,quote());
+  const accepted=await freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne);
   assert.equal(accepted.coinCents,10000);
  }finally{f.close();}
 });
