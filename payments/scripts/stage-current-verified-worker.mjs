@@ -1,5 +1,5 @@
 // RUST UP: safe staging for the exact supported currently deployed Worker.
-// Supports reviewed 10-, 12- and current verified 13-module game bot layouts,
+// Supports reviewed 10-, 12- and both verified 13-module game bot layouts,
 // with or without the 9-module fixed-goods Stars wrapper (10/12/13/19/21/22).
 // Source-maps recovered from Cloudflare; NO payment enabling or deployment.
 import fs from 'node:fs/promises';
@@ -24,15 +24,20 @@ const BASE12=['money.js','broadcast.js','creator.js','gamedata.js',
 const BASE13=['money.js','broadcast.js','creator.js','gamedata.js',
  'progress.js','fairlib.js','modes.js','social.js','game.js','brand.js',
  'support.js','admin.js','worker.js'];
+// Live 2026-11-06 Wrangler publisher variant, verified against Cloudflare.
+// Same 13 module names and contracts, but preserve its exact source order.
+const BASE13_W=['money.js','broadcast.js','gamedata.js','progress.js',
+ 'fairlib.js','modes.js','game.js','social.js','creator.js','brand.js',
+ 'support.js','admin.js','worker.js'];
 const STARS=['stars.mjs','telegram-initdata.mjs','payment-controls.mjs',
  'supporter-badge.mjs','stars-terms.mjs','stars-live-bridge.mjs',
  'refunds.mjs','stars-existing-worker-wrapper.mjs',
  'worker.stars-commerce-entry.mjs'];
 const LAYOUTS=[
  {original:BASE10,activeStars:false},{original:BASE12,activeStars:false},
- {original:BASE13,activeStars:false},
+ {original:BASE13,activeStars:false},{original:BASE13_W,activeStars:false},
  {original:BASE10,activeStars:true},{original:BASE12,activeStars:true},
- {original:BASE13,activeStars:true}
+ {original:BASE13,activeStars:true},{original:BASE13_W,activeStars:true}
 ].map(l=>({...l,names:[...l.original,...(l.activeStars?STARS:[])]}));
 const NAME='RUSTUP-VERIFIED-WORKER-MANIFEST.json';
 const CONFIG='wrangler.stars-verified.toml';
@@ -71,7 +76,7 @@ export function parseSupportedLiveWorker(body,contentType=''){
    fail('invalid_source_'+layout.names[i]);
   files.set(layout.names[i],source);
  }
- if(layout.original===BASE13&&
+ if((layout.original===BASE13||layout.original===BASE13_W)&&
     !files.get('worker.js').includes("from './brand.js'")&&
     !files.get('worker.js').includes('from "./brand.js"'))
   fail('current_brand_module_import_missing');
