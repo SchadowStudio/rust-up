@@ -8,13 +8,13 @@ import {fileURLToPath} from 'node:url';
 export function parseLiveSourceNames(raw, contentType='') {
  if(typeof raw!=='string'||raw.length<1000||raw.length>18_000_000)
   throw Error('invalid_live_worker_content');
- const boundary=contentType.match(/boundary="?([^";\\s]+)"?/i)?.[1]||
-  raw.split(/\\r?\\n/,1)[0].replace(/^--/,'');
+ const boundary=contentType.match(/boundary="?([^";\s]+)"?/i)?.[1]||
+  raw.split(/\r?\n/,1)[0].replace(/^--/,'');
  if(!boundary||boundary.length>200)throw Error('invalid_live_worker_boundary');
  let found=null;
  for(const part of raw.split('--'+boundary)) {
-  const sep=part.indexOf('\\r\\n\\r\\n');
-  if(sep<0||!/(?:filename|name)="[^"]*\\.js\\.map"/.test(part.slice(0,sep)))
+  const sep=part.indexOf('\r\n\r\n');
+  if(sep<0||!/(?:filename|name)="[^"]*\.js\.map"/.test(part.slice(0,sep)))
    continue;
   if(found!==null)throw Error('ambiguous_live_worker_source_map');
   let map;
