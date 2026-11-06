@@ -1,5 +1,7 @@
 -- Isolated PAYMENTS_DB: immutable server-frozen game coin quote per
--- verified Telegram Stars invoice. No client-side price is accepted.
+-- verified Telegram Stars invoice.
+-- NULL rub_per_usd_minor means direct RUB->Coin pricing, no USD FX involved.
+-- Existing non-NULL rows retain their historical quote metadata. No client-side price is accepted.
 -- No live activation and NO account balance changes from this migration.
 PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS rustup_stars_variable_credit_quotes(
@@ -7,7 +9,7 @@ CREATE TABLE IF NOT EXISTS rustup_stars_variable_credit_quotes(
  telegram_user_id INTEGER NOT NULL CHECK(telegram_user_id>0),
  amount_minor INTEGER NOT NULL CHECK(amount_minor BETWEEN 100 AND 100000000),
  coin_cents INTEGER NOT NULL CHECK(coin_cents BETWEEN 1 AND 100000000),
- rub_per_usd_minor INTEGER NOT NULL CHECK(rub_per_usd_minor BETWEEN 100 AND 100000),
+ rub_per_usd_minor INTEGER CHECK(rub_per_usd_minor IS NULL OR rub_per_usd_minor BETWEEN 100 AND 100000),
  quoted_at_ms INTEGER NOT NULL CHECK(quoted_at_ms>0)
 );
 CREATE INDEX IF NOT EXISTS rustup_stars_variable_credit_quote_owner
