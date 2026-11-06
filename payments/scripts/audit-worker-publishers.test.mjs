@@ -23,7 +23,7 @@ function input(){
    {when:'2026-11-06T01:13:17Z',
     action:{type:'script_update'},metadata:{script_tag:TAG},
     actor:{id:'private-user-actor-two',email:'other-private@invalid.test'}},
-   {when:'2026-11-06T01:13:17Z',
+   {when:'2026-11-06T01:12:50Z',
     action:{type:'script_update'},metadata:{script_tag:'other-worker-script'},
     actor:{id:'third-private-actor',email:'third@invalid.test'}}
   ],
@@ -73,4 +73,16 @@ test('unmatched timestamps and missing audit evidence never invent publishers',(
  assert.throws(()=>diagnoseCompetingWorkerPublishers({}),/evidence_missing/);
  const y=input();y.deployments=[];
  assert.throws(()=>diagnoseCompetingWorkerPublishers(y),/history_missing/);
+});
+
+test('ambiguous simultaneous updates for separate Workers abort instead of guessing ownership',()=>{
+ const x=input();
+ x.auditLogs.push({
+  when:'2026-11-06T01:31:09Z',
+  action:{type:'script_update'},
+  metadata:{script_tag:'another-script-at-same-second'},
+  actor:{id:'third-actor-never-display'}
+ });
+ assert.throws(()=>diagnoseCompetingWorkerPublishers(x),
+  /worker_audit_script_identity_ambiguous/);
 });
