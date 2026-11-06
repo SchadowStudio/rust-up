@@ -5,6 +5,19 @@
 -- One INSERT into rustup_game_paid_receipts changes both the unique journal
 -- and accounts.state.balance inside the SAME SQLite transaction.
 PRAGMA foreign_keys=ON;
+-- Independent second release lock. Defaults to OFF even if a Worker
+-- accidentally exposes a settlement route or somebody toggles Worker flags.
+-- Enabling requires a separate reviewed and audited operator action, which
+-- this migration and every automated script deliberately NEVER performs.
+CREATE TABLE IF NOT EXISTS rustup_game_paid_release_control (
+ id INTEGER PRIMARY KEY CHECK(id=1),
+ enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+ approval_reference TEXT,
+ reviewed_at_ms INTEGER
+);
+INSERT INTO rustup_game_paid_release_control(id,enabled)
+VALUES(1,0) ON CONFLICT(id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS rustup_game_paid_receipts (
   source TEXT NOT NULL CHECK(source IN ('stars_variable','crypto_variable')),
   order_id TEXT NOT NULL CHECK(length(order_id) BETWEEN 8 AND 100),
@@ -27,6 +40,12 @@ CREATE INDEX IF NOT EXISTS rustup_game_paid_receipts_by_user
 CREATE TRIGGER IF NOT EXISTS rustup_game_paid_receipts_preflight
 BEFORE INSERT ON rustup_game_paid_receipts
 BEGIN
+ SELECT RAISE(ABORT,'rustup_paid_credit_release_disabled')
+ WHERE NOT EXISTS (
+  SELECT 1 FROM rustup_game_paid_release_control
+  WHERE id=1 AND enabled=1
+    AND length(approval_reference)>=8 AND reviewed_at_ms>0
+ );
  SELECT RAISE(ABORT,'rustup_paid_credit_account_restricted_or_unsynced')
  WHERE NOT EXISTS (
   SELECT 1 FROM accounts a JOIN users u ON u.id=a.id
