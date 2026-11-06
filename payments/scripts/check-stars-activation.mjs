@@ -108,7 +108,12 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   const b=bindings.get(name);
   return {name,value:b?.type==='plain_text'?(b.text||b.value):null};
  });
- const settlementOff=settlementFlags.every(x=>x.value==='false');
+ // Runtime gates are enabled only by the literal string "true".
+ // Absent flags are therefore OFF, but we still report their absence.
+ const settlementOff=settlementFlags.every(x=>x.value!== 'true');
+ const settlementFlagsExplicit=settlementFlags.every(x=>x.value==='false');
+ const settlementFlagsValid=settlementFlags.every(x=>
+  x.value===null||x.value==='false'||x.value==='true');
  const gameJournalSchema=['rustup_game_paid_receipts',
   'rustup_game_paid_refunds','rustup_game_paid_release_control']
   .every(name=>gameTables.includes(name));
@@ -154,8 +159,9 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
     'Every payment-related flag must be an explicit string boolean'),
   success('payments_safely_disabled',paymentsOff,
     'All hard payment and game-wallet gates must remain OFF here'),
-  success('settlement_flags_explicitly_off',settlementOff,
-    'Credit and refund workers are independently disabled'),
+  success('settlement_flags_safely_disabled',
+    settlementOff&&settlementFlagsValid,
+    'Credit and refund workers cannot execute with absent or false flags'),
   success('payment_settlement_tables',settlementSchema,
     'Delivery jobs, frozen credit quotes, refund markers installed'),
   success('game_paid_journal_schema',gameJournalSchema,
@@ -174,10 +180,14 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
    supporter_badge_table:badgeSchemaReady,
    supporter_badge_worker_module:badgeWorkerReady
   },
+  settlementFlagConfiguration:{
+   explicitlyConfigured: settlementFlagsExplicit,
+   unset: settlementFlags.filter(x=>x.value===null).map(x=>x.name)
+  },
   pricePreviewReady:previewReady,
   realPaymentActivationReady:false,
   gameCreditConnected:false,
-  safeCurrentMode:paymentsOff&&settlementOff&&releaseGateOff&&
+  safeCurrentMode:paymentsOff&&settlementOff&&settlementFlagsValid&&releaseGateOff&&
    secretReady&&databaseReady,
   blockers:[
    ...checks.filter(x=>!x.ok).map(x=>x.name),
