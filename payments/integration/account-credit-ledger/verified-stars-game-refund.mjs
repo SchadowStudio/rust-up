@@ -18,11 +18,16 @@ export async function verifyStarsRefundHistory(env,credit,priceStars,
   if(!Array.isArray(txs))throw Error('stars_refund_history_invalid');
   for(const tx of txs){
    if(tx.id!==credit.receipt_id)continue;
-   if(tx.amount>=0)continue; // original incoming payment, not a refund
-   if(tx.amount!==-priceStars||tx.source||
+   // Bot API refunds are outgoing receiver=user transactions; the
+   // StarTransaction.amount remains positive in the observed live history.
+   // An incoming source=user payment is NOT evidence of a refund.
+   if(tx.source?.type==='user'&&tx.source.user?.id===credit.telegram_user_id&&
+      tx.receiver==null&&tx.amount===priceStars)continue;
+   if(tx.amount!==priceStars||tx.source!=null||
       tx.receiver?.type!=='user'||
       tx.receiver.user?.id!==credit.telegram_user_id)
     throw Error('stars_refund_id_amount_or_user_mismatch');
+   if(found)throw Error('stars_refund_duplicate_outgoing_history');
    found=true;
   }
   if(txs.length<100){complete=true;break;}
