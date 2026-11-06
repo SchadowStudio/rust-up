@@ -50,9 +50,9 @@ try{
   $result=$null;$data=$null
  }
  $env:CLOUDFLARE_ACCOUNT_ID='af72e32cb9f1ba99dba07df30fe540fe'
- $originalStage=Join-Path $repo '.private\rustup-bot-recovered\webhook-only-d618b572-dc181bc6f2'
- Run 'Verify currently LIVE Worker original source and version'{
-  node '.\payments\scripts\verify-stars-webhook-only-live.mjs' "$originalStage"
+ $baseline=Join-Path $repo '.private\rustup-bot-recovered\webhook-only-d618b572-dc181bc6f2-deployed-285f2656'
+ Run 'Verify unchanged deployed Worker source against pinned baseline'{
+  node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$baseline"
  }
  Run 'Check current LIVE version before any release'{
   node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' before "$stage"
@@ -64,8 +64,8 @@ try{
   Write-Host 'PASS: release preflight. NOTHING DEPLOYED. All payment gates OFF.' -ForegroundColor Green
   exit 0
  }
- Run 'Immediately recheck live Worker version and OFF gates'{
-  node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' before "$stage"
+ Run 'Immediately recheck published source and OFF gates'{
+  node '.\payments\scripts\verify-stars-refund-upgrade-live.mjs' deployed "$baseline"
  }
  Run 'Publish webhook/refund/quote code ONLY; all money gates remain OFF'{
   npx --yes wrangler deploy --config "$config"
