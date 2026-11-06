@@ -4,6 +4,7 @@
 import {receiveExistingBotStarsUpdate,existingBotStarsApi,existingBotPaySupport} from './stars-live-bridge.mjs';
 import {telegramApi} from './stars.mjs';
 import {handleRefundCommand} from './refunds.mjs';
+import {variableStarsApi} from './stars-variable-bridge.mjs';
 
 function privateCommand(update,name){
  const msg=update?.message;
@@ -34,6 +35,7 @@ export function wrapExistingWorker(original,{
  receiveStars=receiveExistingBotStarsUpdate,
  refundStars=handleRefundCommand,
  handleStarsApi=existingBotStarsApi,
+ handleVariableStarsHistory=variableStarsApi,
  paySupport=existingBotPaySupport,
  telegramCall=callTelegram,
  fetchImpl=fetch
@@ -44,6 +46,15 @@ export function wrapExistingWorker(original,{
   ...original,
   async fetch(request,env,ctx){
    const url=new URL(request.url);
+   // Only the read-only, Telegram-authenticated history may be exposed.
+   // Variable quote and checkout MUST stay unavailable: the live game-credit
+   // consumer is deliberately unconnected. Never forward these paths.
+   if(url.pathname==='/api/stars/variable/history'){
+    const result=await handleVariableStarsHistory(request,env,fetchImpl);
+    return result || new Response('Not Found',{status:404});
+   }
+   if(url.pathname.startsWith('/api/stars/variable/'))
+    return new Response('Not Found',{status:404,headers:{'cache-control':'no-store'}});
    // HTTPS API only, never a publicly browseable payment storefront.
    // All catalog/checkout/owned paths require signed Telegram initData.
    if(url.pathname.startsWith('/api/stars/')){
