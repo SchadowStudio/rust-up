@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {diagnoseCompetingWorkerPublishers}
  from './audit-worker-publishers.mjs';
 
@@ -85,4 +86,16 @@ test('ambiguous simultaneous updates for separate Workers abort instead of guess
  });
  assert.throws(()=>diagnoseCompetingWorkerPublishers(x),
   /worker_audit_script_identity_ambiguous/);
+});
+
+test('the safe Worker release fails closed on competing publishers before upload',()=>{
+ const source=readFileSync(new URL('./prepare-current-verified-worker.ps1',
+  import.meta.url),'utf8');
+ assert.match(source,/audit-worker-publishers\.mjs/);
+ assert.match(source,/if\(\$auditExit -eq 2\)/);
+ assert.match(source,/if\(\$DeployWithPaymentsOff\)/);
+ assert.match(source,/no Worker upload until publishers are coordinated/);
+ assert.match(source,/Cannot verify deployment ownership: live Worker upload blocked/);
+ assert.ok(source.indexOf('audit-worker-publishers.mjs')<
+  source.indexOf('npx --yes wrangler deploy --config'));
 });
