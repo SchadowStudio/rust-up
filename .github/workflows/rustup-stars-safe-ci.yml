@@ -66,6 +66,9 @@ jobs:
       - name: Test isolated atomic Stars settlement journal and independent Telegram receipt checks
         run: |
           node --test payments/integration/account-credit-ledger/atomic-game-credit.test.mjs payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs payments/integration/account-credit-ledger/frozen-game-coin-quote.test.mjs payments/integration/account-credit-ledger/trusted-rub-usd.test.mjs payments/integration/account-credit-ledger/verified-stars-game-refund.test.mjs
+      - name: Verify read-only variable Stars history is safely routed but checkout remains unreachable
+        run: |
+          node --test payments/integration/telegram-stars/stars-existing-worker-variable-history.test.mjs
       - name: Simulate complete Telegram receipt to player and refund with no live money or database
         run: |
           node --test payments/integration/account-credit-ledger/offline-settlement-cycle.test.mjs
