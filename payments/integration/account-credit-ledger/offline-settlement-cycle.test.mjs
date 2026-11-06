@@ -8,6 +8,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {deliverVerifiedVariableStarsCredit} from './verified-stars-game-credit.mjs';
 import {reconcileVerifiedStarsGameRefund} from './verified-stars-game-refund.mjs';
+import {evaluateStarsSettlementSnapshot} from '../../scripts/audit-stars-settlement-readonly.mjs';
 
 const ORDER='123e4567-e89b-42d3-a456-426614174000';
 const ACCOUNT=123456789;
@@ -218,5 +219,86 @@ test('a fake Telegram refund with no original game credit never creates a negati
   assert.equal(result.gameCreditReversed,false);
   assert.deepEqual(totals(f.game),{receipts:0,refunds:0});
   assert.equal(getBalance(f.game).canonical.balance,10);
+ }finally{f.close();}
+});
+
+function liveAuditModelFromIsolatedDatabases(f){
+ const rows=(db,sql)=>db.prepare(sql).all();
+ const tables=db=>rows(db,
+  "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'rustup_%'").map(x=>x.name);
+ const flags=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
+  'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
+  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
+  'PAYMENT_WALLET_STRICT_MODE',
+  'STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
+  'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED'];
+ return evaluateStarsSettlementSnapshot({
+  paymentTables:[
+   ...tables(f.pay),'rustup_stars_variable_refund_intents',
+   'rustup_stars_receipt_incidents','rustup_payment_settings'
+  ],
+  gameTables:tables(f.game),
+  orders:rows(f.pay,'SELECT * FROM rustup_stars_variable_orders'),
+  quotes:rows(f.pay,'SELECT * FROM rustup_stars_variable_credit_quotes'),
+  credits:rows(f.game,'SELECT * FROM rustup_game_paid_receipts'),
+  refunds:rows(f.game,'SELECT * FROM rustup_game_paid_refunds'),
+  controls:['master','stars','crypto'].map(channel=>({channel,enabled:0})),
+  incidents:[{value:0}],refundIntents:[],
+  bindings:[
+   {name:'DB',type:'d1',id:'9b0b533f-540a-4a25-a429-70ca8bd4e23d'},
+   {name:'PAYMENTS_DB',type:'d1',id:'06079270-a227-466a-9991-abd4201ec5f6'},
+   ...flags.map(name=>({name,type:'plain_text',text:'false'}))
+  ],
+  gameReleaseControl:f.game.prepare(
+   'SELECT enabled,approval_reference,reviewed_at_ms FROM rustup_game_paid_release_control WHERE id=1'
+  ).get()
+ });
+}
+
+test('independent cross-D1 audit detects missing credit and reconciled refund in fake lifecycle',async()=>{
+ const f=setup({release:true});
+ try{
+  // Paid order without corresponding game journal is NOT a consistent ledger.
+  let r=liveAuditModelFromIsolatedDatabases(f);
+  assert.equal(r.anomalies.paidNotCredited,1);
+  assert.equal(r.allChecksPass,false);
+  assert.ok(r.blockers.includes('payment_ledger_or_refund_requires_review'));
+  await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  r=liveAuditModelFromIsolatedDatabases(f);
+  assert.equal(r.anomalies.paidNotCredited,0);
+  assert.equal(r.anomalies.creditedIdentityOrAmountMismatch,0);
+  assert.equal(r.scanned.credits,1);
+  // The test fixture temporarily opened its own ephemeral ledger for a
+  // credit; a real production OFF-mode audit must never call this a release.
+  assert.equal(r.gameLedgerGateOff,false);
+  assert.equal(r.allChecksPass,false);
+  f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='refunded' WHERE id=?")
+   .run(ORDER);
+  r=liveAuditModelFromIsolatedDatabases(f);
+  assert.equal(r.anomalies.refundedButStillCredited,1);
+  await reconcileVerifiedStarsGameRefund(
+   f.env,ORDER,telegramStub([transaction(false)]).fetchImpl);
+  r=liveAuditModelFromIsolatedDatabases(f);
+  assert.equal(r.anomalies.refundedButStillCredited,0);
+  assert.equal(r.anomalies.refundedReversalConflict,0);
+  assert.equal(r.scanned.reversals,1);
+  assert.deepEqual(totals(f.game),{receipts:1,refunds:1});
+  // No change to game balance during this READ-ONLY reconciliation.
+  assert.equal(getBalance(f.game).canonical.balance,10);
+ }finally{f.close();}
+});
+
+test('cross-D1 audit detects a tampered quote after fake receipt booking',async()=>{
+ const f=setup({release:true});
+ try{
+  await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  f.pay.prepare('UPDATE rustup_stars_variable_credit_quotes SET coin_cents=? WHERE order_id=?')
+   .run(CREDIT_CENTS+1,ORDER);
+  const r=liveAuditModelFromIsolatedDatabases(f);
+  assert.equal(r.anomalies.creditedIdentityOrAmountMismatch,1);
+  assert.ok(r.blockers.includes('payment_ledger_or_refund_requires_review'));
+  assert.equal(getBalance(f.game).canonical.balance,11.5);
  }finally{f.close();}
 });
