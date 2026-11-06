@@ -49,7 +49,7 @@ export async function reconcileVerifiedStarsGameRefund(env,orderId,fetchImpl=fet
  const credit=validatePaidStarsSettlementOrder({...order,status:'paid'},quote,orderId);
  await verifyStarsRefundHistory(env,credit,order.price_stars,fetchImpl);
  const credited=await env.DB.prepare(
-  'SELECT source,order_id,receipt_id,telegram_user_id,coin_cents '+
+  'SELECT source,order_id,receipt_id,telegram_user_id,amount_minor,coin_cents '+
   'FROM rustup_game_paid_receipts WHERE source=? AND order_id=?'
  ).bind(credit.source,credit.order_id).first();
  if(!credited)
@@ -58,6 +58,7 @@ export async function reconcileVerifiedStarsGameRefund(env,orderId,fetchImpl=fet
  if(credited.source!==credit.source||credited.order_id!==credit.order_id||
     credited.receipt_id!==credit.receipt_id||
     credited.telegram_user_id!==credit.telegram_user_id||
+    credited.amount_minor!==credit.amount_minor||
     credited.coin_cents!==credit.coin_cents)
   throw Error('stars_game_refund_original_credit_conflict');
  try{
