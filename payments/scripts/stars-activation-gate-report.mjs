@@ -1,3 +1,5 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 // RUST UP — fail-closed live Stars activation preparation report.
 // READ ONLY. Never creates invoices, changes Worker settings, credits players,
 // or switches financial release controls. Do not paste Cloudflare tokens anywhere.
@@ -77,7 +79,7 @@ export async function inspectStarsActivation(token){
   note:'Passing configuration checks alone does not prove an end-to-end live charge, settlement and refund. Do not switch public checkout on without independent review.'
  };
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1].replace(/\\/g,'/')).href){
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
   const report=await inspectStarsActivation(process.env.CLOUDFLARE_API_TOKEN);
   console.log(JSON.stringify(report,null,2));
