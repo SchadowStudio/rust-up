@@ -40,14 +40,37 @@ export function webhookEntry(){
   ''
  ].join('\n');
 }
-export function webhookOffConfig(base){
+const OWNER_STAR_RATE=Object.freeze({
+ STARS_MIN_RUB_MINOR:'100',
+ STARS_MAX_RUB_MINOR:'100000000',
+ STARS_RUB_MINOR_PER_STAR_NUM:'183000',
+ STARS_RUB_MINOR_PER_STAR_DEN:'1000'
+});
+// The generic worker recovery function deliberately omits price vars from
+// its generated TOML. Never infer that means the *live* vars are missing.
+// Compare against Cloudflare settings before restoring the exact price.
+export function verifyLiveStarsOwnerRate(bindings){
+ if(!Array.isArray(bindings))reject('live_rate_bindings_missing');
+ for(const [name,value] of Object.entries(OWNER_STAR_RATE)){
+  const found=bindings.filter(binding=>binding?.name===name);
+  if(found.length!==1||found[0].type!=='plain_text'||
+     found[0].text!==value)
+   reject('live_owner_rate_mismatch_'+name);
+ }
+ return true;
+}
+export function webhookOffConfig(base,bindings){
+ if(typeof base!=='string')reject('unreviewed_bot_config');
+ verifyLiveStarsOwnerRate(bindings);
  const from='main = "./worker.stars-commerce.bundle.js"';
- if(typeof base!=='string'||base.split(from).length!==2||
+ if(base.split(from).length!==2||
     !base.includes('keep_vars = true')||
     !base.includes('upload_source_maps = true')||
     !base.includes('binding = "DB"')||
     !base.includes('binding = "PAYMENTS_DB"')||
-    !base.includes('crons = ["* * * * *"]'))
+    !base.includes('crons = ["* * * * *"]')||
+    base.split('\n[vars]').length!==2||
+    base.split('\n[secrets]').length!==2)
   reject('unreviewed_bot_config');
  const flags=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
   'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
@@ -57,16 +80,17 @@ export function webhookOffConfig(base){
   if(base.split(name+' = "false"').length!==2)
    reject('payment_gate_not_off_'+name);
  }
- for(const [name,value] of [
-  ['STARS_MIN_RUB_MINOR','100'],
-  ['STARS_MAX_RUB_MINOR','100000000'],
-  ['STARS_RUB_MINOR_PER_STAR_NUM','183000'],
-  ['STARS_RUB_MINOR_PER_STAR_DEN','1000']
- ]){
-  if(base.split(name+' = "'+value+'"').length!==2)
-   reject('owner_rate_mismatch_'+name);
+ const rateLines=[];
+ for(const [name,value] of Object.entries(OWNER_STAR_RATE)){
+  const matches=base.match(new RegExp('^'+name+'\\s*=.*$','gm'))||[];
+  if(matches.length>1||(matches.length===1&&
+     matches[0]!==name+' = "'+value+'"'))
+   reject('price_config_override_mismatch_'+name);
+  if(matches.length===0)rateLines.push(name+' = "'+value+'"');
  }
- return base.replace(from,'main = "./'+BUNDLE+'"');
+ return base.replace(from,'main = "./'+BUNDLE+'"')
+  .replace('\n[secrets]',
+   (rateLines.length?'\n'+rateLines.join('\n'):'')+'\n[secrets]');
 }
 export function extractCurrentModules(raw){
  checkOwnerQuoteSource(raw,ORIGINAL_SHA);
@@ -133,7 +157,7 @@ async function live(token){
   if(modules.get(name)!==current)
    reject('live_history_or_quote_differs_from_reviewed_repo_'+name);
  }
- const config=webhookOffConfig(safeWorkerConfig(settings,schedules));
+ const config=webhookOffConfig(safeWorkerConfig(settings,schedules),settings.bindings);
  const metadata=liveMetadataFingerprint(settings,schedules,version);
  return {modules,config,etag:bot.etag,metadata,version};
 }
