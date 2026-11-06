@@ -1,13 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {webhookEntry,webhookOffConfig,extractCurrentModules}
+import {webhookEntry,webhookOffConfig,extractCurrentModules,verifyLiveStarsOwnerRate}
  from './stage-current-stars-webhook-only.mjs';
 
 const gates=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
  'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
  'PAYMENT_WALLET_STRICT_MODE'];
+const expectedRate=[
+ ['STARS_MIN_RUB_MINOR','100'],
+ ['STARS_MAX_RUB_MINOR','100000000'],
+ ['STARS_RUB_MINOR_PER_STAR_NUM','183000'],
+ ['STARS_RUB_MINOR_PER_STAR_DEN','1000']
+];
+const liveBindings=expectedRate.map(([name,text])=>({
+ name,type:'plain_text',text
+}));
 const base=[
  'name = "rustup-bot"',
  'main = "./worker.stars-commerce.bundle.js"',
@@ -34,12 +43,37 @@ test('new current webhook-only entry preserves all original exports, history and
  assert.doesNotMatch(entry,/deliverVerifiedVariableStarsCredit|settlement_enabled/);
 });
 test('staged config keeps current 1.83 price, both D1 and all real-money flags OFF',()=>{
- const next=webhookOffConfig(base);
+ const next=webhookOffConfig(base,liveBindings);
  assert.equal(next.replace('main = "./worker.stars-webhook-only.bundle.js"',
   'main = "./worker.stars-commerce.bundle.js"'),base);
  for(const gate of gates)assert.ok(next.includes(gate+' = "false"'));
  assert.ok(next.includes('STARS_RUB_MINOR_PER_STAR_NUM = "183000"'));
  assert.ok(next.includes('STARS_RUB_MINOR_PER_STAR_DEN = "1000"'));
+});
+test('generic recovery TOML omits rate vars; add only the exact four reviewed Cloudflare values',()=>{
+ const generic=base.split('\n').filter(line=>
+  !expectedRate.some(([name])=>line.startsWith(name+' = '))).join('\n');
+ assert.ok(verifyLiveStarsOwnerRate(liveBindings));
+ const staged=webhookOffConfig(generic,liveBindings);
+ for(const [name,value] of expectedRate)
+  assert.ok(staged.includes(name+' = "'+value+'"'));
+ assert.equal(staged.split('STARS_RUB_MINOR_PER_STAR_NUM = "183000"').length,2);
+ assert.equal(staged.split('[secrets]').length,2);
+});
+test('never reconstruct an unverified price or overwrite a changed rate',()=>{
+ const generic=base.split('\n').filter(line=>
+  !expectedRate.some(([name])=>line.startsWith(name+' = '))).join('\n');
+ for(const missing of expectedRate){
+  assert.throws(()=>webhookOffConfig(generic,liveBindings.filter(b=>b.name!==missing[0])),
+   /live_owner_rate_mismatch/);
+ }
+ const changed=liveBindings.map(b=>({...b}));
+ changed[0].text='101';
+ assert.throws(()=>webhookOffConfig(generic,changed),/live_owner_rate_mismatch/);
+ assert.throws(()=>webhookOffConfig(base.replace(
+  'STARS_MIN_RUB_MINOR = "100"','STARS_MIN_RUB_MINOR = "101"'),liveBindings),
+  /price_config_override_mismatch/);
+ assert.throws(()=>webhookOffConfig(generic),/live_rate_bindings_missing/);
 });
 test('altered price, toggled gate, missing cron or wrong D1 refuses a build',()=>{
  for(const mutated of [
@@ -50,7 +84,7 @@ test('altered price, toggled gate, missing cron or wrong D1 refuses a build',()=
   base.replace('binding = "PAYMENTS_DB"','binding = "ALT"'),
   base.replace('crons = ["* * * * *"]','crons = []'),
   base.replace('keep_vars = true','keep_vars = false')
- ])assert.throws(()=>webhookOffConfig(mutated),/stars_webhook_stage_/);
+ ])assert.throws(()=>webhookOffConfig(mutated,liveBindings),/stars_webhook_stage_/);
 });
 test('garbled or missing live Worker source map fails, no source is invented',()=>{
  assert.throws(()=>extractCurrentModules(''),/stars_|owner_quote_/);
