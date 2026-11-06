@@ -66,22 +66,22 @@ test('never silently overwrites a rate already present',()=>{
   /quote_rate_already_present/);
 });
 
-// The reference screenshot establishes the thousand-Star anchor; fractional
-// conversions shown in other cells are illustrative and are not invoice units.
-test('owner 05.11.2026 reference rate is exact, with whole-Star ceiling',()=>{
+// Operator confirmed 1 Star = 1.83 RUB; calculate only with integer kopecks.
+test('owner-confirmed 1.83 RUB/Star uses exact rational arithmetic and rounds invoice Stars UP',()=>{
  const owner=JSON.parse(readFileSync(new URL('../stars-owner-rate.json',import.meta.url),'utf8'));
- assert.equal(owner.rubPerStarDecimal,'1.87159');
- assert.equal(owner.rubMinorPerReferenceLot,187159);
+ assert.equal(owner.operatorApproved,true);
+ assert.equal(owner.rubPerStarDecimal,'1.83');
+ assert.equal(owner.rubMinorPerReferenceLot,183000);
  assert.equal(owner.starsPerReferenceLot,1000);
- assert.equal(owner.STARS_RUB_MINOR_PER_STAR_NUM,'187159');
+ assert.equal(owner.STARS_RUB_MINOR_PER_STAR_NUM,'183000');
  assert.equal(owner.STARS_RUB_MINOR_PER_STAR_DEN,'1000');
- assert.equal(quoteVariableStars(187159,owner).priceStars,1000);
- assert.equal(quoteVariableStars(100000,owner).priceStars,535);
- assert.equal(quoteVariableStars(5000,owner).priceStars,27);
- assert.equal(quoteVariableStars(100,owner).priceStars,1);
- assert.equal(quoteVariableStars(187160,owner).priceStars,1001);
+ for(const [rubMinor,expectedStars] of [
+  [100,1],[183,1],[184,2],[5000,28],[10000,55],
+  [25050,137],[100000,547],[150000,820],[183000,1000],
+  [183001,1001],[100000000,546449]
+ ])assert.equal(quoteVariableStars(rubMinor,owner).priceStars,expectedStars);
  const preview=buildStarsQuotePreviewConfig(config,owner);
- assert.match(preview,/STARS_RUB_MINOR_PER_STAR_NUM = "187159"/);
+ assert.match(preview,/STARS_RUB_MINOR_PER_STAR_NUM = "183000"/);
  assert.match(preview,/STARS_RUB_MINOR_PER_STAR_DEN = "1000"/);
  assert.match(preview,/PAYMENT_PRODUCTION_ENABLED = "false"/);
  assert.match(preview,/STARS_VARIABLE_CREDIT_LEDGER_READY = "false"/);
