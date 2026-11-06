@@ -116,10 +116,6 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   success('miniapp_origin',originReady,'Expected existing Telegram Mini App origin'),
   success('variable_invoice_modules',hasBridge,'Source map must list three modules'),
   success('payment_tables',hasSchema,'Variable orders and payment controls exist'),
-  success('supporter_badge_table',badgeSchemaReady,
-    'Supporter entitlements exist only in isolated Stars payments D1'),
-  success('supporter_badge_worker_module',badgeWorkerReady,
-    'The live Worker must contain the verified supporter badge fulfillment module'),
   success('price_preview',validPriceConfiguration(bindings),
     'Owner-defined minimum, maximum and Stars ratio must be configured'),
   success('payment_flags_known',paymentSwitchesKnown,
@@ -132,6 +128,10 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   mode:'READ_ONLY_DIAGNOSTIC',
   liveVersion:typeof liveVersion==='string'?liveVersion:null,
   checks,
+  optionalComponents:{
+   supporter_badge_table:badgeSchemaReady,
+   supporter_badge_worker_module:badgeWorkerReady
+  },
   pricePreviewReady:previewReady,
   realPaymentActivationReady:false,
   gameCreditConnected:false,
