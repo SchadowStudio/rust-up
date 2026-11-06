@@ -44,6 +44,7 @@ async function report(){
 async function stop(){
  // Disable the shared DB switch first: checkout refuses to proceed.
  await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars','crypto')");
+ try{await sql(PD,'UPDATE rustup_stars_pilot_guard SET enabled=0 WHERE id=1');}catch{/* Guard might not yet be installed. */}
  const failed=[];
  for(const name of flags){
   try{await api(SCRIPT+'/secrets','PUT',{name,type:'secret_text',text:'false'});}
@@ -99,8 +100,10 @@ async function activate(){
  }
  const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
  if(typeof version!=='string')blockers.push('live_version_unknown');
- // A two-invoice limit is not installed yet. Do not claim exactly two charges.
- blockers.push('atomic_two_invoice_limit_not_installed');
+ // A D1 BEFORE INSERT trigger is the atomic pilot order cap. It is installed
+ // while ALL payment switches are OFF and is disabled again by emergency stop.
+ // An invoice cannot be generated without a durable order row.
+
  // The existing live code checks account binding and refund readiness before
  // invoicing, but a release requires an independently reviewed ledger and
  // reliable undo. A self-attested CLI flag is deliberately insufficient.
@@ -122,6 +125,29 @@ async function activate(){
  // Ensure fixed-phase and 1 XTR maximum, one Telegram user only.
  // D1 master+stars remain OFF until last; if any step fails, DB stays OFF.
  try{
+ // Install atomic purchase limit BEFORE enabling ANY financial gate.
+ // This limits total checkout orders rather than relying on a browser counter.
+ await sql(PD,`CREATE TABLE IF NOT EXISTS rustup_stars_pilot_guard(
+  id INTEGER PRIMARY KEY CHECK(id=1),enabled INTEGER NOT NULL DEFAULT 0,
+  owner_id INTEGER NOT NULL,max_orders INTEGER NOT NULL)`);
+ await sql(PD,`INSERT OR IGNORE INTO rustup_stars_pilot_guard(id,enabled,owner_id,max_orders)
+  VALUES(1,0,7390606911,2)`);
+ await sql(PD,`CREATE TRIGGER IF NOT EXISTS rustup_stars_pilot_order_cap
+  BEFORE INSERT ON rustup_stars_variable_orders
+  WHEN (SELECT enabled FROM rustup_stars_pilot_guard WHERE id=1)=1
+  BEGIN
+   SELECT CASE WHEN NEW.telegram_user_id !=
+    (SELECT owner_id FROM rustup_stars_pilot_guard WHERE id=1)
+    THEN RAISE(ABORT,'pilot_user_denied') END;
+   SELECT CASE WHEN (SELECT COUNT(*) FROM rustup_stars_variable_orders)>=
+    (SELECT max_orders FROM rustup_stars_pilot_guard WHERE id=1)
+    THEN RAISE(ABORT,'pilot_order_limit_reached') END;
+  END`);
+ const installed=await sql(PD,`SELECT name FROM sqlite_master
+  WHERE type='trigger' AND name='rustup_stars_pilot_order_cap'`);
+ if(installed.length!==1)throw Error('atomic_pilot_order_trigger_unconfirmed');
+ await sql(PD,`UPDATE rustup_stars_pilot_guard SET enabled=1,owner_id=7390606911,max_orders=2 WHERE id=1 AND enabled=0`);
+
   for(const [name,text] of [
    ['STARS_VARIABLE_PILOT_USER_IDS','7390606911'],
    ['STARS_VARIABLE_PILOT_MAX_STARS','1'],
@@ -138,10 +164,10 @@ async function activate(){
   if(after.checkoutDisabled)throw Error('stars_checkout_not_open');
   console.log(JSON.stringify({action:'activate',activated:true,phase:'fixed',
    maxStars:1,onlyUserId:'7390606911',expiresAtMs:expires,
-   cryptoEnabled:false,refundable:'Requires transaction-by-transaction evidence and operator-approved refund',
+   cryptoEnabled:false,maxOrders:2,refundable:'Requires transaction-by-transaction evidence and operator-approved refund',
    note:'Stop via -Action stop; any successful charge requires manual reconciliation and refund.'},null,2));
  }catch(e){
-  try{await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars')");}
+  try{await sql(PD,"UPDATE rustup_payment_settings SET enabled=0 WHERE channel IN ('master','stars')");await sql(PD,"UPDATE rustup_stars_pilot_guard SET enabled=0 WHERE id=1");}
   catch{console.error('CRITICAL: emergency DB checkout shutdown failed');}
   console.error('Activation failed; D1 checkout shut. '+String(e.message||e));
   process.exitCode=1;
