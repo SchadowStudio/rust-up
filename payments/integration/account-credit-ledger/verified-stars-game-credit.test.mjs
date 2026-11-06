@@ -23,6 +23,7 @@ function gateway(transactions){
  return {fetchImpl:async (url,options)=>{
   assert.match(url,/getStarTransactions$/);
   assert.equal(options.method,'POST');
+  assert.equal(options.redirect,'manual');
   const {offset,limit}=JSON.parse(options.body);
   assert.equal(limit,100);
   requests++;
@@ -127,4 +128,18 @@ test('Telegram may omit optional invoice payload in history when the authenticat
  ])await assert.rejects(()=>independentlyVerifyStarsCharge(
   {BOT_TOKEN:'123456789:'+('a'.repeat(25))},credit,535,
   gateway([altered]).fetchImpl));
+});
+
+test('independent charge verification does not follow a redirected Telegram gateway',async()=>{
+ const credit=validatePaidStarsSettlementOrder(paid,quote,ID);
+ let calls=0;
+ const fakeFetch=async(_url,options)=>{
+  calls++;
+  assert.equal(options.redirect,'manual');
+  return {ok:false,status:302,headers:{get:()=> 'https://untrusted.example'}};
+ };
+ await assert.rejects(()=>independentlyVerifyStarsCharge(
+  {BOT_TOKEN:'123456789:'+('a'.repeat(25))},credit,535,fakeFetch),
+  /telegram_gateway_unavailable/);
+ assert.equal(calls,1);
 });
