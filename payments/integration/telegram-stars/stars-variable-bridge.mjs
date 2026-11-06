@@ -126,7 +126,7 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
    update?.message?.successful_payment?.invoice_payload;
  if(typeof payload!=='string'||!payload.startsWith('v:'))return false;
  if(!env?.PAYMENTS_DB)throw Error('payment_database_missing');
- const enabled=await mayAcceptVariable(env,false);
+ const enabled=await mayAcceptVariable(env,true);
  const outcome=await handleVariableStarsUpdate(
   update,paymentEnv(env,enabled),fetchImpl
  );
