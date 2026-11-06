@@ -106,20 +106,22 @@ export async function readStarsDepositHistory(env,verifiedTelegramUserId){
   ids.add(order.id);
  }
  const placeholders=orders.map(()=>'?').join(',');
- const args=[verifiedTelegramUserId,...orders.map(o=>o.id)];
- // All IDs are bound values. Never interpolate a Telegram ID or order ID
- // into SQL. The game balance is not touched.
+ const args=orders.map(o=>o.id);
+ // Search by the customer's authenticated order IDs, not by receipt owner.
+ // A receipt fraudulently bound to another player must be detected as a
+ // mismatch, never silently hidden as an uncredited payment.
+ // All order IDs are parameter-bound; no balance is touched.
  const [creditsResult,refundsResult]=await Promise.all([
   env.DB.prepare(
    'SELECT source,order_id,receipt_id,telegram_user_id,amount_minor,coin_cents '+
    'FROM rustup_game_paid_receipts '+
-   "WHERE source='stars_variable' AND telegram_user_id=? AND order_id IN ("+
+   "WHERE source='stars_variable' AND order_id IN ("+
    placeholders+')'
   ).bind(...args).all(),
   env.DB.prepare(
    'SELECT source,order_id,receipt_id,telegram_user_id,coin_cents '+
    'FROM rustup_game_paid_refunds '+
-   "WHERE source='stars_variable' AND telegram_user_id=? AND order_id IN ("+
+   "WHERE source='stars_variable' AND order_id IN ("+
    placeholders+')'
   ).bind(...args).all()
  ]);
