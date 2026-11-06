@@ -119,13 +119,11 @@ export async function reconcileRecordedStarsRefundBatch(env,{
  for(const row of rows.results){
   try{
    const result=await reconcile(env,row.id,fetchImpl);
-   if(result?.gameCreditReversed===true){
-    if(result.replayed===true)summary.alreadyReversed++;
-    else summary.reversed++;
-   }else if(result?.refunded===true&&
-      result?.gameCreditHadBeenApplied===false){
-    summary.noGameCredit++;
-   }else {summary.manualReview++;continue;}
+   if(result?.gameCreditReversed!==true&&
+      !(result?.refunded===true&&
+        result?.gameCreditHadBeenApplied===false)){
+    summary.manualReview++;continue;
+   }
    // Record terminal success durably. A write failure leaves the order
    // eligible for a retry; the game ledger itself remains idempotent.
    const terminal=result.gameCreditReversed===true?
@@ -141,6 +139,9 @@ export async function reconcileRecordedStarsRefundBatch(env,{
     if(existing?.outcome!==terminal)
      throw Error('stars_refund_terminal_marker_conflict');
    }
+   if(terminal==='no_game_credit')summary.noGameCredit++;
+   else if(result.replayed===true)summary.alreadyReversed++;
+   else summary.reversed++;
   }catch{
    // Never skip uncertainty silently or mutate the game ledger as a fallback.
    summary.manualReview++;
