@@ -6,6 +6,7 @@ on:
     paths:
       - 'payments/scripts/main-bot-stars-ops.*'
       - 'payments/scripts/refund-main-bot-stars.*'
+      - 'payments/scripts/reconcile-refunded-main-bot-stars.*'
       - 'payments/integration/telegram-stars/**'
       - 'payments/integration/account-credit-ledger/canonical-game-balance-sync*'
       - '.github/workflows/stars-pilot-validation.yml'
@@ -33,5 +34,9 @@ jobs:
         run: node --test payments/integration/account-credit-ledger/guard-game-balance-mirror.test.mjs
       - name: Verify operator refund idempotency and mirror preflight
         run: node --test payments/scripts/refund-main-bot-stars.test.mjs
+      - name: Verify refunded Stars reconciliation never mistakes new charge for refund
+        run: |
+          node --check payments/scripts/reconcile-refunded-main-bot-stars.mjs
+          node --test payments/scripts/reconcile-refunded-main-bot-stars.test.mjs
       - name: Verify Stars API, receipts, refunds, and game ledger
         run: node payments/scripts/test-full-stars-offline-e2e.mjs
