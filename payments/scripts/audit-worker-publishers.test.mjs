@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {diagnoseCompetingWorkerPublishers}
+import {diagnoseCompetingWorkerPublishers,diagnoseWorkerBindingsWithoutAudit,
+ inspectWorkerPublishers}
  from './audit-worker-publishers.mjs';
 
 const NOW=Date.parse('2026-11-06T01:35:00Z');
@@ -98,4 +99,49 @@ test('the safe Worker release fails closed on competing publishers before upload
  assert.match(source,/Cannot verify deployment ownership: live Worker upload blocked/);
  assert.ok(source.indexOf('audit-worker-publishers.mjs')<
   source.indexOf('npx --yes wrangler deploy --config'));
+});
+
+test('account audit 403 shows real live binding drift but never claims a single publisher',async()=>{
+ const evidence=input();
+ evidence.bindings=evidence.bindings.filter(b=>b.name!=='PAYMENTS_DB');
+ const fetchMock=async url=>{
+  if(url.includes('/audit_logs'))return {ok:false,status:403};
+  return {
+   ok:true,status:200,
+   json:async()=>({success:true,result:
+    url.endsWith('/deployments')?{deployments:evidence.deployments}:
+     {bindings:evidence.bindings}})
+  };
+ };
+ const report=await inspectWorkerPublishers('fake-local-token-without-audit-scope',fetchMock);
+ assert.equal(report.paymentDbBound,false);
+ assert.equal(report.allPaymentFlagsOff,true);
+ assert.equal(report.distinctRecentPublisherCount,null);
+ assert.equal(report.hasConflictingDeployers,null);
+ assert.equal(report.readyForUnattendedPayments,false);
+ assert.deepEqual(report.blockers,[
+  'payment_d1_binding_was_overwritten','publisher_actor_audit_unavailable'
+ ]);
+ assert.equal(JSON.stringify(report).includes('fake-local-token'),false);
+});
+
+test('binding-only fallback flags missing switches and never grants release',()=>{
+ const x=input();
+ x.bindings=x.bindings.filter(b=>b.name!=='STARS_PAYMENT_ENABLED');
+ const report=diagnoseWorkerBindingsWithoutAudit(x);
+ assert.equal(report.paymentDbBound,true);
+ assert.equal(report.allPaymentFlagsOff,false);
+ assert.equal(report.paymentFlags.STARS_PAYMENT_ENABLED,'MISSING');
+ assert.ok(report.blockers.includes('payment_flags_are_missing_or_unsafe'));
+ assert.ok(report.blockers.includes('publisher_actor_audit_unavailable'));
+});
+
+test('worker settings 403 is an explicit hard error, not an audit-only fallback',async()=>{
+ const fetchMock=async url=>url.endsWith('/settings')?
+  {ok:false,status:403}:{ok:true,status:200,json:async()=>({
+   success:true,result:{deployments:input().deployments}})};
+ await assert.rejects(
+  ()=>inspectWorkerPublishers('fake-local-token-without-settings-read',fetchMock),
+  /cloudflare_settings_http_403/
+ );
 });
