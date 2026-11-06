@@ -83,7 +83,7 @@ export function evaluateLiveWorkerSafety({settings,deployments,multipart}={}){
   botSecretsIntact,bothDatabasesBound,allPaymentFlagsOff,flagValues,
   fixedStarsAdapterPresent:multipart.fixedStarsAdapterPresent===true,
   sourceMapAvailable:multipart.hasSourceMap===true,
-  chargingActive:false, // this is a diagnostic mode, NOT an assertion about past charges
+  liveChargingNotAssessed:true, // flags OFF does not prove historical transactions
   changesApplied:false,
   blockers,
   realPaymentActivationApproved:false
