@@ -1,3 +1,5 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 // RUST UP MAIN BOT: verified local operator XTR refund with game-credit reversal.
 // This file is not a webhook. Requires operator-owned Cloudflare and bot tokens.
 // Never trusts client-supplied amount, owner or charge ID. No second refund on
@@ -58,9 +60,9 @@ async function verifyTelegram(order,refunded=false){
  assert(complete,'stars_history_incomplete');
  assert(seen,refunded?'refund_evidence_not_yet_visible':'original_charge_unverified');
 }
-async function refundPreflight(orderId){
+export async function refundPreflight(orderId,read=d1){
  assert(ID.test(orderId),'order_uuid_required');
- const {rows:orders}=await d1(PAY,
+ const {rows:orders}=await read(PAY,
   "SELECT id,telegram_user_id,requested_amount_minor,price_stars,status,"+
   "telegram_charge_id,paid_at_ms FROM rustup_stars_variable_orders "+
   "WHERE id='"+orderId+"'");
@@ -68,11 +70,11 @@ async function refundPreflight(orderId){
  const order=orders[0];
  assert(order.telegram_user_id===USER,'refund_not_pilot_owner');
  const [quotes,credits,existing,previous,state]=await Promise.all([
-  d1(PAY,"SELECT coin_cents,amount_minor,telegram_user_id FROM rustup_stars_variable_credit_quotes WHERE order_id='"+orderId+"'"),
-  d1(GAME,"SELECT receipt_id,coin_cents FROM rustup_game_paid_receipts WHERE source='stars_variable' AND order_id='"+orderId+"'"),
-  d1(PAY,"SELECT state FROM rustup_stars_variable_refund_intents WHERE order_id='"+orderId+"'"),
-  d1(GAME,"SELECT order_id FROM rustup_game_paid_refunds WHERE source='stars_variable' AND order_id='"+orderId+"'"),
-  d1(GAME,"SELECT a.v,u.balance AS mirror,json_extract(a.state,'$.balance') AS canonical FROM accounts a JOIN users u ON a.id=u.id WHERE a.id="+USER)
+  read(PAY,"SELECT coin_cents,amount_minor,telegram_user_id FROM rustup_stars_variable_credit_quotes WHERE order_id='"+orderId+"'"),
+  read(GAME,"SELECT receipt_id,coin_cents FROM rustup_game_paid_receipts WHERE source='stars_variable' AND order_id='"+orderId+"'"),
+  read(PAY,"SELECT state FROM rustup_stars_variable_refund_intents WHERE order_id='"+orderId+"'"),
+  read(GAME,"SELECT order_id FROM rustup_game_paid_refunds WHERE source='stars_variable' AND order_id='"+orderId+"'"),
+  read(GAME,"SELECT a.v,u.balance AS mirror,json_extract(a.state,'$.balance') AS canonical FROM accounts a JOIN users u ON a.id=u.id WHERE a.id="+USER)
  ]);
  const blockers=[];
  if(order.status!=='paid'||!CHARGE.test(order.telegram_charge_id))
@@ -224,5 +226,7 @@ async function main(){
  assert(preflight.ok,'refund_preflight_blocked_'+preflight.blockers.join('_'));
  await refund(id);
 }
-main().catch(e=>{console.error('MAIN BOT STARS REFUND:',String(e.message||e));
- process.exitCode=1;});
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ main().catch(e=>{console.error('MAIN BOT STARS REFUND:',String(e.message||e));
+  process.exitCode=1;});
+}
