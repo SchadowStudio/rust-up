@@ -29,5 +29,7 @@ jobs:
         run: node --test payments/scripts/main-bot-stars-ops.test.mjs
       - name: Verify canonical game mirror sync and rollback
         run: node --test payments/integration/account-credit-ledger/canonical-game-balance-sync.test.mjs
+      - name: Verify standalone mirror guard and refund-safe canonical writes
+        run: node --test payments/integration/account-credit-ledger/guard-game-balance-mirror.test.mjs
       - name: Verify Stars API, receipts, refunds, and game ledger
         run: node payments/scripts/test-full-stars-offline-e2e.mjs
