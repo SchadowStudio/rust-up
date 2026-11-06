@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {evaluateStarsActivation} from './check-stars-activation.mjs';
+import {evaluateStarsActivation,parseLiveSourceNames} from './check-stars-activation.mjs';
 const STATS='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
 const PAYMENTS='06079270-a227-466a-9991-abd4201ec5f6';
 const flags=[
@@ -88,4 +88,27 @@ test('missing or incorrectly shaped data always fails closed',()=>{
  const result=audit({settings:bad});
  assert.equal(result.safeCurrentMode,false);
  assert.ok(result.blockers.includes('payment_flags_known'));
+});
+
+test('read-only live parser supports current webhook-only source map',()=>{
+ const names=[
+  'worker.live-compiled-original.mjs','telegram-initdata.mjs',
+  'deposit-history-readonly.mjs','stars-owner-price-preview.mjs',
+  'stars-history-only-wrapper.mjs','stars.mjs','variable-stars.mjs',
+  'payment-controls.mjs','stars-variable-bridge.mjs',
+  'stars-payment-support.mjs','freeze-verified-stars-game-quote.mjs',
+  'verified-stars-game-credit.mjs','stars-delivery-queue.mjs',
+  'verified-stars-game-refund.mjs','stars-variable-webhook-wrapper.mjs',
+  'worker.stars-webhook-only-entry.mjs'
+ ];
+ const map={version:3,sources:names,sourcesContent:names.map(()=>'*'.repeat(90))};
+ const boundary='test-boundary-123456789';
+ const raw='--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="worker.js"\r\n\r\n'+
+  '/* bundle */\r\n--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="worker.js.map"\r\n\r\n'+
+  JSON.stringify(map)+'\r\n--'+boundary+'--\r\n';
+ assert.deepEqual(parseLiveSourceNames(raw,'multipart/form-data; boundary='+boundary),names);
+ assert.throws(()=>parseLiveSourceNames(raw.replace('worker.stars-webhook-only-entry.mjs','unexpected-entry.mjs')),
+  /unexpected_live_stars_entry_modules/);
+ assert.throws(()=>parseLiveSourceNames(raw.replace('"version":3','"version":2')),
+  /invalid_live_worker_source_map_shape/);
 });
