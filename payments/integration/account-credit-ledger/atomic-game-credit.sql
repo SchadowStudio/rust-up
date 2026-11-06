@@ -19,6 +19,29 @@ CREATE TABLE IF NOT EXISTS rustup_game_paid_receipts (
 CREATE INDEX IF NOT EXISTS rustup_game_paid_receipts_by_user
   ON rustup_game_paid_receipts(telegram_user_id,created_at_ms DESC);
 
+-- Do not create a journal entry unless the existing account is active,
+-- the public users.balance mirror agrees with the canonical JSON balance,
+-- and the balance is a whole number of cents. This prevents crediting banned
+-- users or silently normalizing a previously corrupted game balance.
+-- Check inside SQLite: the preflight and increment share a transaction.
+CREATE TRIGGER IF NOT EXISTS rustup_game_paid_receipts_preflight
+BEFORE INSERT ON rustup_game_paid_receipts
+BEGIN
+ SELECT RAISE(ABORT,'rustup_paid_credit_account_restricted_or_unsynced')
+ WHERE NOT EXISTS (
+  SELECT 1 FROM accounts a JOIN users u ON u.id=a.id
+  WHERE a.id=NEW.telegram_user_id
+    AND u.blocked=0 AND u.banned=0 AND u.balance IS NOT NULL
+    AND CASE WHEN json_valid(a.state)=1 THEN
+      json_type(a.state,'$.balance') IN ('integer','real')
+      AND json_extract(a.state,'$.balance')>=0
+      AND json_extract(a.state,'$.balance') < 1000000
+      AND ABS(json_extract(a.state,'$.balance')-u.balance)<0.000001
+      AND ABS(json_extract(a.state,'$.balance')*100.0-
+              ROUND(json_extract(a.state,'$.balance')*100.0))<0.00001
+     ELSE 0 END
+ );
+END;
 CREATE TRIGGER IF NOT EXISTS rustup_game_paid_receipts_apply
 AFTER INSERT ON rustup_game_paid_receipts
 BEGIN
@@ -73,6 +96,23 @@ BEGIN
     AND receipt_id=NEW.receipt_id
     AND telegram_user_id=NEW.telegram_user_id
     AND coin_cents=NEW.coin_cents
+ );
+END;
+-- Refunds must remain possible even when a user is banned, but never
+-- overwrite an inconsistent account mirror. A mismatch needs manual review.
+CREATE TRIGGER IF NOT EXISTS rustup_game_paid_refunds_preflight
+BEFORE INSERT ON rustup_game_paid_refunds
+BEGIN
+ SELECT RAISE(ABORT,'rustup_paid_refund_account_unsynced_manual_review')
+ WHERE NOT EXISTS (
+  SELECT 1 FROM accounts a JOIN users u ON u.id=a.id
+  WHERE a.id=NEW.telegram_user_id AND u.balance IS NOT NULL
+    AND CASE WHEN json_valid(a.state)=1 THEN
+      json_type(a.state,'$.balance') IN ('integer','real')
+      AND ABS(json_extract(a.state,'$.balance')-u.balance)<0.000001
+      AND ABS(json_extract(a.state,'$.balance')*100.0-
+              ROUND(json_extract(a.state,'$.balance')*100.0))<0.00001
+     ELSE 0 END
  );
 END;
 CREATE TRIGGER IF NOT EXISTS rustup_game_paid_refunds_apply
