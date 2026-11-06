@@ -302,3 +302,109 @@ test('cross-D1 audit detects a tampered quote after fake receipt booking',async(
   assert.equal(getBalance(f.game).canonical.balance,11.5);
  }finally{f.close();}
 });
+
+test('two simultaneous fake confirmations cannot credit one Telegram order twice',async()=>{
+ const f=setup({release:true});
+ try{
+  const receipts=await Promise.allSettled(Array.from({length:2},()=>
+   deliverVerifiedVariableStarsCredit(
+    f.env,ORDER,telegramStub([transaction()]).fetchImpl)));
+  assert.ok(receipts.every(x=>x.status==='fulfilled'));
+  assert.equal(receipts.filter(x=>x.value.applied===true).length,1);
+  assert.equal(receipts.filter(x=>x.value.replayed===true).length,1);
+  assert.deepEqual(totals(f.game),{receipts:1,refunds:0});
+  assert.equal(getBalance(f.game).canonical.balance,11.5);
+  assert.equal(getBalance(f.game).v,8);
+ }finally{f.close();}
+});
+
+test('two simultaneous fake refund reconciliations cannot subtract twice',async()=>{
+ const f=setup({release:true});
+ try{
+  await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='refunded' WHERE id=?")
+   .run(ORDER);
+  const results=await Promise.allSettled(Array.from({length:2},()=>
+   reconcileVerifiedStarsGameRefund(
+    f.env,ORDER,telegramStub([transaction(false)]).fetchImpl)));
+  assert.ok(results.every(x=>x.status==='fulfilled'));
+  assert.equal(results.filter(x=>x.value.gameCreditReversed===true&&
+   x.value.replayed===false).length,1);
+  assert.equal(results.filter(x=>x.value.replayed===true).length,1);
+  assert.deepEqual(totals(f.game),{receipts:1,refunds:1});
+  assert.equal(getBalance(f.game).canonical.balance,10);
+  assert.equal(getBalance(f.game).v,9);
+ }finally{f.close();}
+});
+
+function loseAcknowledgementAfterCommittedInsert(originalDb,table){
+ const db=api(originalDb);
+ let injected=false;
+ return {prepare(sql){
+  const prepared=db.prepare(sql);
+  if(!sql.startsWith('INSERT INTO '+table))return prepared;
+  return {bind(...params){
+   const statement=prepared.bind(...params);
+   return {async run(){
+    const result=await statement.run();
+    if(!injected){
+     injected=true;
+     throw Error('simulated_d1_acknowledgement_lost_after_commit');
+    }
+    return result;
+   }};
+  }};
+ }};
+}
+
+test('if game D1 commits fake credit but loses its ACK, it is classified as replay, never credited twice',async()=>{
+ const f=setup({release:true});
+ try{
+  f.env.DB=loseAcknowledgementAfterCommittedInsert(f.game,
+   'rustup_game_paid_receipts');
+  const first=await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  assert.equal(first.applied,false);
+  assert.equal(first.replayed,true);
+  const second=await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  assert.equal(second.applied,false);
+  assert.equal(second.replayed,true);
+  assert.deepEqual(totals(f.game),{receipts:1,refunds:0});
+  assert.equal(getBalance(f.game).canonical.balance,11.5);
+  assert.equal(getBalance(f.game).v,8);
+ }finally{f.close();}
+});
+
+test('if game D1 commits fake refund but loses its ACK, no second debit occurs',async()=>{
+ const f=setup({release:true});
+ try{
+  await deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([transaction()]).fetchImpl);
+  f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='refunded' WHERE id=?")
+   .run(ORDER);
+  f.env.DB=loseAcknowledgementAfterCommittedInsert(f.game,
+   'rustup_game_paid_refunds');
+  const first=await reconcileVerifiedStarsGameRefund(
+   f.env,ORDER,telegramStub([transaction(false)]).fetchImpl);
+  assert.equal(first.replayed,true);
+  const second=await reconcileVerifiedStarsGameRefund(
+   f.env,ORDER,telegramStub([transaction(false)]).fetchImpl);
+  assert.equal(second.replayed,true);
+  assert.deepEqual(totals(f.game),{receipts:1,refunds:1});
+  assert.equal(getBalance(f.game).canonical.balance,10);
+  assert.equal(getBalance(f.game).v,9);
+ }finally{f.close();}
+});
+
+test('Telegram proof missing after a valid paid order must not alter a game account',async()=>{
+ const f=setup({release:true});
+ try{
+  const before=getBalance(f.game);
+  await assert.rejects(()=>deliverVerifiedVariableStarsCredit(
+   f.env,ORDER,telegramStub([]).fetchImpl),/charge_unconfirmed/);
+  assert.deepEqual(getBalance(f.game),before);
+  assert.deepEqual(totals(f.game),{receipts:0,refunds:0});
+ }finally{f.close();}
+});
