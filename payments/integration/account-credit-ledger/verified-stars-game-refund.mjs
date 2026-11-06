@@ -184,7 +184,8 @@ export async function reconcileRecordedStarsRefundBatch(env,{
   const originals=new Map(),refunded=new Map(),ambiguous=new Set();
   for(const tx of transactions){
    if(typeof tx?.id!=='string'||tx.id.length<8||tx.id.length>256)continue;
-   const incoming=tx.source?.type==='user'&&tx.receiver==null;
+   const incoming=tx.source?.type==='user'&&
+    tx.source.transaction_type==='invoice_payment'&&tx.receiver==null;
    const outgoing=tx.source==null&&tx.receiver?.type==='user';
    if(!incoming&&!outgoing)continue;
    if(!Number.isSafeInteger(tx.amount)||tx.amount<1||
@@ -193,7 +194,8 @@ export async function reconcileRecordedStarsRefundBatch(env,{
    if(!Number.isSafeInteger(user)||user<1)continue;
    const destination=incoming?originals:refunded;
    if(destination.has(tx.id))ambiguous.add(tx.id);
-   destination.set(tx.id,{amount:tx.amount,user,date:tx.date});
+   destination.set(tx.id,{amount:tx.amount,user,date:tx.date,
+    invoicePayload:incoming?tx.source.invoice_payload:null});
   }
   const result={enabled:true,detected:0,recorded:0,review:0};
   for(const [chargeId,refund] of refunded){
@@ -209,7 +211,8 @@ export async function reconcileRecordedStarsRefundBatch(env,{
     'WHERE telegram_charge_id=?'
    ).bind(chargeId).first();
    if(!order)continue; // Not a variable Stars deposit.
-   if(order.telegram_user_id!==refund.user||
+   if(original.invoicePayload!=null&&original.invoicePayload!=='v:'+order.id||
+      order.telegram_user_id!==refund.user||
       order.price_stars!==refund.amount||
       !['paid','refunded'].includes(order.status)){
     result.review++;continue;
