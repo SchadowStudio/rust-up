@@ -25,7 +25,7 @@ test('refuses a second version bump or unexpected script orders',()=>{
  assert.throws(()=>patchDepositAppCache(source.replace(stars,'')),/html_changed/);
  assert.throws(()=>patchDepositAppCache(source.replace(style,'')),/html_changed/);
  assert.throws(()=>patchDepositAppCache(source.replace(old,'')),/html_changed/);
- assert.throws(()=>patchDepositAppCache(source.replace(stars,old).replace(old,stars)),/html_changed|already_refreshed/);
+ assert.throws(()=>patchDepositAppCache(source.replace(stars,'__TEMP__').replace(old,stars).replace('__TEMP__',old)),/html_changed|already_refreshed/);
 });
 
 test('cache refresh cannot modify payment flags or game coin balances',()=>{
