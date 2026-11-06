@@ -15,7 +15,7 @@ test('one command stages only reviewed fixed-goods site and preserves virtual ga
  assert.match(script,/publish-current-demo-stars-fixed-goods\.mjs/);
  assert.match(script,/supporter-payment-preflight\.test\.mjs/);
  assert.match(script,/stars-fixed-market-terms\.test\.mjs/);
- assert.match(script,/Website checkout has local changes/);
+ assert.match(script,/Private website checkout has local changes/);
  assert.doesNotMatch(script,/wrangler deploy|wrangler d1 execute|PAYMENT_PRODUCTION_ENABLED = "true"/);
  assert.doesNotMatch(script,/STARS_GAME_CREDIT_SETTLEMENT_ENABLED = "true"/);
 });
