@@ -42,6 +42,9 @@ try{
   npx --yes esbuild "$entry" --bundle --platform=browser --format=esm --target=es2022 --sourcemap=linked "--outfile=$bundle"
  }
  Run 'Check compiled Worker syntax'{node --check "$bundle"}
+ Run 'Validate bundled source map against every reviewed staged source'{
+  node '.\payments\scripts\verify-stars-refund-upgrade-stage.mjs' "$target"
+ }
  Run 'Inspect Cloudflare dry run with all paid switches OFF'{
   npx --yes wrangler deploy --dry-run --config "$config"
  }
