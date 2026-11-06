@@ -22,3 +22,12 @@ node ".\payments\scripts\test-full-stars-offline-e2e.mjs"
 ```
 
 This allowlist controls a future RUST UP technical pilot only. It neither authorizes gambling-related payment acceptance nor demonstrates successful live credit to game balances. The separate one-Star digital test-bot charge/refund was successful, but no live RUST UP main-bot charge or credit has been made.
+
+## Three-phase sequence (code staged, NOT deployed)
+
+Server-only `STARS_VARIABLE_PILOT_PHASE` must be exactly one of:
+- `fixed`: a signed approved pilot user may request **only a 1-XTR invoice**. The expected minimum RUB amount at the approved 1 Star = 1.83 RUB pricing is **183 RUB minor units**; actual price is always recomputed from the live owner settings and never trusted from the browser.
+- `custom`: the same approved pilot user may choose a RUB amount, but still cannot exceed `STARS_VARIABLE_PILOT_MAX_STARS` (1–10 XTR), 24-hour expiry, or any other financial safety gates.
+- `refund`: new invoices and precheckout approvals are blocked. Existing paid receipts still journal and must be refunded via the existing finance-admin refund workflow with independently verified game balance reversal. **Changing phase does not automatically refund**.
+
+An omitted/invalid phase disables the pilot. Do not change `fixed` to `custom` without confirming the initial receipt and game ledger independently. Do not change to `refund` until all invoices and payments have been reconciled. Do not flip financial switches or deploy the latest code based on offline tests alone.
