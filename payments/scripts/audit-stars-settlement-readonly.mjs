@@ -10,9 +10,11 @@ const PAYMENTS='06079270-a227-466a-9991-abd4201ec5f6';
 const WORKER='rustup-bot';
 const MAX=2000;
 const FLAG_NAMES=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
+ 'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
  'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
  'PAYMENT_WALLET_STRICT_MODE','STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
  'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED'];
+const WORKER_GATE_NAMES=FLAG_NAMES.slice(0,7);
 
 const SQL=Object.freeze({
  tables:"SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'rustup_%' ORDER BY name",
@@ -122,13 +124,25 @@ export function evaluateStarsSettlementSnapshot(snapshot){
    throw Error('reconciliation_unknown_refund_state');
   return sum+(row.state==='completed'?0:okCount(row.total));
  },0);
+ const bindingMap=new Map();
+ for(const b of bindings){
+  if(typeof b?.name!=='string'||bindingMap.has(b.name))
+   throw Error('reconciliation_invalid_or_duplicate_worker_binding');
+  bindingMap.set(b.name,b);
+ }
  const flags=Object.fromEntries(FLAG_NAMES.map(name=>{
-  const b=bindings.find(item=>item.name===name);
+  const b=bindingMap.get(name);
   return [name,b?.type==='plain_text'&&['true','false'].includes(b.text)?
    b.text:'unknown'];
  }));
- const chargingFlags=FLAG_NAMES.slice(0,5);
- const chargingOff=chargingFlags.every(name=>flags[name]==='false');
+ const chargingOff=WORKER_GATE_NAMES.every(name=>flags[name]==='false')&&
+  FLAG_NAMES.slice(7).every(name=>flags[name]!=='true');
+ const gameBinding=bindingMap.get('DB');
+ const paymentBinding=bindingMap.get('PAYMENTS_DB');
+ const databasesCorrect=gameBinding?.type==='d1'&&
+  (gameBinding.id||gameBinding.database_id)===GAME&&
+  paymentBinding?.type==='d1'&&
+  (paymentBinding.id||paymentBinding.database_id)===PAYMENTS;
  const controlsDisabled=['master','stars','crypto'].every(channel=>
   controls.some(c=>c.channel===channel&&c.enabled===0));
  const issueTotal=Object.values(problems).reduce((a,b)=>a+b,0)+
@@ -138,6 +152,7 @@ export function evaluateStarsSettlementSnapshot(snapshot){
   ...(!gameLedgerGateOff?['game_ledger_release_gate_not_verifiably_off']:[]),
   ...(!paymentsReady?['payment_quote_or_refund_schema_missing']:[]),
   ...(!complete?['read_only_scan_incomplete_more_than_2000_rows']:[]),
+  ...(!databasesCorrect?['game_or_payments_database_binding_incorrect']:[]),
   ...(!chargingOff||!controlsDisabled?['payments_not_safely_disabled']:[]),
   ...(issueTotal?['payment_ledger_or_refund_requires_review']:[])
  ];
@@ -152,7 +167,7 @@ export function evaluateStarsSettlementSnapshot(snapshot){
   scanned:{orders:pay.size,frozenQuotes:frozen.size,
    credits:booked.size,reversals:returned.size},
   anomalies:problems,receiptIncidents:incidentCount,
-  unresolvedRefundIntents,flags,controlsDisabled,
+  unresolvedRefundIntents,flags,controlsDisabled,databasesCorrect,
   blockers,allChecksPass:blockers.length===0
  };
 }
