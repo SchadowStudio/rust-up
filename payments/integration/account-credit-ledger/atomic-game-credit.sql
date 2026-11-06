@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS rustup_game_paid_receipts (
   order_id TEXT NOT NULL CHECK(length(order_id) BETWEEN 8 AND 100),
   receipt_id TEXT NOT NULL CHECK(length(receipt_id) BETWEEN 8 AND 256),
   telegram_user_id INTEGER NOT NULL CHECK(telegram_user_id > 0),
-  amount_minor INTEGER NOT NULL CHECK(amount_minor BETWEEN 100 AND 100000000),
-  coin_cents INTEGER NOT NULL CHECK(coin_cents BETWEEN 1 AND 100000000),
+  amount_minor INTEGER NOT NULL CHECK(amount_minor BETWEEN 100 AND 10000000000),
+  coin_cents INTEGER NOT NULL CHECK(coin_cents BETWEEN 1 AND 10000000000),
   created_at_ms INTEGER NOT NULL CHECK(created_at_ms > 0),
   PRIMARY KEY(source,order_id),
   UNIQUE(source,receipt_id)
@@ -56,7 +56,7 @@ BEGIN
     AND CASE WHEN json_valid(a.state)=1 THEN
       json_type(a.state,'$.balance') IN ('integer','real')
       AND json_extract(a.state,'$.balance')>=0
-      AND json_extract(a.state,'$.balance') < 1000000
+      AND json_extract(a.state,'$.balance') < 100000000
       AND ABS(json_extract(a.state,'$.balance')-u.balance)<0.000001
       AND ABS(json_extract(a.state,'$.balance')*100.0-
               ROUND(json_extract(a.state,'$.balance')*100.0))<0.00001
@@ -77,7 +77,7 @@ BEGIN
      AND json_type(state,'$.balance') IN ('integer','real')
      AND json_extract(state,'$.balance')>=0
      AND json_extract(state,'$.balance') <=
-         (1000000.0 - NEW.coin_cents/100.0);
+         (100000000.0 - NEW.coin_cents/100.0);
   SELECT RAISE(ABORT,'rustup_paid_credit_account_or_balance_unavailable')
    WHERE changes()<>1;
   -- Keep the existing users.balance materialized view in sync with the
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS rustup_game_paid_refunds (
  order_id TEXT NOT NULL,
  receipt_id TEXT NOT NULL,
  telegram_user_id INTEGER NOT NULL CHECK(telegram_user_id>0),
- coin_cents INTEGER NOT NULL CHECK(coin_cents BETWEEN 1 AND 100000000),
+ coin_cents INTEGER NOT NULL CHECK(coin_cents BETWEEN 1 AND 10000000000),
  refunded_at_ms INTEGER NOT NULL CHECK(refunded_at_ms>0),
  PRIMARY KEY(source,order_id),
  FOREIGN KEY(source,order_id)
