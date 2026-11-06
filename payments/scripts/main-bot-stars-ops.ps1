@@ -1,7 +1,7 @@
 # Main bot RUST UP Stars operator operations.
 # activate: refuse unsafe activation; status: read live; stop: emergency checkout shutdown.
 param(
- [Parameter(Mandatory=$true)][ValidateSet('activate','custom','status','stop')][string]$Action,
+ [Parameter(Mandatory=$true)][ValidateSet('activate','custom','orders','status','stop')][string]$Action,
  [string]$ApprovalReference
 )
 $ErrorActionPreference='Stop'
