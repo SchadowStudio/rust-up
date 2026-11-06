@@ -47,7 +47,7 @@ function db(){
   'coin_cents INTEGER);');
  const api=database=>({prepare(sql){
   const statement=database.prepare(sql);
-  return {bind(...params){return {async all(){return {results:statement.all(...params)};}}};}
+  return {bind(...params){return {async all(){return {results:statement.all(...params)};}};}};
  }});
  return {pay,game,env:{
   APP_URL:origin+'/rust-up/',BOT_TOKEN:BOT,
