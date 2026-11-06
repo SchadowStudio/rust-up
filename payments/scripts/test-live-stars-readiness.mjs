@@ -11,6 +11,8 @@ const PAY='06079270-a227-466a-9991-abd4201ec5f6';
 const GAME='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
 const BASE='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT;
 const VERSION='755be20f-9735-4f19-8182-275e6361a46b';
+const PILOT_USER=7390606911;
+const PILOT_STARS=1;
 const token=process.env.CLOUDFLARE_API_TOKEN;
 if(typeof token!=='string'||token.length<15)
  throw Error('Cloudflare login required. Use wrangler auth token.');
@@ -29,7 +31,7 @@ async function query(db,sql){
     !Array.isArray(rows[0].results))throw Error('Incomplete D1 response');
  return rows[0].results;
 }
-const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,refundMarkers,accountMirrors]=await Promise.all([
+const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,refundMarkers,accountMirrors,pilotAccount,pilotHistory]=await Promise.all([
  req('/workers/scripts/'+WORKER+'/deployments'),
  req('/workers/scripts/'+WORKER+'/settings'),
  query(PAY,'SELECT channel,enabled FROM rustup_payment_settings ORDER BY channel'),
@@ -38,7 +40,9 @@ const [deploy,settings,paymentControls,release,orders,orderLedger,gameReceipts,r
  query(PAY,"SELECT o.id,o.status,o.price_stars,q.coin_cents AS frozen_coin_cents,COALESCE(j.state,'none') delivery FROM rustup_stars_variable_orders o LEFT JOIN rustup_stars_variable_credit_quotes q ON q.order_id=o.id LEFT JOIN rustup_stars_variable_delivery_jobs j ON j.order_id=o.id ORDER BY o.created_at_ms LIMIT 100"),
  query(GAME,"SELECT r.order_id,r.coin_cents,f.coin_cents AS reversed_coin_cents FROM rustup_game_paid_receipts r LEFT JOIN rustup_game_paid_refunds f ON f.source=r.source AND f.order_id=r.order_id WHERE r.source='stars_variable' LIMIT 100"),
  query(PAY,"SELECT order_id,outcome FROM rustup_stars_refund_reconciliation_done LIMIT 100"),
- query(GAME,"SELECT a.id,CAST(json_extract(a.state,'$.balance') AS REAL) canonical,u.balance mirror FROM accounts a JOIN users u ON u.id=a.id WHERE EXISTS (SELECT 1 FROM rustup_game_paid_receipts r WHERE r.telegram_user_id=a.id AND r.source='stars_variable') LIMIT 100")
+ query(GAME,"SELECT a.id,CAST(json_extract(a.state,'$.balance') AS REAL) canonical,u.balance mirror FROM accounts a JOIN users u ON u.id=a.id WHERE EXISTS (SELECT 1 FROM rustup_game_paid_receipts r WHERE r.telegram_user_id=a.id AND r.source='stars_variable') LIMIT 100"),
+ query(GAME,"SELECT a.id,u.blocked,u.banned,CASE WHEN abs(json_extract(a.state,'$.balance')-u.balance)<0.000001 THEN 1 ELSE 0 END balance_synced FROM accounts a JOIN users u ON u.id=a.id WHERE a.id="+PILOT_USER),
+ query(PAY,"SELECT status,price_stars FROM rustup_stars_variable_orders WHERE telegram_user_id="+PILOT_USER+" ORDER BY created_at_ms DESC LIMIT 20")
 ]);
 const version=deploy?.deployments?.[0]?.versions?.[0]?.version_id;
 const vars=Object.fromEntries((settings?.bindings||[]).filter(x=>x.type==='plain_text')
@@ -47,6 +51,10 @@ const secrets=new Set((settings?.bindings||[]).filter(x=>x.type==='secret_text')
  .map(x=>x.name));
 const channel=Object.fromEntries(paymentControls.map(x=>[x.channel,x.enabled]));
 const blockers=['Pilot secret values are masked; read-only API cannot prove pilot checkout readiness'];
+const pilotRecord=pilotAccount[0]||null;
+if(pilotAccount.length!==1||pilotRecord.id!==PILOT_USER||pilotRecord.blocked!==0||
+   pilotRecord.banned!==0||pilotRecord.balance_synced!==1)
+ blockers.push('Pilot account missing, restricted or balance unsynced');
 const receiptMap=new Map(gameReceipts.map(x=>[x.order_id,x]));
 const markerMap=new Map(refundMarkers.map(x=>[x.order_id,x.outcome]));
 if(gameReceipts.length!==receiptMap.size)blockers.push('Duplicate Stars game receipts detected');
@@ -127,6 +135,12 @@ const report={
  channels:channel,gameReleaseApproved:release[0]?.enabled===1,
  historicalAccounting:accounting,
  ordersByStatus:orders,offlineTestsPassed:offlinePassed,
+ pilotAccount:{telegramUserId:PILOT_USER,testStars:PILOT_STARS,
+  exists:pilotAccount.length===1,restricted:pilotRecord?pilotRecord.blocked!==0||pilotRecord.banned!==0:null,
+  canonicalBalanceMatchesMirror:pilotRecord?.balance_synced===1,
+  historicalOrders:pilotHistory.length,
+  // Secret-backed allowlist is unreadable by this API, so not verified here.
+  allowlistVerified:false},
  liveOneStarPilotReady:false,
  secretValuesVerified:false,
  blockers
