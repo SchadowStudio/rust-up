@@ -81,6 +81,10 @@ jobs:
         run: |
           node --check payments/scripts/preflight-game-ledger-migration.mjs
           node --test payments/scripts/preflight-game-ledger-migration.test.mjs
+      - name: Verify original admin recognition and aggregate-only balance audit
+        run: |
+          node --test payments/scripts/existing-admin-classification.test.mjs
+          node --test payments/scripts/audit-game-account-mirrors-readonly.test.mjs
       - name: Verify account import guard without enabling money
         run: |
           node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs
