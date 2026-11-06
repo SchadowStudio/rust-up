@@ -1,3 +1,7 @@
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {execFileSync,spawnSync} from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {patchCurrentWalletApp,patchCurrentWalletHtml}
@@ -45,4 +49,34 @@ test('site version or wallet design drift fails closed',()=>{
   /changed|unrecognized/);
  assert.throws(()=>patchCurrentWalletApp(app().replace('function walletDeposit()','function replacedWallet()')),
   /unrecognized/);
+});
+
+test('publisher accepts staged CRLF but still rejects real trailing whitespace',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'rustup-deposit-eol-'));
+ const git=(...args)=>execFileSync('git',args,{cwd:dir,stdio:'pipe'});
+ const check=(...args)=>spawnSync('git',args,{cwd:dir,encoding:'utf8'});
+ try{
+  git('init','--quiet');
+  git('config','core.autocrlf','false');
+  git('config','user.name','Offline Test');
+  git('config','user.email','test@example.invalid');
+  const target=join(dir,'existing-app.js');
+  writeFileSync(target,'old line\r\n');
+  git('add','existing-app.js');
+  git('commit','--quiet','-m','original CRLF app');
+  writeFileSync(target,'old line\r\nnew line\r\n');
+  git('add','existing-app.js');
+  const gitDefault=check('diff','--cached','--check');
+  assert.notEqual(gitDefault.status,0);
+  assert.match(gitDefault.stdout+gitDefault.stderr,/trailing whitespace/i);
+  const safe=check('-c','core.whitespace=cr-at-eol','diff','--cached','--check');
+  assert.equal(safe.status,0,safe.stdout+safe.stderr);
+  writeFileSync(target,'old line\r\nnew line \r\n');
+  git('add','existing-app.js');
+  const bad=check('-c','core.whitespace=cr-at-eol','diff','--cached','--check');
+  assert.notEqual(bad.status,0);
+  assert.match(bad.stdout+bad.stderr,/trailing whitespace/i);
+ }finally{
+  rmSync(dir,{recursive:true,force:true});
+ }
 });
