@@ -3,7 +3,51 @@
 // The report contains only booleans/counts; secrets and player data never leave Cloudflare.
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {recoverVariableSource} from './recover-current-stars-variable.mjs';
+// Read only source-map names. Do not use the legacy 18-module recovery parser:
+ // the current deployed webhook-only Worker has a different, verified layout.
+export function parseLiveSourceNames(raw, contentType='') {
+ if(typeof raw!=='string'||raw.length<1000||raw.length>18_000_000)
+  throw Error('invalid_live_worker_content');
+ const boundary=contentType.match(/boundary="?([^";\\s]+)"?/i)?.[1]||
+  raw.split(/\\r?\\n/,1)[0].replace(/^--/,'');
+ if(!boundary||boundary.length>200)throw Error('invalid_live_worker_boundary');
+ let found=null;
+ for(const part of raw.split('--'+boundary)) {
+  const sep=part.indexOf('\\r\\n\\r\\n');
+  if(sep<0||!/(?:filename|name)="[^"]*\\.js\\.map"/.test(part.slice(0,sep)))
+   continue;
+  if(found!==null)throw Error('ambiguous_live_worker_source_map');
+  let map;
+  try { map=JSON.parse(part.slice(sep+4).trim()); }
+  catch { throw Error('invalid_live_worker_source_map'); }
+  if(map?.version!==3||!Array.isArray(map.sources)||
+     !Array.isArray(map.sourcesContent)||map.sources.length!==map.sourcesContent.length||
+     map.sources.length<10||map.sources.length>100)
+   throw Error('invalid_live_worker_source_map_shape');
+  if(map.sources.some(x=>typeof x!=='string'||! /^[a-zA-Z0-9_.-]+$/.test(x))||
+     new Set(map.sources).size!==map.sources.length)
+   throw Error('invalid_live_worker_source_names');
+  found=map.sources;
+ }
+ if(!found)throw Error('live_worker_source_map_missing');
+ if(!found.includes('variable-stars.mjs')||
+    !found.includes('stars-variable-bridge.mjs')||
+    !found.includes('payment-controls.mjs')||
+    !found.includes('stars-variable-webhook-wrapper.mjs')||
+    !found.includes('worker.stars-webhook-only-entry.mjs'))
+  throw Error('unexpected_live_stars_entry_modules');
+ return found;
+}
+async function readLiveSourceNames(token) {
+ const response=await fetch('https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+
+  '/workers/scripts/'+SCRIPT+'/content/v2',{
+   headers:{authorization:'Bearer '+token},redirect:'error',
+   signal:AbortSignal.timeout(25000)
+  });
+ if(!response.ok)throw Error('cloudflare_source_read_http_'+response.status);
+ return parseLiveSourceNames(await response.text(),response.headers.get('content-type')||'');
+}
+
 
 const ACCOUNT='af72e32cb9f1ba99dba07df30fe540fe';
 const SCRIPT='rustup-bot';
@@ -54,7 +98,9 @@ export function evaluateStarsActivation({settings,tables,sourceNames,liveVersion
   'https://ttzoomrust-hub.github.io/rust-up/';
  const hasBridge=sourceNames.includes('stars-variable-bridge.mjs')&&
   sourceNames.includes('variable-stars.mjs')&&
-  sourceNames.includes('worker.stars-variable-entry.mjs');
+  (sourceNames.includes('worker.stars-variable-entry.mjs')||
+   (sourceNames.includes('worker.stars-webhook-only-entry.mjs')&&
+    sourceNames.includes('stars-variable-webhook-wrapper.mjs')));
  const hasSchema=tables.includes('rustup_stars_variable_orders')&&
   tables.includes('rustup_payment_settings');
  const badgeSchemaReady=tables.includes('rustup_stars_supporter_badges');
@@ -120,12 +166,12 @@ export async function inspectLiveStars(token){
    sql:"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('rustup_stars_variable_orders','rustup_payment_settings','rustup_stars_supporter_badges') ORDER BY name"
   }),
   cloudflare(base+'/deployments',token),
-  recoverVariableSource(token)
+  readLiveSourceNames(token)
  ]);
  // Recover the exact current source map privately, but report only names
  // and booleans, never the recovered code or Telegram credentials.
  const tables=schema?.[0]?.results?.map(x=>x.name);
- const sources=[...sourceSnapshot.source.keys()];
+ const sources=sourceSnapshot;
  return evaluateStarsActivation({
   settings,tables,sourceNames:sources,
   liveVersion:deploy?.deployments?.[0]?.versions?.[0]?.version_id
