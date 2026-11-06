@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {
- verifyStarsRefundHistory,reconcileVerifiedStarsGameRefund,reconcileRecordedStarsRefundBatch
+ verifyStarsRefundHistory,reconcileVerifiedStarsGameRefund,reconcileRecordedStarsRefundBatch,
+ discoverVerifiedStarsRefunds
 } from './verified-stars-game-refund.mjs';
 const id='123e4567-e89b-42d3-a456-426614174000';
 const user=123456789;
 const token='123456789:'+('a'.repeat(30));
-const tx={id:'tg-charge-12345678',amount:-535,
+const tx={id:'tg-charge-12345678',amount:535,date:1794000001,
  receiver:{type:'user',user:{id:user}}};
 function bot(items=[tx]){
  return async (url,opts)=>({
@@ -20,14 +21,14 @@ function bot(items=[tx]){
   }
  });
 }
-test('independent refund evidence must match negative Stars charge and Telegram user',async()=>{
+test('independent refund evidence matches positive outgoing Stars charge and Telegram user',async()=>{
  const data={receipt_id:tx.id,telegram_user_id:user};
  assert.equal(await verifyStarsRefundHistory({BOT_TOKEN:token},data,535,bot()),true);
  for(const bad of [
-  {...tx,amount:-534},
+  {...tx,amount:534},
   {...tx,receiver:{type:'user',user:{id:user+1}}},
   {...tx,source:{type:'user',user:{id:user}}},
-  {...tx,amount:535}
+  {...tx,amount:-535}
  ]){
   await assert.rejects(
    ()=>verifyStarsRefundHistory({BOT_TOKEN:token},data,535,bot([bad])),
@@ -194,5 +195,43 @@ test('progress migration is additive and skips completed refunds on next batch',
   assert.equal(again.selected,0);
   assert.equal(again.reversed,0);
   assert.equal(f.game.prepare('SELECT COUNT(*) AS n FROM rustup_game_paid_refunds').get().n,1);
+ }finally{f.game.close();f.pay.close();}
+});
+
+test('automatic refund discovery marks independently verified provider refund without issuing refund',async()=>{
+ const f=fixture();
+ try{
+  f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='paid' WHERE id=?").run(id);
+  const original={id:tx.id,amount:535,date:1793999999,
+   source:{type:'user',user:{id:user}}};
+  const env={...f.env,PAYMENT_PRODUCTION_ENABLED:'true'};
+  const found=await discoverVerifiedStarsRefunds(env,{
+   fetchImpl:bot([original,tx])
+  });
+  assert.deepEqual(found,{enabled:true,detected:1,recorded:1,review:0});
+  assert.equal(f.pay.prepare('SELECT status FROM rustup_stars_variable_orders').get().status,
+   'refunded');
+  const again=await discoverVerifiedStarsRefunds(env,{fetchImpl:bot([original,tx])});
+  assert.equal(again.recorded,0);
+  assert.equal((await reconcileVerifiedStarsGameRefund(env,id,bot([original,tx]))).gameCreditReversed,true);
+  assert.equal(f.game.prepare('SELECT COUNT(*) n FROM rustup_game_paid_refunds').get().n,1);
+ }finally{f.game.close();f.pay.close();}
+});
+
+test('automatic refund discovery rejects forged or mismatched Stars refund evidence',async()=>{
+ const f=fixture();
+ try{
+  f.pay.prepare("UPDATE rustup_stars_variable_orders SET status='paid' WHERE id=?").run(id);
+  const env={...f.env,PAYMENT_PRODUCTION_ENABLED:'true'};
+  const original={id:tx.id,amount:535,date:1793999999,
+   source:{type:'user',user:{id:user}}};
+  for(const forged of [
+   {...tx,amount:534},{...tx,receiver:{type:'user',user:{id:user+1}}},
+   {...tx,date:1793999998}
+  ]){
+   const result=await discoverVerifiedStarsRefunds(env,{fetchImpl:bot([original,forged])});
+   assert.equal(result.recorded,0);
+   assert.equal(f.pay.prepare('SELECT status FROM rustup_stars_variable_orders').get().status,'paid');
+  }
  }finally{f.game.close();f.pay.close();}
 });
