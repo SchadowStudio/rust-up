@@ -35,8 +35,10 @@ The persistent, uniquely identified second 5.00-coin credit was present.
 
 1. Applied the additive D1 migration `payments/integration/account-credit-ledger/canonical-game-balance-sync.sql` to live game D1. Trigger: `rustup_canonical_balance_after_account_update`.
 2. Deployed a targeted live Worker patch removing the legacy post-CAS `users.balance` update from `storeAccount`. The D1 trigger now mirrors the canonical balance **within the same transaction** as the original account update, and aborts if the mirror row is missing.
-3. Added isolated regression tests covering update, rollback, non-balance changes, and no historical balance rewrites.
-4. Added activation preflight checks for the mirror trigger, patched Worker, and owner account balance agreement.
+3. Installed an additional live game D1 guard trigger, `rustup_users_balance_canonical_guard`, which rejects standalone attempts to write a `users.balance` value different from the canonical account. It does not change existing balances.
+4. Added isolated regression tests covering update, rollback, stale direct-write rejection, refund-style updates, and no historical balance rewrites.
+5. Added activation preflight checks for the mirror triggers, patched Worker, and owner account balance agreement.
+6. Added `payments/scripts/stars-pilot-refund-readiness.ps1`, a read-only audit for the two exact paid orders, posted game receipts, mirrored account balances, and refund state.
 
 **The migration and code deployment did not reconcile historical differences or issue any refund.**
 A separate, authenticated, documented reconciliation is still required for the current 5-coin discrepancy.
