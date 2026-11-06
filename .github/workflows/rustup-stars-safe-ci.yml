@@ -69,6 +69,10 @@ jobs:
       - name: Simulate complete Telegram receipt to player and refund with no live money or database
         run: |
           node --test payments/integration/account-credit-ledger/offline-settlement-cycle.test.mjs
+      - name: Verify public wallet app.js cache fix without publishing or altering money gates
+        run: |
+          node --check payments/scripts/refresh-current-deposit-app-cache.mjs
+          node --test payments/scripts/refresh-current-deposit-app-cache.test.mjs
       - name: Verify current 19-module live Worker staging and OFF-mode deployment guards
         run: |
           node --test payments/scripts/stage-current-bot19-stars.test.mjs
