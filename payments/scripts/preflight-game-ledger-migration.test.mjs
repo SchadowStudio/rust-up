@@ -42,11 +42,45 @@ test('unknown journal objects and missing backup block automatic migration prepa
  v.backupAvailable=false;
  const r=assessGameLedgerMigration(v);
  assert.deepEqual(r.blockers,[
-  'partial_or_existing_paid_journal_requires_manual_review',
+  'partial_or_unknown_paid_journal_requires_review',
   'd1_time_travel_bookmark_unavailable'
  ]);
  assert.equal(r.safeToPrepareMigration,false);
 });
+
+test('fully installed 10-object journal with disabled release gate is healthy but not reinstalled',()=>{
+ const x=fixture();
+ x.oldJournalObjects=[
+  ['rustup_game_paid_release_control','table'],
+  ['rustup_game_paid_receipts','table'],
+  ['rustup_game_paid_receipts_by_user','index'],
+  ['rustup_game_paid_receipts_preflight','trigger'],
+  ['rustup_game_paid_receipts_apply','trigger'],
+  ['rustup_game_paid_refunds','table'],
+  ['rustup_game_paid_refunds_by_user','index'],
+  ['rustup_game_paid_refunds_verify','trigger'],
+  ['rustup_game_paid_refunds_preflight','trigger'],
+  ['rustup_game_paid_refunds_apply','trigger']
+ ].map(([name,type])=>({name,type}));
+ x.releaseControl={enabled:0,approval_reference:null,reviewed_at_ms:null};
+ const healthy=assessGameLedgerMigration(x);
+ assert.equal(healthy.installedAndLocked,true);
+ assert.equal(healthy.safeToPrepareMigration,false);
+ assert.equal(healthy.journalInstallationState,'INSTALLED_LOCKED');
+ assert.deepEqual(healthy.blockers,[]);
+ assert.equal(healthy.chargesEnabled,false);
+ x.releaseControl.enabled=1;
+ const active=assessGameLedgerMigration(x);
+ assert.equal(active.installedAndLocked,false);
+ assert.equal(active.journalInstallationState,'INSTALLED_GATE_ON');
+ assert.deepEqual(active.blockers,['installed_paid_journal_gate_not_verified_off']);
+ x.releaseControl.enabled=0;
+ x.oldJournalObjects.pop();
+ const broken=assessGameLedgerMigration(x);
+ assert.equal(broken.journalInstallationState,'PARTIAL_OR_UNVERIFIED');
+ assert.ok(broken.blockers.includes('partial_or_unknown_paid_journal_requires_review'));
+});
+
 test('any live payment gate or provider charge blocks new ledger schema',()=>{
  const v=fixture();v.bindings.find(x=>x.name==='STARS_PAYMENT_ENABLED').text='true';
  v.controls[0].enabled=1;v.paidOrderCount=2;
