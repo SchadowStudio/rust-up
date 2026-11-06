@@ -11,9 +11,8 @@ import {readStarsDepositHistory} from './deposit-history-readonly.mjs';
 const ROOT='/api/stars/variable/';
 const ROUTES=new Set(['quote','checkout','history']);
 const MAX_BODY=4096;
-// Build-time safety lock: no production game-credit consumer exists in this
-// repository. Payment flags alone must NEVER authorize an XTR charge.
-const VERIFIED_GAME_CREDIT_CONSUMER_PRESENT=false;
+// A concrete server-side quote freezer and audited settlement/reversal gates
+// are mandatory. Configuration flags alone do not establish pricing authority.
 function json(payload,status=200,origin=null){
  return new Response(JSON.stringify(payload),{
   status,headers:{'content-type':'application/json; charset=utf-8',
@@ -35,10 +34,13 @@ function paymentEnv(env,enableCheckout=false){
   STARS_VARIABLE_TOPUP_ENABLED:enableCheckout?'true':'false'
  };
 }
-async function mayAcceptVariable(env){
- // The current code records receipts but cannot deliver a balance credit.
- // An operator setting all environment/D1 switches to ON cannot fix that.
- if(!VERIFIED_GAME_CREDIT_CONSUMER_PRESENT)return false;
+async function mayAcceptVariable(env,hasQuoteFreezer=false){
+ if(!hasQuoteFreezer)return false;
+ if(env?.STARS_GAME_CREDIT_SETTLEMENT_ENABLED!=='true'||
+    env?.STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED!=='true'||
+    env?.STARS_VARIABLE_CHECKOUT_RELEASE_APPROVED!=='true'||
+    !env?.DB?.prepare||!env?.PAYMENTS_DB?.prepare)
+  return false;
  // No paid invoice may be created before the existing game is protected and
  // the authenticated, idempotent credit consumer is explicitly wired.
  if(env?.STARS_VARIABLE_TOPUP_ENABLED!=='true'||
@@ -77,7 +79,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
  }catch{return json({ok:false,error:'telegram_auth_required'},401,allowed);}
  if(!env?.PAYMENTS_DB)
   return json({ok:false,error:'payment_database_missing'},503,allowed);
- const enabled=await mayAcceptVariable(env);
+ const enabled=await mayAcceptVariable(env,
+  typeof freezeQuote==='function');
  if(action==='quote'){
   try{
    const quote=quoteVariableStars(body?.amountMinor,env);
@@ -123,7 +126,7 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
    update?.message?.successful_payment?.invoice_payload;
  if(typeof payload!=='string'||!payload.startsWith('v:'))return false;
  if(!env?.PAYMENTS_DB)throw Error('payment_database_missing');
- const enabled=await mayAcceptVariable(env);
+ const enabled=await mayAcceptVariable(env,false);
  const outcome=await handleVariableStarsUpdate(
   update,paymentEnv(env,enabled),fetchImpl
  );
