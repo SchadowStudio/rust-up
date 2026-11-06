@@ -70,6 +70,7 @@ jobs:
         run: |
           node --test payments/integration/telegram-stars/stars-existing-worker-variable-history.test.mjs
           node --test payments/integration/telegram-stars/stars-variable-webhook-routing.test.mjs
+          node --test payments/integration/telegram-stars/stars-variable-webhook-sqlite-e2e.test.mjs
       - name: Test source-map-free recovery and isolated read-only deposit history, no deploy
         run: |
           node --check payments/scripts/stage-history-only-compiled-worker.mjs
