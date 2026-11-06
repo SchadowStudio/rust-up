@@ -21,8 +21,10 @@ try{
  node '.\payments\scripts\audit-worker-publishers.mjs'
  $code=$LASTEXITCODE
  if($code -eq 2){
-  Write-Warning 'Conflicting Wrangler publishers, missing D1, or unsafe payment flags detected.'
-  Write-Host 'No changes were made. Coordinate all deployments before enabling payments.'
+  Write-Warning 'Worker payment binding/flags are missing or unsafe, or publisher ownership is not verified.'
+  Write-Host 'When publisherAudit=UNAVAILABLE_ACCOUNT_SETTINGS_READ_REQUIRED, Cloudflare Account Settings Read permission is needed for local actor audit.'
+  Write-Host 'Missing audit permission does not prove one or several publishers; do not deploy or enable money until ownership is verified.'
+  Write-Host 'READ ONLY: No changes were made.'
   exit 2
  }
  if($code -ne 0){throw 'Read-only audit failed; do not guess live deployment state.'}
