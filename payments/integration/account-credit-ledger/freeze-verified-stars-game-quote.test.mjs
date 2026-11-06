@@ -153,7 +153,8 @@ test('reject an invoice before any quote write when the game balance would excee
    .run(JSON.stringify({balance:99999900}),USER);
   f.game.prepare('UPDATE users SET balance=? WHERE id=?')
    .run(99999900,USER);
-  const accepted=await freezeVerifiedStarsGameQuote(f.env,quote(),calculateRubCoinOneToOne);
+  const accepted=await freezeVerifiedStarsGameQuote(f.env,quote(),
+   async()=>calculateRubGameCredit({amountMinor:10000,rubPerUsdMinor:8000}));
   assert.equal(accepted.coinCents,6250);
  }finally{f.close();}
 });
