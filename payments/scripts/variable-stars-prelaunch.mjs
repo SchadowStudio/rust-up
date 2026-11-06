@@ -43,7 +43,7 @@ const PAYMENTS_SCHEMA_SQL=[
 ].join(' ');
 const GAME_SCHEMA_SQL=[
  "SELECT name FROM sqlite_master WHERE type='table'",
- "AND name IN ('accounts','grants','rustup_verified_deposit_credits')"
+ "AND name IN ('accounts','users','rustup_game_paid_receipts','rustup_game_paid_refunds','rustup_game_paid_release_control')"
 ].join(' ');
 const GAME_COUNTS_SQL="SELECT 'account_rows' AS name,COUNT(*) AS n FROM accounts";
 const SETTINGS_SQL="SELECT channel,enabled FROM rustup_payment_settings WHERE channel IN ('master','stars','crypto')";
@@ -88,8 +88,8 @@ export function evaluateVariableStarsPrelaunch(x){
  const ps=tables(x.paymentTables,[
   'rustup_stars_variable_orders','rustup_payment_settings',
   'rustup_stars_refund_intents','rustup_stars_receipt_incidents']);
- const gs=tables(x.gameTables,['accounts','grants']);
- const ledger=x.gameTables.includes('rustup_verified_deposit_credits');
+ const gs=tables(x.gameTables,['accounts','users']);
+ const ledger=tables(x.gameTables,['rustup_game_paid_receipts','rustup_game_paid_refunds','rustup_game_paid_release_control']);
  const variableRefundSchema=x.paymentTables.includes('rustup_stars_variable_refund_intents');
  const financeAdmin=b.get('PAYMENT_ADMIN_IDS');
  const refundAdminReady=financeAdmin?.type==='plain_text'&&
@@ -119,7 +119,7 @@ export function evaluateVariableStarsPrelaunch(x){
   check('correct_existing_miniapp_origin',b.get('APP_URL')?.text===SITE),
   check('telegram_sdk_and_deposit_ui_published',
    x.siteHtml.includes('https://telegram.org/js/telegram-web-app.js?64')&&
-   x.siteHtml.includes('js/stars-deposit-v5.js?v=20261105deposit1')),
+   x.siteHtml.includes('js/stars-deposit-v5.js?v=20261106depositstatus1')),
   check('variable_payment_schema_present',ps),
   check('variable_refund_intent_schema',variableRefundSchema),
   check('verified_refund_operator_allowlist',refundAdminReady),
