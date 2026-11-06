@@ -69,25 +69,70 @@ export function diagnoseCompetingWorkerPublishers({
   readyForUnattendedPayments:false
  };
 }
-async function cloudflare(token,route){
- const resp=await fetch('https://api.cloudflare.com/client/v4'+route,{
+// If the local token cannot read account-wide Audit Logs, still examine the
+// latest deployed Worker and finance bindings. Publisher ownership stays UNKNOWN
+// and release must fail closed. No fabricated actor identities or all-clear.
+export function diagnoseWorkerBindingsWithoutAudit({deployments,bindings}={}){
+ if(!Array.isArray(deployments)||!Array.isArray(bindings))
+  throw Error('worker_binding_evidence_missing');
+ const published=deployments.filter(x=>x&&Number.isFinite(ms(x.created_on)))
+  .sort((a,b)=>ms(b.created_on)-ms(a.created_on));
+ if(!published.length)throw Error('worker_deployment_history_missing');
+ const db=bindings.find(x=>x.name==='PAYMENTS_DB');
+ const paymentDbBound=db?.type==='d1'&&
+  (db.id===REQUIRED_DB||db.database_id===REQUIRED_DB);
+ const paymentFlags=Object.fromEntries(EXPECTED_OFF.map(name=>{
+  const b=bindings.find(x=>x.name===name);
+  return [name,b?.type==='plain_text'&&b.text==='false'?'OFF':
+   b?.type==='plain_text'&&b.text==='true'?'ON':'MISSING'];
+ }));
+ const allPaymentFlagsOff=Object.values(paymentFlags).every(x=>x==='OFF');
+ return {
+  mode:'READ_ONLY_WORKER_PUBLISHER_AUDIT',
+  readOnly:true,changedWorker:false,changedPayments:false,
+  liveVersion:published[0]?.versions?.[0]?.version_id||null,
+  lastDeployment:published[0]?.created_on||null,
+  paymentDbBound,allPaymentFlagsOff,paymentFlags,
+  distinctRecentPublisherCount:null,recentDeployments:[],
+  publisherAudit:'UNAVAILABLE_ACCOUNT_SETTINGS_READ_REQUIRED',
+  blockers:[
+   ...(!paymentDbBound?['payment_d1_binding_was_overwritten']:[]),
+   ...(!allPaymentFlagsOff?['payment_flags_are_missing_or_unsafe']:[]),
+   'publisher_actor_audit_unavailable'
+  ],
+  hasConflictingDeployers:null,
+  readyForUnattendedPayments:false
+ };
+}
+async function cloudflare(token,route,scope,fetchImpl=fetch){
+ const resp=await fetchImpl('https://api.cloudflare.com/client/v4'+route,{
   headers:{authorization:'Bearer '+token},method:'GET',redirect:'error',
   signal:AbortSignal.timeout(25000)
  });
- if(!resp.ok)throw Error('cloudflare_read_http_'+resp.status);
+ if(!resp.ok)throw Error('cloudflare_'+scope+'_http_'+resp.status);
  const result=await resp.json();
- if(result.success!==true)throw Error('cloudflare_audit_read_failed');
+ if(result.success!==true)throw Error('cloudflare_'+scope+'_read_failed');
  return result.result;
 }
-export async function inspectWorkerPublishers(token){
+export async function inspectWorkerPublishers(token,fetchImpl=fetch){
  if(typeof token!=='string'||token.length<15)
   throw Error('local_cloudflare_login_required');
  const prefix='/accounts/'+ACCOUNT+'/workers/scripts/'+WORKER;
- const [deploy,settings,audit]=await Promise.all([
-  cloudflare(token,prefix+'/deployments'),
-  cloudflare(token,prefix+'/settings'),
-  cloudflare(token,'/accounts/'+ACCOUNT+'/audit_logs?per_page=100')
+ const [deploy,settings]=await Promise.all([
+  cloudflare(token,prefix+'/deployments','deployments',fetchImpl),
+  cloudflare(token,prefix+'/settings','settings',fetchImpl)
  ]);
+ let audit;
+ try{
+  audit=await cloudflare(token,'/accounts/'+ACCOUNT+
+   '/audit_logs?per_page=100','audit_logs',fetchImpl);
+ }catch(e){
+  if(e?.message==='cloudflare_audit_logs_http_403')
+   return diagnoseWorkerBindingsWithoutAudit({
+    deployments:deploy?.deployments,bindings:settings?.bindings
+   });
+  throw e;
+ }
  if(!Array.isArray(audit))throw Error('invalid_cloudflare_audit_history');
  return diagnoseCompetingWorkerPublishers({
   deployments:deploy?.deployments,auditLogs:audit,bindings:settings?.bindings
