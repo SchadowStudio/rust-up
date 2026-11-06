@@ -8,9 +8,9 @@ const host='https://rustup-bot.ttzoomrust.workers.dev';
 const origin='https://ttzoomrust-hub.github.io';
 const BOT='123456789:abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
 const ID=123456;
-function initData(user=ID){
+function initData(user=ID,secondsAgo=10){
  const params=new URLSearchParams({
-  auth_date:String(Math.floor(Date.now()/1000)-10),
+  auth_date:String(Math.floor(Date.now()/1000)-secondsAgo),
   user:JSON.stringify({id:user,first_name:'Offline'})
  });
  const data=[...params].sort(([a],[b])=>a.localeCompare(b))
@@ -171,4 +171,33 @@ test('D1 read error becomes generic 503 with no player or SQL disclosure',async(
   assert.doesNotMatch(body,/private sql|123456/);
   assert.equal(body.includes('deposit_history_unavailable'),true);
  }finally{f.close();}
+});
+
+test('sanitized 401 diagnostics distinguish expired from malformed Telegram auth',async()=>{
+ const f=db(),messages=[];
+ const originalWarn=console.warn;
+ console.warn=(...args)=>messages.push(args);
+ try{
+  const wrapped=wrapHistoryOnlyWorker(original().worker);
+  const malformed=await wrapped.fetch(req('/api/stars/variable/quote',{
+   body:JSON.stringify({initData:'forged',amountMinor:10000})
+  }),f.env,{});
+  const expired=await wrapped.fetch(req('/api/stars/variable/quote',{
+   body:JSON.stringify({initData:initData(ID,90000),amountMinor:10000})
+  }),f.env,{});
+  for(const response of [malformed,expired]){
+   assert.equal(response.status,401);
+   assert.deepEqual(await response.json(),
+    {ok:false,error:'telegram_auth_required'});
+  }
+  assert.deepEqual(messages,[
+   ['rustup_stars_auth_denied','quote','signature_or_format'],
+   ['rustup_stars_auth_denied','quote','expired']
+  ]);
+  const output=JSON.stringify(messages);
+  assert.doesNotMatch(output,/123456|hash=|initData|abcdefghijklmnopqrstuvwxyz/);
+ }finally{
+  console.warn=originalWarn;
+  f.close();
+ }
 });
