@@ -117,11 +117,13 @@ async function refund(orderId){
  assert(sent,'refund_not_confirmed');
  // Record provider success immediately, before game reversal; refund batch
  // can independently reconcile eventual game changes if this script crashes.
- await d1(PAY,"UPDATE rustup_stars_variable_orders SET status='refunded' "+
+ const refundMark=await d1(PAY,"UPDATE rustup_stars_variable_orders SET status='refunded' "+
   "WHERE id='"+orderId+"' AND status='paid'");
- await d1(PAY,"UPDATE rustup_stars_variable_refund_intents "+
+ assert(refundMark.meta?.changes===1,'provider_refunded_but_order_db_unconfirmed_manual_review');
+ const intentMark=await d1(PAY,"UPDATE rustup_stars_variable_refund_intents "+
   "SET state='completed',completed_at_ms="+Date.now()+
   " WHERE order_id='"+orderId+"' AND state='pending'");
+ assert(intentMark.meta?.changes===1,'provider_refunded_but_intent_db_unconfirmed_manual_review');
  // Independent Telegram verification may lag after the provider has refunded.
  try{await verifyTelegram(o,true);}
  catch(e){
