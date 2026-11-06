@@ -21,7 +21,14 @@ function liveModule(raw) {
 }
 function gitSecret(){
  if(process.env.CLOUDFLARE_API_TOKEN)return process.env.CLOUDFLARE_API_TOKEN;
- const raw=execFileSync('npx.cmd',['--yes','wrangler','auth','token','--json'],{
+ // Node 24 on Windows cannot spawn .cmd files directly via execFileSync.
+ // Run this fixed, non-user-controlled command through cmd.exe instead.
+ const isWindows=process.platform==='win32';
+ const command=isWindows?(process.env.ComSpec||'cmd.exe'):'npx';
+ const args=isWindows?
+  ['/d','/s','/c','npx --yes wrangler auth token --json']:
+  ['--yes','wrangler','auth','token','--json'];
+ const raw=execFileSync(command,args,{
   cwd:root,encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:60000});
  const token=JSON.parse(raw).token;
  if(typeof token!=='string'||token.length<15)throw Error('wrangler_login_required');
