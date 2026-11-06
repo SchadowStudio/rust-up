@@ -82,7 +82,7 @@ export function wrapHistoryOnlyWorker(original,{
       error?.message==='invalid_telegram_user'?'user':
       error?.message==='invalid_telegram_auth'?'signature_or_format':'other';
     console.warn('rustup_stars_auth_denied',path===QUOTE?'quote':'history',reason);
-    return json({ok:false,error:'telegram_auth_required'},401,permitted);
+    return json({ok:false,error:'telegram_auth_required',authReason:reason},401,permitted);
    }
    if(path===QUOTE){
     try{
