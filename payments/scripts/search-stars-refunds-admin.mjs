@@ -8,7 +8,7 @@ const args=process.argv.slice(2);
 function arg(name){const i=args.indexOf(name);return i<0?null:args[i+1];}
 function validDate(value,label,endOfDay=false){
  if(value==null)return null;
- if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))throw Error('invalid_'+label+'_use_YYYY-MM-DD');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error('invalid_'+label+'_use_YYYY-MM-DD');
  const time=Date.parse(value+'T00:00:00.000Z');
  if(!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==value)
   throw Error('invalid_'+label);
@@ -16,7 +16,7 @@ function validDate(value,label,endOfDay=false){
 }
 function strInt(value,name,{min=1,max=Number.MAX_SAFE_INTEGER}={}){
  if(value==null)return null;
- if(!/^[1-9]\\d*$/.test(value))throw Error('invalid_'+name);
+ if(!/^[1-9]\d*$/.test(value))throw Error('invalid_'+name);
  const n=Number(value);
  if(!Number.isSafeInteger(n)||n<min||n>max)throw Error('invalid_'+name);
  return n;
@@ -26,7 +26,7 @@ const stars=strInt(arg('--stars'),'stars',{max:1000000});
 const rub=arg('--rub');
 let rubMinor=null;
 if(rub!==null){
- if(!/^(?:[1-9]\\d{0,6})(?:\\.\\d{1,2})?$/.test(rub))throw Error('invalid_rub_use_1.83');
+ if(!/^(?:[1-9]\d{0,6})(?:\.\d{1,2})?$/.test(rub))throw Error('invalid_rub_use_1.83');
  const [a,b='']=rub.split('.');
  rubMinor=Number(a)*100+Number(b.padEnd(2,'0'));
 }
