@@ -152,8 +152,9 @@ test('SIGNED TELEGRAM USER: invoice -> confirmed receipt -> one canonical game c
  try{
   const initial=f.balance(USER);
   assert.equal(initial.canonical,10);
-  const unauthorized=await variableStarsApi(apiRequest('quote',{amountMinor:AMOUNT},OTHER),
-   f.env,f.fakeTelegram);
+  const unauthorized=await f.worker.fetch(apiRequest('quote',{
+   amountMinor:AMOUNT
+  },OTHER),f.env,{});
   // A valid Telegram identity outside the former pilot allowlist can quote.
   assert.equal((await unauthorized.json()).checkoutEnabled,true);
   assert.equal(f.calls.invoice,0);
