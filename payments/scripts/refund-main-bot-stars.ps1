@@ -21,7 +21,7 @@ try {
  node '.\payments\scripts\refund-main-bot-stars.mjs' --preflight $OrderId
  if($LASTEXITCODE -ne 0){
   Write-Host 'Refund was NOT attempted. Fix the above account or receipt issue first.' -ForegroundColor Yellow
-  return
+  exit 2
  }
  if([string]::IsNullOrWhiteSpace($env:RUSTUP_MAIN_BOT_TOKEN)){
   $secret=Read-Host 'Main bot @rustuper_bot token (hidden, never paste in chat)' -AsSecureString
