@@ -131,10 +131,20 @@ export function wrapCurrentStarsWebhook(original,{
    // returns 503 to trigger Telegram redelivery, never an implicit success.
    try{
     const handled=await receiveVariableStars(update,env,fetchImpl);
-    if(handled===true)
+    if(handled===true){
+     // Only after Telegram's signed webhook was validated and its paid
+     // receipt was durably journaled, request an early settlement attempt.
+     // The idempotent scheduled delivery queue remains the fallback.
+     if(update?.message?.successful_payment?.currency==='XTR'&&
+        typeof ctx?.waitUntil==='function'&&settlementWorkerAllowed(env)){
+      ctx.waitUntil(Promise.resolve().then(()=>settlePaidStars(env)).catch(e=>
+       console.error('Stars immediate settlement retry via cron',
+        String(e?.message||'error').slice(0,100))));
+     }
      return new Response('ok',{
       status:200,headers:{'cache-control':'no-store'}
      });
+    }
     throw Error('variable_stars_webhook_not_handled');
    }catch(e){
     console.error('RUST UP variable Stars webhook requires retry',
