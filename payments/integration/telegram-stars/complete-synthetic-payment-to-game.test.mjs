@@ -154,17 +154,19 @@ test('SIGNED TELEGRAM USER: invoice -> confirmed receipt -> one canonical game c
   assert.equal(initial.canonical,10);
   const unauthorized=await variableStarsApi(apiRequest('quote',{amountMinor:AMOUNT},OTHER),
    f.env,f.fakeTelegram);
-  assert.equal((await unauthorized.json()).checkoutEnabled,false);
-  const rejectedCheckout=await f.worker.fetch(apiRequest('checkout',{
-   amountMinor:AMOUNT,requestId:randomUUID()
-  },OTHER),f.env,{});
-  assert.equal(rejectedCheckout.status,503);
+  // A valid Telegram identity outside the former pilot allowlist can quote.
+  assert.equal((await unauthorized.json()).checkoutEnabled,true);
   assert.equal(f.calls.invoice,0);
   const overLimit=await f.worker.fetch(apiRequest('quote',{
    amountMinor:AMOUNT*2
   }),f.env,{});
   assert.equal(overLimit.status,200);
-  assert.equal((await overLimit.json()).checkoutEnabled,false);
+  const publicQuote=await overLimit.json();
+  assert.equal(publicQuote.checkoutEnabled,true);
+  assert.equal(publicQuote.priceStars,2);
+  // Quotes never charge or credit the account.
+  assert.equal(f.calls.invoice,0);
+  assert.deepEqual(f.balance(OTHER),{canonical:10,mirror:10,v:1});
   const quoted=await f.worker.fetch(apiRequest('quote',{amountMinor:AMOUNT}),f.env,{});
   assert.equal(quoted.status,200);
   const preview=await quoted.json();
