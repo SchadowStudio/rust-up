@@ -71,7 +71,7 @@ FROM rustup_stars_variable_orders o
 LEFT JOIN rustup_stars_variable_credit_quotes q ON q.order_id=o.id
 LEFT JOIN rustup_stars_variable_refund_intents i ON i.order_id=o.id
 LEFT JOIN rustup_stars_refund_reconciliation_done d ON d.order_id=o.id
-WHERE ${conditions.join(' AND ')} ORDER BY o.created_at_ms DESC LIMIT ?`;
+WHERE ${conditions.length?conditions.join(' AND '):'1=1'} ORDER BY o.created_at_ms DESC LIMIT ?`;
 params.push(limit);
 const rows=await d1(PAY,sql,params);
 if(!rows.length){console.log('No matching Stars orders.');process.exit(0);}
