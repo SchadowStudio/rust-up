@@ -1,0 +1,14 @@
+:root{color-scheme:dark;font-family:Rubik,system-ui,sans-serif;--red:#e5383b;--dim:#a4a6af}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 30% -20%,#5c111e 0%,transparent 55%),#09090d;color:#f5f5f8}
+main{max-width:670px;margin:0 auto;padding:22px 14px 58px}
+.brand{font-size:27px;font-weight:900;letter-spacing:-1px}.brand span{color:var(--red)}.brand small{font-size:11px;letter-spacing:1px;color:#ffcfce;background:#5d202a;padding:5px 8px;border-radius:24px}
+header p{margin:4px 0 22px;color:var(--dim)}h2{font-size:18px;margin:24px 0 10px}
+.summary,.product,.purchase{border:1px solid #ffffff27;border-radius:19px;background:linear-gradient(160deg,#ffffff17,#ffffff09);padding:16px;margin:10px 0;box-shadow:inset 0 1px #ffffff28,0 12px 30px #0005}
+.summary{border-left:4px solid #fb7f78}.summary p,.description,.detail,footer{font-size:12px;color:var(--dim);line-height:1.5}
+.product{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px}.product strong{font-size:15px}.product p{margin:6px 0 0}.price{color:#ffbdb9;font-weight:800}
+button{font:inherit;border:none;border-radius:13px;padding:11px 15px;color:#fff;font-weight:800;background:linear-gradient(180deg,#f56660,#b71d2b);cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#ffffff18;border:1px solid #ffffff23}
+.owned-text{white-space:pre-wrap;word-break:break-word;margin-top:12px;padding:13px;border-radius:12px;background:#ffffff0d;border:1px solid #ffffff20;font-size:13px}
+.empty{border:1px dashed #ffffff24;padding:20px;border-radius:15px;color:var(--dim);font-size:13px}
+footer{margin:30px 0 0;border-top:1px solid #ffffff18;padding-top:16px}a{color:#ffaaa7}
+#notice{display:block;padding:12px;border-radius:13px;background:#1d2029;margin:14px 0}#notice:empty{display:none}

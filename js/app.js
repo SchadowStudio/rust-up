@@ -71,7 +71,7 @@
   let usdRub = 81;                 // fallback until the Central Bank rate loads
   try { const r = JSON.parse(localStorage.getItem(RATE_KEY)); if (r && r.v > 0) usdRub = r.v; } catch (e) { /* no storage */ }
   const CURRENCIES = {
-    rub: { name: 'Рубли', sym: '₽', perCoin: () => COIN_USD * usdRub, dec: n => (n && Math.abs(n) < 100 ? 2 : 0),
+    rub: { name: 'Рубли', sym: '₽', perCoin: () => COIN_USD * usdRub, dec: () => 2,
       icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#2f7cf6"/><circle cx="10" cy="10" r="8.6" fill="#3d8bff"/><path d="M8.2 15V5.2h3a2.55 2.55 0 010 5.1H6.6M6.6 12.7h5" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
     usdt: { name: 'USDT', sym: 'USDT', perCoin: () => COIN_USD, dec: () => 2,
       icon: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="#26a17b"/><path d="M5.6 5.8h8.8M10 5.8v9.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><ellipse cx="10" cy="9.4" rx="4.7" ry="1.5" fill="none" stroke="#fff" stroke-width="1.1"/></svg>' },
@@ -607,7 +607,7 @@
   const DEP_METHODS = [
     ['rub', 'Рубли', 500, 0, ['sbp'], 'СБП и карты', ['SberPay', 'T-Pay', 'Банковская карта']],
     ['crypto', 'Криптовалюта', 10, 5, ['usdt', 'ton'], 'USDT · TON', ['@xRocket', '@CryptoBot', 'Кошелёк TON']],
-    ['gifts', 'Telegram и CS2', 10, 7, ['star', 'gift'], 'Звёзды, подарки, скины', ['Звёзды Telegram', 'Подарки и NFT', 'Скины CS2']]];
+    ['gifts', 'Telegram Stars', 10, 7, ['star'], 'Звёзды Telegram', ['Оплата через Telegram Stars']]];
   // [id, title, min ₽, fee %, icon, input label, placeholder]
   const WD_METHODS = [
     ['rub', 'Рубли', 2000, 5, 'card', 'Номер карты', '0000 0000 0000 0000'],
@@ -2118,6 +2118,11 @@
     if (!refAvailable() || !S.user || subsOk() || !casesLeft().length || Date.now() - subsCheckedAt < 10000) return;
     checkSubs().then(() => { if (subsOk()) { sfxWin(); toast('Подписки подтверждены — кейсы открыты!', 'success'); refreshCases(); } }).catch(() => {});
   }
+  // A confirmed game receipt from the Stars wallet triggers an immediate
+  // authenticated state load, not a client-side balance increment.
+  window.addEventListener('rustup:wallet-credit-confirmed', () => {
+    refreshAuthoritativeWallet(true);
+  });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && curPath().startsWith('/case')) { subsCheckedAt = 0; autoCheckSubs(); }
   });
@@ -2564,5 +2569,28 @@
     });
   }
   startGame();
+
+  // Keep the displayed wallet current when Telegram Stars settle or refunds
+  // reverse game credits while this Mini App is already open. Always obtain
+  // the authoritative server state; do not mutate a local wallet cache.
+  let walletRefreshBusy = false;
+  let walletRefreshAt = 0;
+  function refreshAuthoritativeWallet(force = false) {
+    if (!gameReady || document.hidden || walletRefreshBusy || releaseVisual ||
+        (!force && Date.now() - walletRefreshAt < 12000)) return;
+    walletRefreshBusy = true;
+    walletRefreshAt = Date.now();
+    api('load').then(d => {
+      if (!d.ok) return;
+      // api('load') already applies state and renders the header.
+      // Refresh the open wallet panel only if its route is active.
+      if (curPath().startsWith('/wallet')) route();
+    }).finally(() => { walletRefreshBusy = false; });
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshAuthoritativeWallet();
+  });
+  window.addEventListener('focus', refreshAuthoritativeWallet);
+  setInterval(refreshAuthoritativeWallet, 30000);
   setInterval(() => { renderHeader(); scheduleTgPromo(0); }, 60e3);
 })();

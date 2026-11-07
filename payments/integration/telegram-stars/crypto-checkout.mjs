@@ -67,8 +67,11 @@ export async function providerInvoice(env,order,fetchImpl) {
 // merchantRequestId is a durable UUID supplied by trusted merchant backend;
 // retries with this ID reuse the same blockchain invoice.
 export async function createExternalCryptoCheckout(env,{
-  verifiedExternalCustomerRef,merchantRequestId,sku,asset,fetchImpl=fetch
+  verifiedExternalCustomerRef,merchantRequestId,sku,asset,sourceChannel='external_store',fetchImpl=fetch
 }) {
+  // Reject third-party cryptocurrency purchases in Telegram Mini Apps/Bots.
+  if(sourceChannel==='telegram-miniapp'||sourceChannel==='telegram-bot')
+   throw Error('telegram_digital_goods_require_stars');
   if(env.EXTERNAL_CRYPTO_CHECKOUT_ENABLED!=='true')
     throw Error('external_crypto_checkout_disabled');
   if(!env.EXTERNAL_DB||!UUID.test(verifiedExternalCustomerRef||'')||

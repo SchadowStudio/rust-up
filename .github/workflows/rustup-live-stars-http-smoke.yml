@@ -1,0 +1,25 @@
+name: RUST UP live Stars safe HTTP smoke
+on:
+  push:
+    branches:
+      - feature/rustup-payment-admin-controls
+    paths:
+      - 'payments/scripts/live-stars-http-smoke.mjs'
+      - 'payments/scripts/stars-live-fx-preflight.mjs'
+      - '.github/workflows/rustup-live-stars-http-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify live Stars API rejects forged Telegram invoice access
+        run: node payments/scripts/live-stars-http-smoke.mjs
+      - name: Verify live RUB/USD quote can be frozen from two independent sources
+        run: node payments/scripts/stars-live-fx-preflight.mjs

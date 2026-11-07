@@ -1,0 +1,234 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {evaluateStarsSettlementSnapshot,inspectLiveStarsSettlement} from './audit-stars-settlement-readonly.mjs';
+const ORDER='123e4567-e89b-42d3-a456-426614174000';
+const CHARGE='secret-charge-private-01';
+const USER=123456789;
+const flags=['PAYMENT_PRODUCTION_ENABLED','STARS_PAYMENT_ENABLED',
+ 'STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
+ 'STARS_VARIABLE_TOPUP_ENABLED','STARS_VARIABLE_CREDIT_LEDGER_READY',
+ 'PAYMENT_WALLET_STRICT_MODE','STARS_GAME_CREDIT_SETTLEMENT_ENABLED',
+ 'STARS_GAME_CREDIT_REFUND_RECONCILIATION_ENABLED'];
+function fixture(){
+ return {
+  paymentTables:['rustup_stars_variable_orders','rustup_stars_variable_credit_quotes',
+   'rustup_stars_variable_refund_intents','rustup_stars_receipt_incidents',
+   'rustup_payment_settings'],
+  gameTables:['rustup_game_paid_receipts','rustup_game_paid_refunds',
+   'rustup_game_paid_release_control'],
+  orders:[{id:ORDER,telegram_user_id:USER,requested_amount_minor:100000,
+   price_stars:535,status:'paid',telegram_charge_id:CHARGE,
+   paid_at_ms:1794000000000}],
+  quotes:[{order_id:ORDER,telegram_user_id:USER,amount_minor:100000,
+   coin_cents:62500,quoted_at_ms:1793999999000}],
+  credits:[{source:'stars_variable',order_id:ORDER,receipt_id:CHARGE,
+   telegram_user_id:USER,amount_minor:100000,coin_cents:62500}],
+  refunds:[],incidents:[{value:0}],refundIntents:[],
+  controls:['master','stars','crypto'].map(channel=>({channel,enabled:0})),
+  bindings:[
+   {name:'DB',type:'d1',id:'9b0b533f-540a-4a25-a429-70ca8bd4e23d'},
+   {name:'PAYMENTS_DB',type:'d1',id:'06079270-a227-466a-9991-abd4201ec5f6'},
+   ...flags.map(name=>({name,type:'plain_text',text:'false'}))
+  ],
+  gameReleaseControl:{enabled:0,approval_reference:null,reviewed_at_ms:null}
+ };
+}
+test('matching records show consistency without claiming authorization to charge',()=>{
+ const s=evaluateStarsSettlementSnapshot(fixture());
+ assert.equal(s.allChecksPass,true);
+ assert.deepEqual(s.blockers,[]);
+ assert.equal(s.paymentOrderCounts.paid,1);
+ assert.equal(s.scanned.credits,1);
+ assert.equal(s.livePaymentApproval,false);
+ assert.equal(s.gameCreditReleaseApproved,false);
+ assert.equal(s.chargesCreated,false);
+ assert.equal(s.balancesChanged,false);
+ const serialized=JSON.stringify(s);
+ for(const secret of [ORDER,CHARGE,String(USER)])
+  assert.equal(serialized.includes(secret),false);
+});
+test('fixed-product checkout, refunds and variable credits must all be explicitly OFF',()=>{
+ for(const flag of ['STARS_FIXED_PRODUCTS_ENABLED','STARS_REFUNDS_ENABLED',
+  'STARS_VARIABLE_CREDIT_LEDGER_READY']){
+  const data=fixture();
+  data.bindings.find(b=>b.name===flag).text='true';
+  const report=evaluateStarsSettlementSnapshot(data);
+  assert.equal(report.allChecksPass,false);
+  assert.ok(report.blockers.includes('payments_not_safely_disabled'));
+ }
+});
+
+test('missing, incorrect or repeated D1 bindings cannot pass settlement audit',()=>{
+ for(const issue of ['missing','different_database']){
+  const data=fixture();
+  const found=data.bindings.find(b=>b.name==='PAYMENTS_DB');
+  if(issue==='missing')data.bindings=data.bindings.filter(b=>b!==found);
+  else found.id='incorrect-payment-database';
+  const report=evaluateStarsSettlementSnapshot(data);
+  assert.equal(report.databasesCorrect,false);
+  assert.ok(report.blockers.includes('game_or_payments_database_binding_incorrect'));
+ }
+ const repeated=fixture();
+ repeated.bindings.push({...repeated.bindings.find(b=>b.name==='DB')});
+ assert.throws(()=>evaluateStarsSettlementSnapshot(repeated),
+  /reconciliation_invalid_or_duplicate_worker_binding/);
+});
+
+test('a settlement-specific release flag unexpectedly ON is not safe',()=>{
+ const data=fixture();
+ data.bindings.find(b=>b.name==='STARS_GAME_CREDIT_SETTLEMENT_ENABLED').text='true';
+ const result=evaluateStarsSettlementSnapshot(data);
+ assert.equal(result.allChecksPass,false);
+ assert.ok(result.blockers.includes('payments_not_safely_disabled'));
+});
+
+test('records paid without credit, without immutable quote, or missing receipt',()=>{
+ const x=fixture();x.credits=[];x.quotes=[];x.orders[0].telegram_charge_id=null;
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.anomalies.paidWithoutCharge,1);
+ assert.equal(s.anomalies.paidMissingFrozenQuote,1);
+ assert.equal(s.anomalies.paidNotCredited,1);
+ assert.equal(s.allChecksPass,false);
+});
+test('bad ledger identity, receipt, or coin conversion triggers manual review',()=>{
+ const x=fixture();x.credits[0].receipt_id='different-charge';
+ x.credits[0].telegram_user_id=USER+1;
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.anomalies.creditedIdentityOrAmountMismatch,1);
+ assert.equal(s.allChecksPass,false);
+});
+test('confirmed refunded payment requires matching reversal when credit existed',()=>{
+ const x=fixture();x.orders[0].status='refunded';
+ let s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.anomalies.refundedButStillCredited,1);
+ x.refunds=[{source:'stars_variable',order_id:ORDER,receipt_id:CHARGE,
+  telegram_user_id:USER,coin_cents:62500}];
+ s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.allChecksPass,true);
+ assert.equal(s.anomalies.refundedButStillCredited,0);
+ x.refunds[0].coin_cents=62501;
+ s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.anomalies.refundedReversalConflict,1);
+});
+test('reversal against an unrefunded order is never accepted as reconciled',()=>{
+ const x=fixture();x.refunds=[{source:'stars_variable',order_id:ORDER,
+  receipt_id:CHARGE,telegram_user_id:USER,coin_cents:62500}];
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.anomalies.reversedWithoutRecordedRefund,1);
+ assert.equal(s.allChecksPass,false);
+});
+test('ledger release enabled or missing prevents calling read-only reconciliation safe',()=>{
+ const x=fixture();
+ x.gameReleaseControl.enabled=1;
+ let s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.gameLedgerGateOff,false);
+ assert.ok(s.blockers.includes('game_ledger_release_gate_not_verifiably_off'));
+ x.gameReleaseControl=null;
+ s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.gameLedgerGateOff,false);
+ assert.equal(s.allChecksPass,false);
+});
+
+test('missing game journal schema is not misreported as zero payments',()=>{
+ const x=fixture();x.gameTables=[];x.credits=[];x.refunds=[];
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.schema.gameLedgerReady,false);
+ assert.ok(s.blockers.includes('game_journal_schema_not_installed'));
+ assert.ok(s.blockers.includes('payment_ledger_or_refund_requires_review'));
+});
+test('unresolved operator refunds, quarantined charges and enabled payment gates block',()=>{
+ const x=fixture();x.incidents=[{value:2}];
+ x.refundIntents=[{state:'pending',total:1},{state:'manual_review',total:3}];
+ x.bindings[0].text='true';
+ x.controls[0].enabled=1;
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.receiptIncidents,2);
+ assert.equal(s.unresolvedRefundIntents,4);
+ assert.ok(s.blockers.includes('payments_not_safely_disabled'));
+ assert.ok(s.blockers.includes('payment_ledger_or_refund_requires_review'));
+});
+test('scans over 2,000 rows are explicitly incomplete, and duplicate ids reject',()=>{
+ const x=fixture();
+ x.orders=Array.from({length:2001},(_,i)=>({
+  ...x.orders[0],id:'order-'+i,status:'pending'
+ }));
+ const s=evaluateStarsSettlementSnapshot(x);
+ assert.equal(s.coverageComplete,false);
+ assert.ok(s.blockers.includes('read_only_scan_incomplete_more_than_2000_rows'));
+ const y=fixture();y.orders.push({...y.orders[0]});
+ assert.throws(()=>evaluateStarsSettlementSnapshot(y),
+  /duplicate_identifier/);
+});
+test('unknown schemas, counts or payment states fail closed',()=>{
+ const x=fixture();x.incidents=[{value:-1}];
+ assert.throws(()=>evaluateStarsSettlementSnapshot(x),/invalid_count/);
+ x.incidents=[{value:0}];x.orders[0].status='hijacked';
+ assert.throws(()=>evaluateStarsSettlementSnapshot(x),/unknown_payment_state/);
+ assert.throws(()=>evaluateStarsSettlementSnapshot({}),/incomplete_read_only_evidence/);
+});
+
+
+test('real read-only inspector queries all existing D1 optional quote, credit, refund and lock tables',async()=>{
+ const state=fixture();
+ const queries=[];
+ const gameId='9b0b533f-540a-4a25-a429-70ca8bd4e23d';
+ const paymentsId='06079270-a227-466a-9991-abd4201ec5f6';
+ const mockFetch=async (url,options)=>{
+  const uri=String(url);
+  if(uri.endsWith('/settings')){
+   assert.equal(options.method,'GET');
+   return {ok:true,json:async()=>({success:true,result:{bindings:state.bindings}})};
+  }
+  assert.equal(options.method,'POST');
+  const sql=JSON.parse(options.body).sql;
+  assert.match(sql,/^SELECT /);
+  const isGame=uri.includes(gameId),isPayment=uri.includes(paymentsId);
+  assert.ok(isGame||isPayment);
+  queries.push({isGame,isPayment,sql});
+  let rows;
+  if(sql.includes('FROM sqlite_master')){
+   rows=(isGame?state.gameTables:state.paymentTables).map(name=>({name}));
+  }else if(sql.includes('FROM rustup_stars_variable_orders')){
+   assert.ok(isPayment);rows=state.orders;
+  }else if(sql.includes('FROM rustup_stars_variable_credit_quotes')){
+   assert.ok(isPayment);rows=state.quotes;
+  }else if(sql.includes('FROM rustup_game_paid_receipts')){
+   assert.ok(isGame);rows=state.credits;
+  }else if(sql.includes('FROM rustup_game_paid_refunds')){
+   assert.ok(isGame);rows=state.refunds;
+  }else if(sql.includes('FROM rustup_game_paid_release_control')){
+   assert.ok(isGame);rows=[state.gameReleaseControl];
+  }else if(sql.includes('FROM rustup_stars_receipt_incidents')){
+   assert.ok(isPayment);rows=state.incidents;
+  }else if(sql.includes('FROM rustup_stars_variable_refund_intents')){
+   assert.ok(isPayment);rows=state.refundIntents;
+  }else if(sql.includes('FROM rustup_payment_settings')){
+   assert.ok(isPayment);rows=state.controls;
+  }else throw Error('UNEXPECTED_QUERY '+sql);
+  return {ok:true,json:async()=>({success:true,result:[{results:rows}]})};
+ };
+ const run=()=>inspectLiveStarsSettlement('local-test-token-no-real-credentials',mockFetch);
+ let report=await run();
+ assert.equal(report.allChecksPass,true);
+ assert.equal(report.gameLedgerGateOff,true);
+ assert.equal(report.scanned.orders,1);
+ assert.equal(report.scanned.frozenQuotes,1);
+ assert.equal(report.scanned.credits,1);
+ assert.equal(report.scanned.reversals,0);
+ for(const table of ['rustup_stars_variable_credit_quotes','rustup_game_paid_receipts',
+  'rustup_game_paid_refunds','rustup_game_paid_release_control']){
+  assert.equal(queries.some(q=>q.sql.includes('FROM '+table)),true,
+   'optional table was skipped: '+table);
+ }
+ state.credits=[];
+ report=await run();
+ assert.equal(report.allChecksPass,false);
+ assert.equal(report.anomalies.paidNotCredited,1);
+ assert.ok(report.blockers.includes('payment_ledger_or_refund_requires_review'));
+ state.credits=fixture().credits;
+ state.gameReleaseControl.enabled=1;
+ report=await run();
+ assert.equal(report.gameLedgerGateOff,false);
+ assert.ok(report.blockers.includes('game_ledger_release_gate_not_verifiably_off'));
+ assert.equal(JSON.stringify(report).includes('secret-charge-private-01'),false);
+});

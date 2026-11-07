@@ -52,8 +52,22 @@ test('Stars disabled by default without Telegram calls',async()=>{
     ()=>createStarsCheckout({STARS_PAYMENT_ENABLED:'false'},{verifiedTelegramUserId:123456,sku:'fixed_badge'}),
     /disabled/
   );
-  assert.deepEqual(await handleStarsUpdate({pre_checkout_query:q},{STARS_PAYMENT_ENABLED:'false'}),
+  assert.deepEqual(await handleStarsUpdate({message:{text:'/start'}},{STARS_PAYMENT_ENABLED:'false'}),
     {handled:false,disabled:true});
+});
+
+test('admin emergency off rejects a new Stars precheckout explicitly',async()=>{
+  let queried=false,answered=null;
+  const env={STARS_PAYMENT_ENABLED:'false',TG_STARS_BOT_TOKEN:'123:'+'a'.repeat(30),
+    DB:{prepare(){queried=true;throw Error('disabled_should_not_query_db');}}};
+  const fakeTelegram=async(_url,opt)=>{
+    answered=JSON.parse(opt.body);
+    return {ok:true,async json(){return {ok:true,result:true}}};
+  };
+  const result=await handleStarsUpdate({pre_checkout_query:q},env,fakeTelegram);
+  assert.equal(result.ok,false);
+  assert.equal(queried,false);
+  assert.deepEqual({ok:answered.ok,id:answered.pre_checkout_query_id},{ok:false,id:q.id});
 });
 
 function starsDb(){
@@ -190,4 +204,12 @@ test('only one Stars pre-checkout reservation, same query retries allowed',async
   assert.equal((await handleStarsUpdate({pre_checkout_query:{...q,id:'another'}},env,telegram)).ok,false);
   assert.equal(n,1);
   assert.deepEqual(replies.map(x=>x.ok),[true,true,false]);
+});
+
+
+test('external crypto refuses Telegram Mini App digital payment context',async()=>{
+ await assert.rejects(
+  ()=>createExternalCryptoCheckout({}, {sourceChannel:'telegram-miniapp'}),
+  /telegram_digital_goods_require_stars/
+ );
 });

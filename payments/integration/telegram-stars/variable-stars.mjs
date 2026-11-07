@@ -32,12 +32,29 @@ export function quoteVariableStars(amountMinor,env){
   };
 }
 
+async function ensureFrozenSettlementQuote(env,row,freezeQuote,now){
+ if(env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')
+  throw Error('variable_stars_paid_credit_ledger_disabled');
+ if(typeof freezeQuote!=='function')
+  throw Error('variable_stars_paid_quote_freezer_missing');
+ const quote=await freezeQuote({
+  orderId:row.id,verifiedTelegramUserId:row.telegram_user_id,
+  amountMinor:row.requested_amount_minor,now
+ });
+ if(quote?.orderId!==row.id||
+    quote?.amountMinor!==row.requested_amount_minor||
+    !Number.isSafeInteger(quote.coinCents)||quote.coinCents<=0)
+  throw Error('variable_stars_paid_quote_unconfirmed');
+}
+
 // verifiedTelegramUserId is produced only by server-authenticated initData.
 export async function createVariableStarsCheckout(env,{
-  verifiedTelegramUserId,amountMinor,requestId,now=Date.now(),fetchImpl=fetch
+  verifiedTelegramUserId,amountMinor,requestId,now=Date.now(),fetchImpl=fetch,
+  freezeQuote=null
 }){
   if(env.STARS_PAYMENT_ENABLED!=='true'||
-     env.STARS_VARIABLE_TOPUP_ENABLED!=='true')
+     env.STARS_VARIABLE_TOPUP_ENABLED!=='true'||
+     env.STARS_VARIABLE_CREDIT_LEDGER_READY!=='true')
     throw Error('variable_stars_checkout_disabled');
   if(!env.DB||!isPositiveSafe(verifiedTelegramUserId)||!UUID.test(requestId||''))
     throw Error('invalid_variable_stars_identity_or_request');
@@ -49,10 +66,12 @@ export async function createVariableStarsCheckout(env,{
     if(row.requested_amount_minor!==amountMinor||row.status!=='pending')
       throw Error('variable_stars_request_conflict');
     if(now>=row.expires_at_ms)throw Error('variable_stars_order_expired');
-    if(row.invoice_url)
+    if(row.invoice_url){
+      await ensureFrozenSettlementQuote(env,row,freezeQuote,now);
       return {orderId:row.id,invoiceUrl:row.invoice_url,
         requestedAmountMinor:row.requested_amount_minor,priceStars:row.price_stars,
         currency:'RUB',expiresAtMs:row.expires_at_ms,creditedToGame:false};
+    }
   }else{
     const id=crypto.randomUUID();
     try{
@@ -72,6 +91,9 @@ export async function createVariableStarsCheckout(env,{
     if(!row||row.status!=='pending'||row.requested_amount_minor!==amountMinor||
        now>=row.expires_at_ms)throw Error('variable_stars_concurrent_conflict');
   }
+  // Never request payment before an immutable, server-priced game credit quote
+  // is durable. D1 failures stop invoice creation instead of charging a user.
+  await ensureFrozenSettlementQuote(env,row,freezeQuote,now);
   // Persisted quote, not browser-controlled value, is the invoice authority.
   const link=await telegramApi(env,'createInvoiceLink',{
     title:'Цифровое пополнение',
@@ -105,7 +127,10 @@ export function validVariableStarsPrecheckout(row,q,now=Date.now()){
      (row.status==='checkout_approved'&&row.checkout_query_id===q.id))&&
     isPositiveSafe(q.from?.id)&&q.from.id===row.telegram_user_id&&
     q.currency==='XTR'&&q.total_amount===row.price_stars&&
-    q.invoice_payload===payload(row.id)&&row.expires_at_ms>now;
+    q.invoice_payload===payload(row.id)&&row.expires_at_ms>now&&
+    // A payment must never be approved without a durable invoice record.
+    typeof row.invoice_url==='string'&&
+    /^https:\/\/\S+$/.test(row.invoice_url)&&row.invoice_url.length<=1024;
 }
 export function validVariableStarsReceipt(row,msg){
   const pay=msg?.successful_payment;
@@ -119,6 +144,46 @@ export function validVariableStarsReceipt(row,msg){
     pay.telegram_payment_charge_id.length<=256;
 }
 
+// Persist unmatched or inconsistent XTR receipts for operator investigation.
+// An acknowledged incident must be durable, never a silently lost payment.
+export async function recordUnexpectedVariableStarsReceipt(db,msg,now=Date.now()){
+  const pay=msg?.successful_payment;
+  const charge=pay?.telegram_payment_charge_id;
+  if(!db?.prepare||!Number.isSafeInteger(now)||now<=0||
+     !Number.isSafeInteger(msg?.from?.id)||msg.from.id<=0||
+     typeof charge!=='string'||charge.length<1||charge.length>256||
+     pay.currency!=='XTR'||!Number.isSafeInteger(pay.total_amount)||
+     pay.total_amount<1||
+     typeof pay.invoice_payload!=='string'||!pay.invoice_payload.startsWith('v:'))
+    throw Error('variable_receipt_evidence_incomplete_retry');
+  const result=await db.prepare(
+    'INSERT OR IGNORE INTO rustup_stars_receipt_incidents '+
+    '(telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason,occurred_at_ms) '+
+    'VALUES(?,?,?,?,?,?)'
+  ).bind(charge,msg.from.id,pay.invoice_payload.slice(0,256),
+     pay.total_amount,'variable_receipt_mismatch',now).run();
+  // An ignored duplicate is safe: the prior incident must still be present.
+  if(result?.meta?.changes===1)return {stored:true,duplicate:false};
+  const existing=await db.prepare(
+    'SELECT telegram_charge_id,telegram_user_id,invoice_payload,price_stars,reason '+
+    'FROM rustup_stars_receipt_incidents WHERE telegram_charge_id=?'
+  ).bind(charge).first();
+  if(!existing||existing.telegram_user_id!==msg.from.id||
+     existing.invoice_payload!==pay.invoice_payload.slice(0,256)||
+     existing.price_stars!==pay.total_amount||
+     existing.reason!=='variable_receipt_mismatch')
+    throw Error('variable_receipt_incident_conflict_retry');
+  return {stored:true,duplicate:true};
+}
+
+// A second charge for an already paid invoice is not a harmless replay.
+// Preserve the evidence before acknowledging Telegram; never give it credit.
+async function quarantineVariableReceipt(db,msg,now){
+  const incident=await recordUnexpectedVariableStarsReceipt(db,msg,now);
+  return {handled:true,type:'variable_receipt',accepted:false,
+    incidentRecorded:incident.stored,creditedToGame:false};
+}
+
 export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=Date.now()){
   const q=update?.pre_checkout_query;
   if(q&&typeof q.invoice_payload==='string'&&q.invoice_payload.startsWith('v:')){
@@ -127,7 +192,23 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
       'SELECT * FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(id).first():null;
     let ok=env.STARS_VARIABLE_TOPUP_ENABLED==='true'&&
-      env.STARS_PAYMENT_ENABLED==='true'&&validVariableStarsPrecheckout(row,q,now);
+      env.STARS_PAYMENT_ENABLED==='true'&&
+      env.STARS_VARIABLE_CREDIT_LEDGER_READY==='true'&&
+      validVariableStarsPrecheckout(row,q,now);
+    if(ok){
+      try{
+        const immutable=await env.DB.prepare(
+          'SELECT telegram_user_id,amount_minor,coin_cents,quoted_at_ms '+
+          'FROM rustup_stars_variable_credit_quotes WHERE order_id=?'
+        ).bind(row.id).first();
+        ok=!!immutable&&immutable.telegram_user_id===row.telegram_user_id&&
+          immutable.amount_minor===row.requested_amount_minor&&
+          Number.isSafeInteger(immutable.coin_cents)&&immutable.coin_cents>0&&
+          Number.isSafeInteger(immutable.quoted_at_ms)&&
+          immutable.quoted_at_ms>=row.created_at_ms&&
+          immutable.quoted_at_ms<=now;
+      }catch{ok=false;}
+    }
     if(ok&&row.status==='pending'){
       try{
         const reservation=await env.DB.prepare(
@@ -148,18 +229,33 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
   const pay=msg?.successful_payment;
   if(pay&&typeof pay.invoice_payload==='string'&&pay.invoice_payload.startsWith('v:')){
     const id=fromPayload(pay.invoice_payload);
-    if(!id||!env.DB){
-      console.error('Unmatched Stars variable payment: invalid payload or DB unavailable');
+    if(!env.DB){
+      console.error('Variable Stars receipt cannot be recorded without D1');
       throw Error('variable_stars_receipt_unavailable');
+    }
+    if(!id){
+      // Telegram may have charged for an invalid/stale payload. Quarantine
+      // complete evidence rather than forever returning 503 for that charge.
+      return quarantineVariableReceipt(env.DB,msg,now);
     }
     const row=await env.DB.prepare(
       'SELECT * FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(id).first();
     if(!validVariableStarsReceipt(row,msg)){
-      console.error('Unmatched Stars variable receipt; investigate payment manually');
-      return {handled:true,type:'variable_receipt',accepted:false};
+      // Do not lose an unexpected payment or loop on Telegram webhook retries.
+      // Only acknowledge after an incident was saved in the isolated D1.
+      console.error('Unmatched Stars variable receipt recorded for operator review');
+      return quarantineVariableReceipt(env.DB,msg,now);
     }
     const charge=pay.telegram_payment_charge_id;
+    if(row.status==='paid'){
+      if(row.telegram_charge_id===charge)
+        return {handled:true,type:'variable_receipt',accepted:true,
+          duplicate:true,creditedToGame:false};
+      // Telegram can send an additional actual charge against the same invoice.
+      // It requires human refund/reconciliation, not an endless HTTP 503 loop.
+      return quarantineVariableReceipt(env.DB,msg,now);
+    }
     try{
       const result=await env.DB.prepare(
         "UPDATE rustup_stars_variable_orders SET status='paid',telegram_charge_id=?,paid_at_ms=? "+
@@ -169,22 +265,31 @@ export async function handleVariableStarsUpdate(update,env,fetchImpl=fetch,now=D
         return {handled:true,type:'variable_receipt',accepted:true,
           duplicate:false,creditedToGame:false,
           requestedAmountMinor:row.requested_amount_minor,currency:'RUB'};
-    }catch{
-      // Duplicate charge ID is rejected by UNIQUE. Other DB errors get retried.
+    }catch(error){
+      // Only a proven uniqueness collision may be quarantined. Transient D1
+      // errors MUST propagate so Telegram retries rather than losing a charge.
       const existing=await env.DB.prepare(
         'SELECT status,telegram_charge_id FROM rustup_stars_variable_orders WHERE id=?'
       ).bind(row.id).first();
-      if(existing?.status==='paid'&&existing.telegram_charge_id===charge)
-        return {handled:true,type:'variable_receipt',accepted:true,
-          duplicate:true,creditedToGame:false};
-      throw Error('variable_stars_receipt_conflict');
+      if(existing?.status==='paid'){
+        if(existing.telegram_charge_id===charge)
+          return {handled:true,type:'variable_receipt',accepted:true,
+            duplicate:true,creditedToGame:false};
+        return quarantineVariableReceipt(env.DB,msg,now);
+      }
+      if(/UNIQUE constraint failed[^\n]*telegram_charge_id/i.test(String(error?.message||'')))
+        return quarantineVariableReceipt(env.DB,msg,now);
+      throw Error('variable_stars_receipt_database_retry');
     }
     const old=await env.DB.prepare(
       'SELECT status,telegram_charge_id FROM rustup_stars_variable_orders WHERE id=?'
     ).bind(row.id).first();
-    if(old?.status==='paid'&&old.telegram_charge_id===charge)
-      return {handled:true,type:'variable_receipt',accepted:true,
-        duplicate:true,creditedToGame:false};
+    if(old?.status==='paid'){
+      if(old.telegram_charge_id===charge)
+        return {handled:true,type:'variable_receipt',accepted:true,
+          duplicate:true,creditedToGame:false};
+      return quarantineVariableReceipt(env.DB,msg,now);
+    }
     throw Error('variable_stars_receipt_state_conflict');
   }
   return {handled:false};

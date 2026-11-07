@@ -1,0 +1,16 @@
+{
+  "description": "Operator-selected RUST UP reference price for Telegram Stars invoices: 1 Star = 1.83 RUB exactly. Merchant-defined rate, not an official Telegram redemption/FX guarantee. Payments remain OFF until separately verified.",
+  "referenceDate": "2026-11-06",
+  "rubPerStarDecimal": "1.83",
+  "starsPerReferenceLot": 1000,
+  "rubMinorPerReferenceLot": 183000,
+  "STARS_MIN_RUB_MINOR": "100",
+  "STARS_MAX_RUB_MINOR": "100000000",
+  "STARS_RUB_MINOR_PER_STAR_NUM": "183000",
+  "STARS_RUB_MINOR_PER_STAR_DEN": "1000",
+  "invoiceRounding": "ceil to whole Star",
+  "liveCheckoutEnabled": false,
+  "gameWalletCreditEnabled": false,
+  "operatorApproved": true,
+  "approvalStatus": "OWNER_CONFIRMED_RATE_2026_11_06"
+}

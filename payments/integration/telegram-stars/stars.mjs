@@ -77,7 +77,8 @@ export async function telegramApi(env, method, body, fetchImpl) {
   const response = await fetchImpl('https://api.telegram.org/bot' +
     env.TG_STARS_BOT_TOKEN + '/' + method, {
       method: 'POST', headers: {'content-type': 'application/json'},
-      body: JSON.stringify(body), redirect: 'error'
+      // Telegram API should not redirect; manual prevents a 3xx from forwarding credentials.
+      body: JSON.stringify(body), redirect: 'manual'
     });
   if (!response.ok) throw Error('telegram_gateway_unavailable');
   const result = await response.json();
@@ -120,8 +121,14 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
     if (res.meta?.changes === 1)
       return {accepted:true,duplicate:false,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
   } catch {
-    // Unique charge conflict or storage failure must never credit the user.
-    return {accepted:false,reason:'database_conflict'};
+    // Distinguish an idempotent replay from a D1 failure. Never ACK a
+    // legitimate payment when the receipt could not be persisted.
+    const prior=await db.prepare(
+      'SELECT status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
+    ).bind(order.id).first();
+    if(prior?.status==='paid'&&prior.telegram_charge_id===charge)
+      return {accepted:true,duplicate:true,fulfillment:'MANUAL_FIXED_GOOD_ONLY'};
+    throw Error('stars_receipt_write_failed_retry');
   }
   const previous = await db.prepare(
     'SELECT status,telegram_charge_id FROM rustup_stars_orders WHERE id=?'
@@ -132,15 +139,18 @@ export async function saveReceipt(db, order, message, now = Date.now()) {
 }
 
 export async function handleStarsUpdate(update, env, fetchImpl = fetch) {
-  if (env.STARS_PAYMENT_ENABLED !== 'true')
+  // Keep recording legitimate already-approved payments after a switch-off.
+  // The switch must reject new precheckout requests, not lose paid receipts.
+  if (env.STARS_PAYMENT_ENABLED !== 'true' &&
+      !update?.pre_checkout_query && !update?.message?.successful_payment)
     return {handled:false,disabled:true};
   const q = update?.pre_checkout_query;
   if (q) {
-    const order = UUID.test(String(q.invoice_payload))
+    const order = env.STARS_PAYMENT_ENABLED === 'true' && UUID.test(String(q.invoice_payload))
       ? await env.DB.prepare(
         'SELECT id,telegram_user_id,price_stars,status,expires_at_ms,checkout_query_id FROM rustup_stars_orders WHERE id=?'
       ).bind(q.invoice_payload).first() : null;
-    let ok = validPreCheckout(order,q);
+    let ok = env.STARS_PAYMENT_ENABLED === 'true' && validPreCheckout(order,q);
     if(ok && order.status==='pending'){
       // Only one checkout query can be approved for a one-use invoice.
       // Concurrent payment attempts cannot both reserve this order.

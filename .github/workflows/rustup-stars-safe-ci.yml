@@ -1,0 +1,141 @@
+name: RUST UP Stars safe regression tests
+
+on:
+  push:
+    branches:
+      - feature/rustup-payment-admin-controls
+    paths:
+      - 'payments/**'
+      - '.github/workflows/rustup-stars-safe-ci.yml'
+  pull_request:
+    paths:
+      - 'payments/**'
+      - '.github/workflows/rustup-stars-safe-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-check:
+    name: Offline Mini App and payment guard regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Compile syntax without deploying
+        run: |
+          node --check payments/frontend/telegram-miniapp/stars-variable-wallet-v4.js
+          node --check payments/integration/telegram-stars/stars-variable-bridge.mjs
+          node --check payments/integration/telegram-stars/supporter-badge.mjs
+          node --check payments/frontend/telegram-miniapp/stars-variable-wallet-v4.js
+          node --check payments/scripts/publish-stars-ui-refresh.mjs
+          node --check payments/scripts/recover-current-stars-variable.mjs
+          node --check payments/scripts/check-stars-activation.mjs
+          node --check payments/scripts/prepare-stars-quote-preview.mjs
+          node --check payments/scripts/telegram-stars-test-env.mjs
+      - name: Test amount entry and existing website integration
+        run: |
+          node --test payments/scripts/stars-variable-wallet-ui.test.mjs payments/scripts/publish-stars-ui-refresh.test.mjs payments/scripts/publish-variable-stars-wallet.test.mjs
+      - name: Verify current website deposit panel safe version patch without publishing
+        run: |
+          node --check payments/scripts/prepare-current-deposit-wallet.mjs
+          node --test payments/scripts/prepare-current-deposit-wallet.test.mjs payments/scripts/publish-rustup-deposit-wallet.test.mjs
+
+      - name: Test current public demo wallet fixed-goods shop safety and publish version guards
+        run: |
+          node --test payments/scripts/publish-current-demo-stars-fixed-goods.test.mjs
+          node --test payments/scripts/release-current-fixed-goods-site.test.mjs
+      - name: Test isolated receipts, read-only audit, and fallback recovery
+        run: |
+          node --test payments/integration/telegram-stars/variable-payments.test.mjs payments/integration/telegram-stars/variable-refunds.test.mjs payments/integration/telegram-stars/stars-variable-bridge.test.mjs payments/scripts/audit-variable-stars.test.mjs payments/scripts/recover-current-stars-variable.test.mjs payments/scripts/check-stars-activation.test.mjs payments/scripts/variable-stars-prelaunch.test.mjs payments/scripts/prepare-stars-quote-preview.test.mjs payments/scripts/telegram-stars-test-env.test.mjs
+      - name: Verify player-visible deposits distinguish payment from game credit and refund
+        run: |
+          node --test payments/integration/telegram-stars/deposit-history-readonly.test.mjs
+          node --test payments/integration/telegram-stars/stars-variable-bridge.test.mjs
+
+      - name: Test supporter badge delivery, owner-only visibility and refund revocation
+        run: |
+          node --test payments/integration/telegram-stars/stars-sqlite-e2e.test.mjs payments/integration/telegram-stars/stars-terms.test.mjs
+          node --test payments/integration/telegram-stars/supporter-badge.test.mjs
+          node --test payments/frontend/telegram-miniapp/stars-supporter-ui.test.mjs payments/frontend/telegram-miniapp/stars-fixed-market-terms.test.mjs
+      - name: Test isolated atomic Stars settlement journal and independent Telegram receipt checks
+        run: |
+          node --test payments/integration/account-credit-ledger/atomic-game-credit.test.mjs payments/integration/account-credit-ledger/verified-stars-game-credit.test.mjs payments/integration/account-credit-ledger/frozen-game-coin-quote.test.mjs payments/integration/account-credit-ledger/trusted-rub-usd.test.mjs payments/integration/account-credit-ledger/verified-stars-game-refund.test.mjs
+      - name: Verify read-only variable Stars history is safely routed but checkout remains unreachable
+        run: |
+          node --test payments/integration/telegram-stars/stars-existing-worker-variable-history.test.mjs
+          node --test payments/integration/telegram-stars/stars-variable-webhook-routing.test.mjs
+          node --test payments/integration/telegram-stars/stars-variable-webhook-sqlite-e2e.test.mjs
+          node --check payments/integration/telegram-stars/stars-delivery-queue.mjs
+          node --test payments/integration/telegram-stars/stars-delivery-queue.test.mjs
+          node --check payments/integration/telegram-stars/stars-variable-webhook-wrapper.mjs
+          node --test payments/integration/telegram-stars/stars-variable-webhook-wrapper.test.mjs
+          node --test payments/integration/telegram-stars/complete-synthetic-payment-to-game.test.mjs
+          node --check payments/scripts/stage-current-stars-webhook-only.mjs
+          node --test payments/scripts/stage-current-stars-webhook-only.test.mjs
+          node --check payments/scripts/stage-current-rustup-dark-release.mjs
+          node --check payments/scripts/test-live-stars-readiness.mjs
+          node --test payments/scripts/stage-current-rustup-dark-release.test.mjs
+          node --check payments/scripts/verify-stars-webhook-only-live.mjs
+          node --test payments/scripts/verify-stars-webhook-only-live.test.mjs
+          node --test payments/scripts/release-current-stars-webhook-only.test.mjs
+      - name: Test source-map-free recovery and isolated read-only deposit history, no deploy
+        run: |
+          node --check payments/scripts/stage-history-only-compiled-worker.mjs
+          node --check payments/integration/telegram-stars/stars-history-only-wrapper.mjs
+          node --test payments/scripts/stage-history-only-compiled-worker.test.mjs
+          node --test payments/integration/telegram-stars/stars-history-only-wrapper.test.mjs
+          node --test payments/integration/telegram-stars/stars-owner-price-preview.test.mjs
+          node --check payments/scripts/stage-current-stars-owner-quote.mjs
+          node --test payments/scripts/stage-current-stars-owner-quote.test.mjs
+          node --check payments/scripts/verify-owner-stars-quote-live.mjs
+          node --test payments/scripts/verify-owner-stars-quote-live.test.mjs
+          node --check payments/scripts/probe-owner-stars-quote.mjs
+          node --test payments/scripts/probe-owner-stars-quote.test.mjs
+          node --check payments/scripts/verify-history-only-worker-release.mjs
+          node --test payments/scripts/verify-history-only-worker-release.test.mjs
+          node --check payments/scripts/probe-history-only-worker.mjs
+          node --test payments/scripts/probe-history-only-worker.test.mjs
+          node --test payments/scripts/release-history-only-worker.test.mjs
+          node --test payments/scripts/verify-deployed-history-only-worker.test.mjs
+      - name: Simulate complete Telegram receipt to player and refund with no live money or database
+        run: |
+          node --test payments/integration/account-credit-ledger/offline-settlement-cycle.test.mjs
+      - name: Verify public wallet app.js cache fix without publishing or altering money gates
+        run: |
+          node --check payments/scripts/refresh-current-deposit-app-cache.mjs
+          node --test payments/scripts/refresh-current-deposit-app-cache.test.mjs
+      - name: Verify current 19-module live Worker staging and OFF-mode deployment guards
+        run: |
+          node --test payments/scripts/stage-current-bot19-stars.test.mjs
+          node --test payments/scripts/stage-current-verified-worker.test.mjs
+      - name: Verify Cloudflare Worker publisher conflict audit without exposing identities
+        run: |
+          node --test payments/scripts/audit-worker-publishers.test.mjs
+      - name: Check live Worker source map and adapter presence without altering production
+        run: |
+          node --check payments/scripts/audit-current-live-worker.mjs
+          node --test payments/scripts/audit-current-live-worker.test.mjs
+      - name: Check source-map-free exact compiled Worker recovery with original named exports
+        run: |
+          node --check payments/scripts/stage-current-compiled-worker.mjs
+          node --test payments/scripts/stage-current-compiled-worker.test.mjs
+      - name: Verify read-only cross-D1 payment and game ledger reconciliation
+        run: |
+          node --test payments/scripts/audit-stars-settlement-readonly.test.mjs
+      - name: Review live D1 migration safety and account mirror consistency, without deployment
+        run: |
+          node --check payments/scripts/preflight-game-ledger-migration.mjs
+          node --test payments/scripts/preflight-game-ledger-migration.test.mjs
+      - name: Verify original admin recognition and aggregate-only balance audit
+        run: |
+          node --test payments/scripts/existing-admin-classification.test.mjs
+          node --test payments/scripts/audit-game-account-mirrors-readonly.test.mjs
+      - name: Verify account import guard without enabling money
+        run: |
+          node --test payments/integration/existing-game-state-sandbox/strict-first-login-guard.test.mjs

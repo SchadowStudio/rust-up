@@ -5,6 +5,7 @@ on:
     branches:
       - feature/self-hosted-crypto-payments
       - feature/rustup-payments-staging
+      - feature/rustup-payment-admin-controls
     paths:
       - 'payments/**'
       - '.github/workflows/crypto-payments-checks.yml'
@@ -27,3 +28,50 @@ jobs:
         run: cd payments && npm run test:local
       - name: Run isolated Telegram Stars and crypto checkout integration tests
         run: cd payments && node --test integration/telegram-stars/*.test.mjs
+      - name: Test isolated nonredeemable Stars and crypto game demo ledger
+        run: cd payments && node --test integration/demo-game-wallet/*.test.mjs
+      - name: Demonstrate sandbox Stars and crypto flow without real payments
+        run: node payments/scripts/demo-game-wallet.mjs
+      - name: Parse safe Stars Windows release helper without running it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'payments/scripts/release-safe-stars-reliability.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+      - name: Verify private bot recovery and patch scripts
+        run: |
+          node --check payments/scripts/recover-live-bot-source.mjs
+          node --check payments/scripts/patch-recovered-live-bot.mjs
+          node --test payments/scripts/recover-live-bot-source.test.mjs
+          node --check payments/scripts/prepare-live-bot-deployment.mjs
+          node --test payments/scripts/prepare-live-bot-deployment.test.mjs
+          node --check payments/scripts/patch-recovered-admin-panel.mjs
+          node --test payments/scripts/patch-recovered-admin-panel.test.mjs
+          node --check payments/scripts/check-live-admin-panel-release.mjs
+          node --test payments/scripts/check-live-admin-panel-release.test.mjs
+          node --check payments/scripts/patch-existing-support-admin-frontend.mjs
+          node --test payments/scripts/patch-existing-support-admin-frontend.test.mjs
+          node --check payments/frontend/support-admin/payments-tab.js
+          node --check payments/integration/telegram-stars/stars-live-bridge.mjs
+          node --check payments/integration/telegram-stars/stars-existing-worker-wrapper.mjs
+          node --check payments/integration/telegram-stars/worker.stars-entry.mjs
+          node --check payments/scripts/prepare-stars-recovered-worker.mjs
+          node --check payments/scripts/install-stars-shop.mjs
+          node --check payments/frontend/stars-shop/app.js
+          node --check payments/frontend/stars-shop/config.js
+          node --check payments/scripts/install-telegram-wallet-payments.mjs
+          node --test payments/scripts/install-telegram-wallet-payments.test.mjs
+          node --check payments/frontend/telegram-miniapp/stars-panel.js
+          node --check payments/scripts/refresh-staged-telegram-stars.mjs
+          node --check payments/scripts/retire-standalone-stars-shop.mjs
+          node --check payments/integration/telegram-stars/refunds.mjs
+          node --check payments/scripts/stage-stars-purchase-locks.mjs
+          node --check payments/scripts/check-telegram-wallet-bundle.mjs
+          node --check payments/scripts/add-safe-stars-worker-vars.mjs
+          node --check payments/scripts/stage-stars-invoice-replay.mjs
+          node --check payments/scripts/fix-wallet-stars-method-navigation.mjs
+          node --test payments/scripts/fix-wallet-stars-method-navigation.test.mjs
+          node --check payments/integration/telegram-stars/stars-telegram-shop.mjs
