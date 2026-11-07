@@ -33,18 +33,14 @@ if(!name||name.includes('/')||name.includes('\\'))throw Error('Unexpected module
 let source=part.slice(split+4).replace(/\r\n$/,'');
 if(!source.includes('function pilotStarsUserAllowed(')||!source.includes('function mayAcceptVariable('))
  throw Error('Unexpected current Stars integration');
-// The compiled live Worker contains two copies. The first is already patched,
-// but the active wrapper calls variableStarsApi2 and variableStarsWebhook2.
-// Patch ONLY the active second copy, preserving all payment safety gates.
-if(!source.includes('handleCheckout = variableStarsApi2')||
-   !source.includes('receiveVariableStars = variableStarsWebhook2'))
- throw Error('Unexpected active checkout wiring');
+// Cloudflare Workers reject redirect "error" in fetch. Keep redirects non-followed.
+// Only the FX-source fetch contains this option; all non-2xx results still fail closed.
+if(!source.includes('async function getText(url, fetchImpl)')||
+   !source.includes('async function readIndependentlyConfirmedRubUsdRate(')||
+   !source.includes('handleCheckout = variableStarsApi2'))
+ throw Error('Live FX/checkout contract changed');
 const replacements=[
- ['const enabled = pilotStarsUserAllowed2(env, identity.userId) && await mayAcceptVariable2(','const enabled = await mayAcceptVariable2('],
- ['checkoutEnabled: enabled && pilotStarsAmountAllowed2(env, quote.priceStars) && pilotStarsPhaseAllowed2(env, quote.priceStars)','checkoutEnabled: enabled'],
- ['if (!pilotStarsAmountAllowed2(env, preview.priceStars) || !pilotStarsPhaseAllowed2(env, preview.priceStars))\n      return json4({ ok: false, error: "topup_checkout_disabled" }, 503, allowed);','/* Public Stars checkout: no pilot amount, user-list or expiry restriction. */'],
- ['const pilotAllowed = !update?.pre_checkout_query || pilotStarsUserAllowed2(env, update.pre_checkout_query.from?.id) && pilotStarsAmountAllowed2(env, update.pre_checkout_query.total_amount) && pilotStarsPhaseAllowed2(env, update.pre_checkout_query.total_amount);','const pilotAllowed = true;'],
- ['const enabled = pilotAllowed && await mayAcceptVariable2(env, true);','const enabled = await mayAcceptVariable2(env, true);']
+ ['redirect: "error",','redirect: "manual",']
 ];
 for(const [oldCode,newCode] of replacements){
  if(source.split(oldCode).length!==2)throw Error('Source marker changed or not unique: '+oldCode.slice(0,65));
