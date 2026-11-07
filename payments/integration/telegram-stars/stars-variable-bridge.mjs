@@ -119,14 +119,11 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
  }catch{return json({ok:false,error:'telegram_auth_required'},401,allowed);}
  if(!env?.PAYMENTS_DB)
   return json({ok:false,error:'payment_database_missing'},503,allowed);
- const enabled=pilotStarsUserAllowed(env,identity.userId)&&
-  await mayAcceptVariable(env,typeof freezeQuote==='function');
+ const enabled=await mayAcceptVariable(env,typeof freezeQuote==='function');
  if(action==='quote'){
   try{
    const quote=quoteVariableStars(body?.amountMinor,env);
-   return json({ok:true,checkoutEnabled:enabled&&
-    pilotStarsAmountAllowed(env,quote.priceStars)&&
-    pilotStarsPhaseAllowed(env,quote.priceStars),...quote},200,allowed);
+   return json({ok:true,checkoutEnabled:enabled,...quote},200,allowed);
   }catch(e){
    return json({ok:false,error:e?.message==='variable_stars_amount_out_of_bounds'
     ?'invalid_amount_or_range':'conversion_not_configured'},422,allowed);
@@ -137,9 +134,8 @@ export async function variableStarsApi(request,env,fetchImpl=fetch,freezeQuote=n
   let preview;
   try {preview=quoteVariableStars(body?.amountMinor,env);}
   catch{return json({ok:false,error:'invalid_checkout'},400,allowed);}
-  if(!pilotStarsAmountAllowed(env,preview.priceStars)||
-     !pilotStarsPhaseAllowed(env,preview.priceStars))
-   return json({ok:false,error:'topup_checkout_disabled'},503,allowed);
+  // Pricing and provider bounds are validated by quoteVariableStars.
+  // Public checkout does not depend on pilot user, amount or expiry secrets.
   if(!Number.isSafeInteger(body?.amountMinor)||typeof body?.requestId!=='string')
    return json({ok:false,error:'invalid_checkout'},400,allowed);
   try{
@@ -176,11 +172,7 @@ export async function variableStarsWebhook(update,env,fetchImpl=fetch){
  if(!env?.PAYMENTS_DB)throw Error('payment_database_missing');
  // A paid receipt must still be journaled even after pilot permission is
  // revoked. Only new pre-checkout approvals need the allowlist.
- const pilotAllowed=!update?.pre_checkout_query||
-  (pilotStarsUserAllowed(env,update.pre_checkout_query.from?.id)&&
-   pilotStarsAmountAllowed(env,update.pre_checkout_query.total_amount)&&
-   pilotStarsPhaseAllowed(env,update.pre_checkout_query.total_amount));
- const enabled=pilotAllowed&&await mayAcceptVariable(env,true);
+ const enabled=await mayAcceptVariable(env,true);
  const outcome=await handleVariableStarsUpdate(
   update,paymentEnv(env,enabled),fetchImpl
  );
