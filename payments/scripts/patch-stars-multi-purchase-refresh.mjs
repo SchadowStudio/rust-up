@@ -76,9 +76,15 @@ const replacement=`  // Keep every paid invoice in the reconciliation queue. A s
    // An already confirmed receipt was handled; re-read the backend balance.
    await window.RUSTUP_APP?.api?.('load');
   }
-  document.addEventListener('visibilitychange',()=>{
-   if(!document.hidden)void refreshVisibleBalance();
-  });
+  window.__rustupStarsRefreshVisible=()=>{
+   if(panel.isConnected)void refreshVisibleBalance();
+  };
+  if(!window.__rustupStarsVisibilityListener){
+   window.__rustupStarsVisibilityListener=true;
+   document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)window.__rustupStarsRefreshVisible?.();
+   });
+  }
 `;
 source=source.slice(0,start)+replacement+source.slice(end);
 if(source===original.replace(/\r\n/g,'\n'))throw Error('No change');
