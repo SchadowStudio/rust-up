@@ -53,12 +53,15 @@ export async function freezeVerifiedStarsGameQuote(env,{
     !validInt(release.reviewed_at_ms,1,Number.MAX_SAFE_INTEGER))
   throw Error('stars_quote_freezer_game_release_disabled');
  const order=await env.PAYMENTS_DB.prepare(
-  'SELECT id,telegram_user_id,requested_amount_minor,status,created_at_ms,'+
+  'SELECT id,telegram_user_id,requested_amount_minor,price_stars,rate_num,rate_den,status,created_at_ms,'+
   'expires_at_ms FROM rustup_stars_variable_orders WHERE id=?'
  ).bind(orderId).first();
  if(!order||order.id!==orderId||
     order.telegram_user_id!==verifiedTelegramUserId||
     order.requested_amount_minor!==amountMinor||
+    !validInt(order.price_stars,1,1000000)||
+    !validInt(order.rate_num,1,Number.MAX_SAFE_INTEGER)||
+    !validInt(order.rate_den,1,Number.MAX_SAFE_INTEGER)||
     order.status!=='pending'||
     !validInt(order.created_at_ms,1,now)||
     !validInt(order.expires_at_ms,now+1,Number.MAX_SAFE_INTEGER))
@@ -83,7 +86,9 @@ export async function freezeVerifiedStarsGameQuote(env,{
   throw Error('stars_quote_freezer_player_balance_unavailable');
  // The calculation is a trusted server-owned component, never a client quote.
  const entitlement=await calculateEntitlement({
-  orderId,telegramUserId:verifiedTelegramUserId,amountMinor
+  orderId,telegramUserId:verifiedTelegramUserId,amountMinor,
+  priceStars:order.price_stars,rateNumerator:order.rate_num,
+  rateDenominator:order.rate_den
  });
  if(!validInt(entitlement?.coinCents,1,100000000)||
     !validInt(entitlement?.rubPerUsdMinor,1000,50000))
