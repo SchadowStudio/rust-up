@@ -8,7 +8,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {randomUUID,createHmac} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {variableStarsApi} from './stars-variable-bridge.mjs';
-import {wrapCurrentStarsWebhook} from './stars-variable-webhook-wrapper.mjs';
+import {wrapCurrentStarsWebhook,paidStarsRubMinor} from './stars-variable-webhook-wrapper.mjs';
 import {calculateRubGameCredit} from '../account-credit-ledger/freeze-verified-stars-game-quote.mjs';
 import {runVariableStarsDeliveryQueue} from './stars-delivery-queue.mjs';
 import {discoverVerifiedStarsRefunds,reconcileRecordedStarsRefundBatch}
@@ -130,8 +130,8 @@ function fixture(){
   async scheduled(){}
  },{
   fetchImpl:fakeTelegram,
-  calculateEntitlement:async({amountMinor})=>
-   calculateRubGameCredit({amountMinor,rubPerUsdMinor:FX})
+  calculateEntitlement:async({priceStars,rateNumerator,rateDenominator})=>
+   calculateRubGameCredit({amountMinor:paidStarsRubMinor({priceStars,rateNumerator,rateDenominator}),rubPerUsdMinor:FX})
  });
  const balance=id=>{
   const account=game.prepare('SELECT state,v FROM accounts WHERE id=?').get(id);
@@ -283,4 +283,13 @@ test('FORGED INITDATA cannot create a fake Telegram invoice or game credit',asyn
   assert.deepEqual(f.counts(),{receipts:0,refunds:0});
   assert.equal(f.balance(USER).canonical,10);
  }finally{f.close();}
+});
+
+
+test('Paid Stars define RUB value independently of a lower requested RUB amount',()=>{
+ assert.equal(paidStarsRubMinor({priceStars:1,rateNumerator:183000,rateDenominator:1000}),183);
+ assert.equal(paidStarsRubMinor({priceStars:5,rateNumerator:183000,rateDenominator:1000}),915);
+ assert.equal(paidStarsRubMinor({priceStars:10,rateNumerator:183000,rateDenominator:1000}),1830);
+ assert.throws(()=>paidStarsRubMinor({priceStars:1,rateNumerator:183001,rateDenominator:1000}),/fractional_kopeck/);
+ assert.throws(()=>paidStarsRubMinor({priceStars:1000000,rateNumerator:183000,rateDenominator:1000}),/out_of_range/);
 });
