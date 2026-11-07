@@ -33,19 +33,18 @@ if(!name||name.includes('/')||name.includes('\\'))throw Error('Unexpected module
 let source=part.slice(split+4).replace(/\r\n$/,'');
 if(!source.includes('function pilotStarsUserAllowed(')||!source.includes('function mayAcceptVariable('))
  throw Error('Unexpected current Stars integration');
-// Cloudflare Workers reject redirect "error" in fetch. Keep redirects non-followed.
-// Only the FX-source fetch contains this option; all non-2xx results still fail closed.
-if(!source.includes('async function getText(url, fetchImpl)')||
-   !source.includes('async function readIndependentlyConfirmedRubUsdRate(')||
-   !source.includes('handleCheckout = variableStarsApi2'))
- throw Error('Live FX/checkout contract changed');
-const replacements=[
- ['redirect: "error",','redirect: "manual",']
-];
-for(const [oldCode,newCode] of replacements){
- if(source.split(oldCode).length!==2)throw Error('Source marker changed or not unique: '+oldCode.slice(0,65));
- source=source.replace(oldCode,newCode);
-}
+// Route authenticated Stars deposit history through the actual Stars handler.
+// The current live bundle has two wrappers; only the second is active.
+const activeStart=source.indexOf('function wrapCurrentStarsWebhook2(');
+if(activeStart<0||!source.includes('handleCheckout = variableStarsApi2'))
+ throw Error('Active Stars wrapper missing');
+const oldRoute='if (url.pathname === "/api/stars/variable/checkout" || url.pathname === "/api/stars/variable/quote") {';
+const newRoute='if (url.pathname === "/api/stars/variable/checkout" || url.pathname === "/api/stars/variable/quote" || url.pathname === "/api/stars/variable/history") {';
+const active=source.slice(activeStart);
+if(active.split(oldRoute).length!==2)throw Error('Active Stars route marker changed or duplicated');
+source=source.slice(0,activeStart)+active.replace(oldRoute,newRoute);
+const replacements=[oldRoute]; // one precise replacement in active wrapper only
+
 const stage=resolve('.private','stars-public-release-'+originalVersion.slice(0,8));
 await mkdir(stage,{recursive:true});
 await writeFile(join(stage,name),source);
