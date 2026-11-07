@@ -10,7 +10,24 @@ import {runVariableStarsDeliveryQueue,settlementWorkerAllowed} from './stars-del
 import {reconcileRecordedStarsRefundBatch,discoverVerifiedStarsRefunds} from '../account-credit-ledger/verified-stars-game-refund.mjs';
 
 const WEBHOOK='/tg';
-async function trustedRubleEntitlement({amountMinor}){
+// Freeze the value of the number of Stars the user actually pays, not the
+// lower arbitrary requested RUB amount that was rounded up to whole Stars.
+// Uses immutable server-side order rate. Never trust a browser currency value.
+export function paidStarsRubMinor({priceStars,rateNumerator,rateDenominator}){
+ if(!Number.isSafeInteger(priceStars)||priceStars<1||priceStars>1000000||
+    !Number.isSafeInteger(rateNumerator)||rateNumerator<1||
+    !Number.isSafeInteger(rateDenominator)||rateDenominator<1)
+  throw Error('stars_paid_value_invalid');
+ const numerator=BigInt(priceStars)*BigInt(rateNumerator);
+ const divisor=BigInt(rateDenominator);
+ if(numerator%divisor!==0n)throw Error('stars_paid_value_fractional_kopeck');
+ const rubMinor=numerator/divisor;
+ if(rubMinor<100n||rubMinor>100000000n)
+  throw Error('stars_paid_value_out_of_range');
+ return Number(rubMinor);
+}
+async function trustedRubleEntitlement({priceStars,rateNumerator,rateDenominator}){
+ const amountMinor=paidStarsRubMinor({priceStars,rateNumerator,rateDenominator});
  const fx=await readIndependentlyConfirmedRubUsdRate();
  return calculateRubGameCredit({amountMinor,rubPerUsdMinor:fx.rubPerUsdMinor});
 }
